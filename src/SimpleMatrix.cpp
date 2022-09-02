@@ -9,7 +9,6 @@ template<class T> inline void SimpleMatrix<T>::resize(const unsigned int &xdim, 
 
 template<class T> inline std::__1::vector<T> SimpleMatrix<T>::operator[](const unsigned int &i) const
 { 
-    //std::cout << m.size() << "\n";
     assert(i<m.size());
     return m[i];
 }
