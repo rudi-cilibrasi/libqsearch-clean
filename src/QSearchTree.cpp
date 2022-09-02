@@ -4,6 +4,7 @@
 #include "QSearchNeighborList.hpp"
 #include "QSearchFullTree.hpp"
 #include "SimpleMatrix.hpp"
+#include "QSearchConnectedNode.hpp"
 
 QSearchTree::QSearchTree(int how_many_leaves)
 {
@@ -12,15 +13,14 @@ QSearchTree::QSearchTree(int how_many_leaves)
   int s = total_node_count;
   dist_calculated = false;
 
+  // move to initializer
   for (int i = 0; i < s; i += 1) {
     nodeflags.push_back( NULL );
   }
   must_recalculate_paths = true;
-  for (int i = 0; i < s; i += 1) {
-    n.push_back( std::unique_ptr< QSearchNeighborList >( new QSearchNeighborList ) );
-    spm.push_back( std::unique_ptr< std::vector< unsigned int > >( new std::vector< unsigned int >( s ) ) );
-  }
-  for (int i = 0; i < how_many_leaves - 2; i += 1) {
+  spm.resize(s,s);
+
+  for (int i = 0; i < how_many_leaves - 2; i++ ) {
     connect(i, how_many_leaves + i);
     if (i > 0)
       connect(i + how_many_leaves-1, i + how_many_leaves);
@@ -51,7 +51,7 @@ QSearchTree::QSearchTree(QSearchTree& q)
     n = q.n;    
 }
 
-QSearchTree::QSearchTree(QSearchTree& q, int howManyTries, const gsl_matrix& dm)
+QSearchTree::QSearchTree(QSearchTree& q, int howManyTries, const SimpleMatrix<unsigned int>& dm)
 {
     if (!dist_calculated) {
         calc_min_max(dm);
@@ -197,23 +197,23 @@ unsigned int QSearchTree::get_kernel_node_count()
   return (total_node_count-2)/2;
 }
 
-// possibly return unique pointer?
+// possibly return unique pointer? call by reference?
 SimpleMatrix< unsigned int> QSearchTree::get_adjacency_matrix()
 {
   int s = get_node_count();
-  gsl_matrix *m = gsl_matrix_calloc(s,s);
+  SimpleMatrix<unsigned int> m(s,s);
   int i, j;
   for (i = 0; i < s; i += 1) {
     for (j = i+1; j < s; j += 1) {
       int b = is_connected( i, j) ? 1 : 0;
-      gsl_matrix_set(m, i, j, b);
-      gsl_matrix_set(m, j, i, b);
+      m[i][j] = b;
+      m[j][i] = b;
     }
   }
   return m;
 }
 
-void QSearchTree::calc_min_max(const gsl_matrix& dm) {
+void QSearchTree::calc_min_max(const SimpleMatrix<unsigned int>& dm) {
     dist_min = 0;
     dist_max = 0;
     for (int i = 0; i < leaf_placement.size(); i += 1)
@@ -221,10 +221,10 @@ void QSearchTree::calc_min_max(const gsl_matrix& dm) {
             for (int k = j+1; k < leaf_placement.size(); k += 1)
                 for (int l = k+1; l < leaf_placement.size(); l += 1) {
                     double c1, c2, c3;
-                    c1  = gsl_matrix_get(dm, i, j) + gsl_matrix_get(dm, k, l);
-                    c2  = gsl_matrix_get(dm, i, k) + gsl_matrix_get(dm, j, l);
-                    c3  = gsl_matrix_get(dm, i, l) + gsl_matrix_get(dm, j, k);
-
+                    c1 = dm[i][j] + dm[k][l];
+                    c2 = dm[i][k] + dm[j][l];
+                    c1 = dm[i][l] + dm[j][k];
+ 
                     dist_min += std::min( c1, c2, c3 ); dist_max += std::max( c1, c2, c3 );
                 }
     // wheee!!
@@ -234,5 +234,110 @@ bool QSearchTree::is_connected(const unsigned int& a, const unsigned int& b)
 {
     assert(a >= 0 && b >= 0 && a < total_node_count && b < total_node_count);
     if (a == b) return false;
-    return a > b ? n[b]->has_neighbor(a) : n[b]->has_neighbor(a);
+    return a > b ? n[a].has_neighbor(b) : n[b].has_neighbor(a); // backwards?
+}
+
+bool QSearchTree::is_standard_tree()
+{
+  for (int i = 0; i < get_node_count(); i += 1) {
+    int nc = get_neighbor_count(i);
+    if (nc != 1 && nc != 3)
+      return false;
+  }
+  return true;
+}
+
+unsigned int QSearchTree::get_neighbor_count(const unsigned int& a) {
+  int acc = 0;
+  for (unsigned int i = 0; i < total_node_count; i += 1)
+    if (is_connected(i, a))
+      acc += 1;
+  return acc;
+}
+
+void QSearchTree::connect(const unsigned int& a, const unsigned int& b)
+{
+  assert(is_connected(a,b) == false);
+  assert(a != b);
+  if (a < b)
+    n[a].add_neighbor(b);
+  else
+    n[b].add_neighbor(a);
+  must_recalculate_paths = true;
+  f_score_good = false;
+}
+
+void QSearchTree::disconnect(const unsigned int& a, const unsigned int& b)
+{
+  assert(is_connected(a,b) == true);
+  assert(a != b);
+  if (a < b)
+    n[a].remove_neighbor(b);
+  else
+    n[b].remove_neighbor(a);
+  must_recalculate_paths = true;
+  f_score_good = false;
+}
+
+// changed to call by reference
+void QSearchTree::find_path(std::vector<unsigned int>& result, unsigned int a, unsigned int b) {
+  find_path_fast(result, a, b);
+}
+
+// changed argument order
+void QSearchTree::find_path_fast(std::vector<unsigned int>& result, unsigned int a, unsigned int b)
+{
+  assert(a >= 0 && b >= 0 && a < total_node_count && b < total_node_count);
+  freshen_spm();
+  
+  int step_counter = -1;
+  for (;;) {    
+    result.push_back(a);
+    step_counter += 1;
+    if (step_counter > total_node_count)
+      break;
+    if (a == b)
+      break;
+    a = spm[b][a];
+  }
+  if (a != b)
+    std::cout << "Error, broken path from " << a << " to " << b << " for tree.\n";
+}
+
+void QSearchTree::freshen_spm()
+{
+  //guint32 target;
+  if (!must_recalculate_paths)
+    return;
+  must_recalculate_paths = 0;
+  assert(total_node_count > 1);
+  //for (target = 0; target < total_node_count; target += 1)
+  //  qsearch_calculate_spm_for(clt, nodeflags, target);
+
+  QSearchConnectedNodeMap map(*this);
+    
+  int i,j;
+  for (i=0;i<total_node_count;++i) {  
+      auto& spm_connect = spm[i];
+      for (j=0;j<total_node_count; ++j) {
+         if (j==i) continue;
+         // path from j to i
+         spm_connect[j] = map[j].connections[ (int) map[j].node_branch[i] ]; 
+      }
+  }
+}
+
+bool QSearchTree::is_consistent_quartet(const int &a, const int &b, const int &c, const int &d)
+{
+  assert(get_neighbor_count(a) == 1);
+  assert(get_neighbor_count(b) == 1);
+  assert(get_neighbor_count(c) == 1);
+  assert(get_neighbor_count(d) == 1);
+  
+  for( auto flag : nodeflags) flag &= ~NODE_FLAG_QUARTETINT;
+  find_path_fast(p1, a, b);
+  for( auto node : p1 ) nodeflags[node] |= NODE_FLAG_QUARTETINT;
+  find_path_fast(p2, c, d);
+  for( auto node : p2 ) if( nodeflags[node] & NODE_FLAG_QUARTETINT) return false;
+  return true;
 }
