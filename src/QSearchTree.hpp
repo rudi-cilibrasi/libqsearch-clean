@@ -2,10 +2,18 @@
 #define __QSEARCHTREE_HPP
 
 #include <vector>
+#include "SimpleMatrix.hpp"
 
-template< class T> class SimpleMatrix;
 struct LabeledMatrix {};
-typedef int foo;
+
+#define CHUNKSIZE 1
+
+#define NODE_FLAG_FRINGE       0x01
+#define NODE_FLAG_DONE         0x02
+#define NODE_FLAG_NEXTFRINGE   0x04
+#define NODE_FLAG_QUARTETINT   0x08
+#define NODE_FLAG_ISWALKED     0x10
+#define NODE_FLAG_ISFLIPPED    0x20
 
 struct MutationStatistics {
   int total_complex_mutations;
@@ -35,10 +43,10 @@ struct QSearchTree {
   double dist_max;
   MutationStatistics ms;
   double score;
-  std::vector< std::unique_ptr< QSearchNeighborList > > n;   // could also use std::unique_ptr
+  std::vector< QSearchNeighborList > n;   
   std::vector< unsigned int > p1, p2;
-  std::vector< std::unique_ptr< std::vector< unsigned int > > > spm;
-  std::vector< std::unique_ptr< foo > > nodeflags;
+  SimpleMatrix<unsigned int > spm;
+  std::vector< unsigned int > nodeflags;
   std::vector< unsigned int > leaf_placement;
 
   // QSearchTree(); // should default constructor exist?
@@ -55,20 +63,23 @@ struct QSearchTree {
   unsigned int get_node_count();
   unsigned int get_leaf_node_count();
   unsigned int get_kernel_node_count();
-  SimpleMatrix<unsigned int>& get_adjacency_matrix();
+  SimpleMatrix<unsigned int> get_adjacency_matrix();
   bool is_connected(const unsigned int& a, const unsigned int& b);
   bool is_standard_tree();
-  int get_neighbor_count(const int& a);
-  void connect(const int& a, const int& b);
-  void disconnect(const int& a, const int& b);
-  std::vector<foo>& find_path(const int& a, const int& b);
+  unsigned int get_neighbor_count(const unsigned int& a);
+  void connect(const unsigned int& a, const unsigned int& b);
+  void disconnect(const unsigned int& a, const unsigned int& b);
+  void find_path(std::vector<unsigned int>& result, unsigned int a, unsigned int b);
+  void find_path_fast(std::vector<unsigned int>& result, unsigned int a, unsigned int b);
+  void freshen_spm();
   bool is_consistent_quartet(const int& a, const int& b, const int& c, const int& d);
-  double score_tree(const SimpleMatrix<unsigned int>& dm);
+
   int get_random_node(const int& what_kind);
   int get_random_node_but_not(const int& what_kind, const int& but_not);
   int find_path_length(const int& a, const int& b);
   int get_random_neighbor(const int& who);
-  std::vector<foo>& get_neighbors(const int& who);
+  // change to call by reference
+  std::vector<unsigned int>& get_neighbors(const int& who);
   bool is_valid_tree();
   void complex_mutation();
   void simple_mutation();
@@ -78,17 +89,19 @@ struct QSearchTree {
   void simple_mutation();
   bool can_subtree_transfer();
   bool can_subtree_interchange();
-  std::vector<foo>& walk_tree(const int& fromwhere, bool f_bfs);
-  std::vector<foo>& walk_tree_bfs(const int& fromwhere);
-  std::vector<foo>& walk_tree_dfs(const int& fromwhere);
+  // change to call by reference
+  std::vector<unsigned int>& walk_tree(const int& fromwhere, bool f_bfs);
+  std::vector<unsigned int>& walk_tree_bfs(const int& fromwhere);
+  std::vector<unsigned int>& walk_tree_dfs(const int& fromwhere);
   double calculate_order_cost(const SimpleMatrix<unsigned int> *dm);
   int get_column_number(const int& nodenum);
   int get_node_number(const int& columnnum);
   void mutate_order_simple();
   void mutate_order_complex();
   std::string to_s();
-  std::vector<foo>& flipped_node_order();
-  std::vector<foo>& walk_filtered(const int& fromwhere, const int& filterType);
+  // change to call by reference
+  std::vector<unsigned int>& flipped_node_order();
+  std::vector<unsigned int>& walk_filtered(const int& fromwhere, const int& filterType);
 
   /* Returns true if every node has exactly 1 or 3 neighbors */
   bool is_tree_ternary();
@@ -100,6 +113,10 @@ struct QSearchTree {
 
   void clear_all_connections();
   double read_from_dot(std::string treedot, LabeledMatrix& lm);
+
+  // are these functions called?
+  double score_tree(const SimpleMatrix<unsigned int>& dm);
+
 };
 
 class QLabeledTree {

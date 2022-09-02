@@ -1,3 +1,6 @@
+#ifndef __SIMPLE_MATRIX_HPP
+#define __SIMPLE_MATRIX_HPP
+
 #include <vector>
 #include <iostream>
 
@@ -11,6 +14,7 @@ public:
     SimpleMatrix(const unsigned int& xdim, const unsigned int& ydim) : m(xdim, std::vector<T>(ydim)) {}
 
     void resize(const unsigned int& xdim, const unsigned int& ydim);
-    std::vector<T> operator [](const unsigned int& i) const; 
+    std::vector<T>  operator [](const unsigned int& i) const; 
     std::vector<T>& operator [](const unsigned int& i); 
 };
+#endif // __SIMPLE_MATRIX_HPP
