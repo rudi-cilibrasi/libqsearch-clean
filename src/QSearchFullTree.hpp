@@ -3,20 +3,22 @@
 
 #include "QSearchTree.hpp"
 
+// roll into QSearchTree?
 struct QSearchFullTree {
     void*        data; // ?
     unsigned int node_count;
     double       raw_score;
 
-    QSearchFullTree(QSearchTree& clt, const gsl_matrix& dm); // was qsearch_make_fulltree()
+    QSearchFullTree(QSearchTree& clt, QMatrix<double>& dm); // was qsearch_make_fulltree()
     ~QSearchFullTree(); // was void qsearch_free_fulltree()
 
-    static void random_pair(int *A, int *B);    // from qsearch-tree.c
+    static void random_pair(unsigned int& A, unsigned int& B);    // from qsearch-tree.c
 
     void to_searchtree(QSearchTree& dest);
 
-    bool can_swap(int A, int B);
-    void swap_nodes(int A, int B, const gsl_matrix& dm);
+    bool can_swap(const unsigned int& A, const unsigned int& B);
+    void swap_nodes(const unsigned int& A, const unsigned int&, const QMatrix<unsigned int>& dm);
+    void swap_nodes(const unsigned int& A, const unsigned int& B);
                     
     unsigned int move_to(unsigned int from, unsigned int to);
     unsigned int find_sibling(unsigned int node, unsigned int ancestor);
