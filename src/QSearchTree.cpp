@@ -37,23 +37,24 @@ QSearchTree::QSearchTree(QMatrix<double>& dm_init) : dm( dm_init)
   }
 }
 
-/*
-QSearchTree::QSearchTree(QSearchTree& q)
-{
-    QSearchTree( q.get_leaf_node_count() ); 
-    must_recalculate_paths = true;
-    f_score_good = q.f_score_good;
-    score = q.score;
-    ms = q.ms;
-    ms.total_clonings += 1;
-    dist_calculated = q.dist_calculated;
-    dist_min = q.dist_min;
-    dist_max = q.dist_max;
-    leaf_placement = q.leaf_placement;
-    n = q.n;   
-    dm = q.dm; 
+QSearchTree::QSearchTree(const QSearchTree& q) : 
+  total_node_count(q.total_node_count), 
+  must_recalculate_paths(true), 
+  dist_calculated(q.dist_calculated),
+  score(q.score),
+  spm(q.spm),
+  f_score_good(false), 
+  dist_min(q.dist_min), 
+  dist_max(q.dist_max),
+  ms(q.ms), 
+  n(q.n),
+  nodeflags(q.nodeflags),
+  leaf_placement(q.leaf_placement),
+  dm(q.dm) 
+{  
+  ms.total_clonings++; 
 }
-*/
+
 // replaces qsearch_tree_find_better_tree()
 QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
 {
@@ -435,6 +436,20 @@ int QSearchTree::get_mutation_distribution_sample()
   std::default_random_engine generator;
   std::discrete_distribution<double> d(p.begin(),p.end());
   return d(generator)+1;
+}
+
+void QSearchTree::simple_mutation()
+{
+  bool hm = false;
+  int i;
+  do {
+    i = rand() % 3;
+    switch (i) {
+      case 0: simple_mutation_leaf_swap(); hm = true; break;
+      case 1: if (can_subtree_transfer()) { simple_mutation_subtree_transfer(); hm = true; } break;
+      case 2: if (can_subtree_interchange()) { simple_mutation_subtree_interchange(); hm = true; } break;
+    }
+  } while (!hm);
 }
 
 void QSearchTree::simple_mutation_leaf_swap()

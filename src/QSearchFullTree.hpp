@@ -16,8 +16,8 @@ struct QSearchFullTree {
 
     void to_searchtree(QSearchTree& dest);
 
-    bool can_swap(const unsigned int& A, const unsigned int& B);
-    void swap_nodes(const unsigned int& A, const unsigned int&, const QMatrix<unsigned int>& dm);
+    // bool can_swap(const unsigned int& A, const unsigned int& B); // deprecated - not called
+    void swap_nodes(const unsigned int& A, const unsigned int&, const QMatrix<double>& dm);
     void swap_nodes(const unsigned int& A, const unsigned int& B);
                     
     unsigned int move_to(unsigned int from, unsigned int to);

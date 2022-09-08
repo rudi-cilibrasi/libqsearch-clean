@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "SimpleMatrix.hpp"
+#include "QSearchNeighborList.hpp"
 
 #define CHUNKSIZE 1
 
@@ -43,7 +44,7 @@ struct QSearchTree {
   double score;
   std::vector< QSearchNeighborList > n;   
   node_list p1, p2;
-  QMatrix<unsigned int > spm;
+  QMatrix<unsigned int > spm; // Do we need to be copying this around?
   std::vector< unsigned int > nodeflags;
   node_list leaf_placement;
   // distance matrix
@@ -51,7 +52,8 @@ struct QSearchTree {
 
   // QSearchTree(); // should default constructor exist?
   QSearchTree(QMatrix<double>& dm_init);    // is how_many_leaves needed in C++?
-  //QSearchTree(QSearchTree& q) : dm( q.dm );  // copy constructor replaces clone()
+  QSearchTree(const QSearchTree& q);   
+  // copy constructor replaces clone()
   QSearchTree(QSearchTree& q, int howManyTries); // replaces qsearch_tree_find_better_tree()
   // qsearch_tree_free() would become ~QSearchTree()
   // however implicit destructor is all that is needed as C++ objects clean their own memory
