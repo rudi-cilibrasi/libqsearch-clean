@@ -438,6 +438,20 @@ int QSearchTree::get_mutation_distribution_sample()
   return d(generator)+1;
 }
 
+void QSearchTree::simple_mutation()
+{
+  bool hm = false;
+  int i;
+  do {
+    i = rand() % 3;
+    switch (i) {
+      case 0: simple_mutation_leaf_swap(); hm = true; break;
+      case 1: if (can_subtree_transfer()) { simple_mutation_subtree_transfer(); hm = true; } break;
+      case 2: if (can_subtree_interchange()) { simple_mutation_subtree_interchange(); hm = true; } break;
+    }
+  } while (!hm);
+}
+
 void QSearchTree::simple_mutation_leaf_swap()
 {
   unsigned int l1, l2;
