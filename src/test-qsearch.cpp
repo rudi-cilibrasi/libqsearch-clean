@@ -14,5 +14,5 @@ void testQMatrix()
 // for stand-alone test
 int main() {
   testQMatrix();
-  return 0;
+  return 1;
 }
