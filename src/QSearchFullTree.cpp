@@ -1,6 +1,8 @@
 
 #include "QSearchFullTree.hpp"
 
+#include <cassert>
+
 unsigned int QSearchFullTree::next_node(const unsigned int& from, const unsigned int& to) {
     return map[from].connections[ (int) map[from].node_branch[to] ];
 }

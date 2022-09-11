@@ -1,7 +1,8 @@
-
-#include <cmath> 
-#include "RandTools.hpp"
 #include "QSearchTree.hpp"
+#include <cmath> 
+#include <cassert>
+
+#include "RandTools.hpp"
 #include "QSearchNeighborList.hpp"
 #include "QSearchFullTree.hpp"
 #include "SimpleMatrix.hpp"

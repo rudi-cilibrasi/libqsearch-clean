@@ -3,6 +3,9 @@
 
 #include "QSearchTree.hpp"
 
+#include <functional>
+#include <memory>
+
 // callback function types
 typedef std::function< void () > start_fn;
 typedef std::function< void (QSearchTree&, QSearchTree&) > improve_fn;
