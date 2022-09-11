@@ -31,7 +31,7 @@ typedef enum {
   NODE_TYPE_ALL
 } node_type;
 
-typedef std::vector< unsigned int > node_list;
+typedef std::vector< unsigned int > NodeList;
 
 struct QSearchTree {
   int total_node_count;
@@ -43,10 +43,10 @@ struct QSearchTree {
   MutationStatistics ms;
   double score;
   std::vector< QSearchNeighborList > n;   
-  node_list p1, p2;
+  NodeList p1, p2;
   QMatrix<unsigned int > spm; // Do we need to be copying this around?
   std::vector< unsigned int > nodeflags;
-  node_list leaf_placement;
+  NodeList leaf_placement;
   // distance matrix
   QMatrix<double>& dm; // Using reference here as we don't want to be copying this big matrix a lot
 
@@ -73,8 +73,8 @@ struct QSearchTree {
   unsigned int get_neighbor_count(const unsigned int& a);
   void connect(const unsigned int& a, const unsigned int& b);
   void disconnect(const unsigned int& a, const unsigned int& b);
-  void find_path(node_list& result, unsigned int a, unsigned int b);
-  void find_path_fast(node_list& result, unsigned int a, unsigned int b);
+  void find_path(NodeList& result, unsigned int a, unsigned int b);
+  void find_path_fast(NodeList& result, unsigned int a, unsigned int b);
   unsigned int find_path_length(unsigned int& a, unsigned int& b);
   void freshen_spm();
   bool is_consistent_quartet(unsigned int& a, unsigned int& b, unsigned int& c, unsigned int& d);
@@ -82,7 +82,7 @@ struct QSearchTree {
   unsigned int get_random_node_but_not(const node_type& what_kind, const unsigned int& but_not);
   unsigned int get_random_neighbor(const unsigned int& who);
   // obsolete?
-    void get_neighbors(node_list& neighbors, const unsigned int& who); // changed to call by reference
+    void get_neighbors(NodeList& neighbors, const unsigned int& who); // changed to call by reference
   bool is_valid_tree();
   void complex_mutation();
   int get_mutation_distribution_sample();
@@ -93,27 +93,27 @@ struct QSearchTree {
   bool can_subtree_transfer();
   bool can_subtree_interchange();
   // changed to call by reference - use iterator?
-  void walk_tree(node_list& result, const unsigned int& fromwhere, bool f_bfs);  
-  void walk_tree_bfs(node_list& result, const unsigned int& fromwhere);
-  void walk_tree_dfs(node_list& result, const unsigned int& fromwhere);
+  void walk_tree(NodeList& result, const unsigned int& fromwhere, bool f_bfs);  
+  void walk_tree_bfs(NodeList& result, const unsigned int& fromwhere);
+  void walk_tree_dfs(NodeList& result, const unsigned int& fromwhere);
   double calculate_order_cost();
   unsigned int get_column_number(const unsigned int& nodenum);
   // unsigned int get_node_number(const int& columnnum); // deprecated - not called
   void mutate_order_simple();
   void mutate_order_complex();
-  void flipped_node_order(node_list& nodes);  // changed to call by reference
-  void walk_filtered(node_list& nodes, const int& fromwhere, const int& filterType);
+  void flipped_node_order(NodeList& nodes);  // changed to call by reference
+  void walk_filtered(NodeList& nodes, const int& fromwhere, const int& filterType);
   bool is_tree_ternary(); // Returns true if every node has exactly 1 or 3 neighbors
   // Sets the "connectedness" state (TRUE or FALSE) between nodes a and b and
   // returns the old connectedness status that was overwritten.
   bool set_connected(const unsigned int& a, const unsigned int& b, bool newconstate);
   void clear_all_connections();
-  // deferred. Is dm needed? Could this be constructor?
-    double read_from_dot(std::string treedot, QMatrix<unsigned int>& dm);  
   double score_tree();
   // double score_tree_fast(); - deprecated - not called
   double score_tree_fast_v2();
 
+  // deferred. Is dm needed? Could this be constructor?
+    double read_from_dot(std::string treedot, QMatrix<unsigned int>& dm);  
   // from QLabeledTree - deferred
     std::string to_dot();
     std::string to_nexus();

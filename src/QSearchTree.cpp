@@ -82,7 +82,7 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
     cand.reset( new QSearchTree( q ) );
      
     //qsearch_tree_complex_mutation(cand);
-    QSearchFullTree tree(*cand, dm);
+    QSearchFullTree tree(*cand);
 
     // perform node_count swaps, keep track of best
     best_score = tree.raw_score;
@@ -103,7 +103,7 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
             tree.swap_nodes(p1, p2);
             
             if (tree.raw_score <= best_score || fabs(tree.raw_score - best_score) < 1e-6) { 
-                tree.to_searchtree(*cand);
+                cand.reset( new QSearchTree( tree.to_searchtree() ) );
                 best_score = tree.raw_score;
                 //printf("Score improved from %f to %f, raw: %f \n", curscore, cand->score, tree.raw_score);
             }
@@ -125,7 +125,7 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
             tree.swap_nodes(interior, p2);
             
             if (tree.raw_score <= best_score || fabs(tree.raw_score - best_score) < 1e-6) { 
-                tree.to_searchtree(*cand);
+                cand.reset( new QSearchTree( tree.to_searchtree() ) );
                 best_score = tree.raw_score;
                 //printf("Score improved from %f to %f, raw: %f \n", curscore, cand->score, tree.raw_score);
             }
@@ -137,7 +137,7 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
             assert( tree.find_sibling(p1, sibling) == p2);
 
             if (tree.raw_score <= best_score || fabs(tree.raw_score - best_score) < 1e-6) { 
-                tree.to_searchtree(*cand);
+                cand.reset( new QSearchTree( tree.to_searchtree() ) );
                 best_score = tree.raw_score;
                 //printf("Score improved from %f to %f, raw: %f \n", curscore, cand->score, tree.raw_score);
             }
@@ -285,12 +285,12 @@ void QSearchTree::disconnect(const unsigned int& a, const unsigned int& b)
 }
 
 // changed to call by reference
-void QSearchTree::find_path(node_list& result, unsigned int a, unsigned int b) {
+void QSearchTree::find_path(NodeList& result, unsigned int a, unsigned int b) {
   find_path_fast(result, a, b);
 }
 
 // changed argument order
-void QSearchTree::find_path_fast(node_list& result, unsigned int a, unsigned int b)
+void QSearchTree::find_path_fast(NodeList& result, unsigned int a, unsigned int b)
 {
   assert(a >= 0 && b >= 0 && a < total_node_count && b < total_node_count);
   freshen_spm();
@@ -378,13 +378,13 @@ unsigned int QSearchTree::get_random_node_but_not(const node_type& what_kind, co
 unsigned int QSearchTree::get_random_neighbor(const unsigned int& who)
 {
   unsigned int result;
-  node_list neighbors;
+  NodeList neighbors;
   get_neighbors(neighbors, who);
   result = neighbors[ rand_int( 0, neighbors.size() ) ];
   return result;
 }
 
-void QSearchTree::get_neighbors(node_list& neighbors, const unsigned int &who) {
+void QSearchTree::get_neighbors(NodeList& neighbors, const unsigned int &who) {
   for (int i = 0; i < total_node_count; i++) 
     if (is_connected(i, who)) neighbors.push_back(i);
 }
@@ -470,7 +470,7 @@ void QSearchTree::simple_mutation_subtree_transfer()
     k1 = get_random_node(NODE_TYPE_ALL);
     k2 = get_random_node_but_not(NODE_TYPE_KERNEL, k1);
   } while (find_path_length(k1, k2) <= 2);
-  node_list path, neighbors; 
+  NodeList path, neighbors; 
   find_path(path, k1, k2);
   i1 = path[1];
   disconnect(k1, i1);
@@ -498,7 +498,7 @@ void QSearchTree::simple_mutation_subtree_interchange()
     k1 = get_random_node(NODE_TYPE_KERNEL);
     k2 = get_random_node_but_not(NODE_TYPE_KERNEL, k1);
   } while (find_path_length(k1, k2) <= 3);
-  node_list path; 
+  NodeList path; 
   find_path(path, k1, k2);
   n1 = path[1];
   n2 = path[path.size()-2];
@@ -519,9 +519,9 @@ bool QSearchTree::can_subtree_interchange()
   return (total_node_count >= 11);
 }
 
-void QSearchTree::walk_tree(node_list& result, const unsigned int& fromwhere, bool f_bfs)
+void QSearchTree::walk_tree(NodeList& result, const unsigned int& fromwhere, bool f_bfs)
 {
-  node_list todo;
+  NodeList todo;
   unsigned int d = 0, s = total_node_count, v = fromwhere;
   todo.push_back(v);
   for (unsigned int i = 0; i < s; i += 1) nodeflags[i] &= ~NODE_FLAG_ISWALKED;
@@ -533,7 +533,7 @@ void QSearchTree::walk_tree(node_list& result, const unsigned int& fromwhere, bo
     result.push_back(nextguy);
     nodeflags[nextguy] |= NODE_FLAG_ISWALKED;
     d += 1;
-    node_list nlist;
+    NodeList nlist;
     get_neighbors(nlist, nextguy);
     if (nlist.size() == 3 && ((nodeflags[nextguy] & NODE_FLAG_ISFLIPPED) != 0))
       { std::reverse(nlist.begin(), nlist.end()); }
@@ -546,12 +546,12 @@ void QSearchTree::walk_tree(node_list& result, const unsigned int& fromwhere, bo
   }
 }
 
-  void QSearchTree::walk_tree_bfs(node_list& result, const unsigned int& fromwhere)
+  void QSearchTree::walk_tree_bfs(NodeList& result, const unsigned int& fromwhere)
 {
   walk_tree(result, fromwhere, true);
 }
 
-  void QSearchTree::walk_tree_dfs(node_list& result, const unsigned int& fromwhere)
+  void QSearchTree::walk_tree_dfs(NodeList& result, const unsigned int& fromwhere)
 {
   walk_tree(result, fromwhere, false);
 }
@@ -560,7 +560,7 @@ double QSearchTree::calculate_order_cost()
 {
   int i;
   double acc = 0.0;
-  node_list res, bres; 
+  NodeList res, bres; 
   flipped_node_order(bres);
   for (i = 0; i < bres.size(); i += 1) {
     unsigned int a;
@@ -607,7 +607,7 @@ void QSearchTree::mutate_order_complex()
   ms.total_order_complex_mutations += 1;
 }
 
-void QSearchTree::flipped_node_order(node_list& nodes)  
+void QSearchTree::flipped_node_order(NodeList& nodes)  
 {
   walk_tree_dfs(nodes, 0);
 }
@@ -769,7 +769,8 @@ if(0) // will skip loop
             dm2[leaf_placement[i]][leaf_placement[j]] = dm[i][j];
           }
       }
-      QSearchFullTree tree(*this, dm2);
+      QSearchFullTree tree(*this);
+      tree.dm = dm2;
       printf("Raw scores %f %f\n", score2, tree.raw_score);
       exit(0);
   }
