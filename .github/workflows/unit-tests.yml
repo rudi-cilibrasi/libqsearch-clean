@@ -9,15 +9,7 @@ jobs:
         - uses: actions/checkout@v2
         
         - name: Build libqsearch-clean:latest docker image
-          uses: whoan/docker-build-with-cache-action@v5
-          with:
-            username: rudi-cilibrasi
-            password: "${{ secrets.GITHUB_TOKEN }}"
-            registry: docker.pkg.github.com
-            image_name: libqsearch-clean
-
-        - name: Tag cached docker image
-          run: docker tag docker.pkg.github.com/rudi-cilibrasi/libqsearch-clean/libqsearch-clean:latest libqsearch-clean:latest
+          run: docker build -t libqsearch-clean .
 
         - name: Run build
           run: docker run --rm libqsearch-clean:latest ./runtests --build
