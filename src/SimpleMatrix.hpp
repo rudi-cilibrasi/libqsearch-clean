@@ -5,45 +5,31 @@
 #include <optional>
 #include <iostream>
 
+typedef std::vector<std::string> StringList;
+
+// Breaks a string up into a vector of substrings wherever separated by a given character
+void segment_string( StringList& v, const std::string& s, const unsigned char c );
+
 // Minimal matrix class supports only storage and retrieval of data
 // No matrix math, but it could be extended to include this
 template<class T> struct QMatrix {
     std::vector< std::vector<T> > m;
-    std::optional< std::vector<std::string> > labels;
+    StringList labels;
     unsigned int dim;   // matrix constrained to be square
 
-    QMatrix() : dim(0), labels(std::nullopt), m() {}
-    QMatrix(const unsigned int& dim_init, std::optional< std::vector<std::string> > labels_init = std::nullopt ) 
+    QMatrix() : dim(0), labels(), m() {}
+    QMatrix(const unsigned int& dim_init ) 
+        : dim(dim_init), labels(), m(dim_init, std::vector<T>(dim_init)) {}
+    QMatrix(const unsigned int& dim_init, const StringList& labels_init) 
         : dim(dim_init), labels(labels_init), m(dim_init, std::vector<T>(dim_init)) {}
 
     std::vector<T>  operator [](const unsigned int& i) const; 
     std::vector<T>& operator [](const unsigned int& i);
-    //friend std::ostream& operator<< <T> (std::ostream& os, const QMatrix<T>& q);
 
+    bool has_labels();
     void to_string(std::string& s);
     void from_string( const std::string& s );
     void resize(const unsigned int& new_dim);
 };
-
-/*
-template< class T > std::ostream& operator<< (std::ostream& os, const QMatrix<T>& q)
-{ 
-    if( q.labels.has_value() ) {
-        auto label_it = q.labels.begin();
-        for( auto v : q.m ) {
-            os << *label_it;
-            for( auto a : v ) os << " " << a;
-            os << "\n";
-            label_it++;
-        }
-    }
-    else {
-        for( auto v : q.m ) {
-            for( auto a : v ) os << " " << a;
-             os << "\n";
-        }
-    }
-}
-*/
 
 #endif // __SIMPLE_MATRIX_HPP
