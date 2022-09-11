@@ -1,6 +1,8 @@
 #include "QSearchConnectedNode.hpp"
 #include "QSearchNeighborList.hpp"
 
+#include <cassert>
+
 inline int QSearchConnectedNode::find_branch(const int &to) {
     if (connections[0] == to) return 0;
     if (connections[1] == to) return 1;
