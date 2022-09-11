@@ -2,22 +2,18 @@
 #define __QSEARCH_NEIGHBOR_LIST_HPP
 
 #include <vector>
+#include "QSearchTree.hpp"
 
 struct QSearchNeighborList {
-    std::vector< unsigned int > n; // list of unsigned int neighbors
+    NodeList n; // list of unsigned int neighbors
 
-    QSearchNeighborList();
-    QSearchNeighborList( const QSearchNeighborList& q ); // replaces qsearch_neighborlist_clone()
-    ~QSearchNeighborList();
+    QSearchNeighborList() {}
+    QSearchNeighborList(const QSearchNeighborList& q ); // replaces qsearch_neighborlist_clone()
 
-    void add_neighbor(unsigned int w);
-    void remove_neighbor(unsigned int w);
-    bool has_neighbor(unsigned int w);
-    int find_index(unsigned int w);
-    void copy_from(const QSearchNeighborList& s);
+    void add_neighbor(const unsigned int& w);
+    void remove_neighbor(const unsigned int& w);
+    bool has_neighbor(const unsigned int& w);
+    int find_index(const unsigned int& w);
 };
-
-// may be able to use std::vector functions to replace this
-void qsearch_copy_intarray(std::vector< unsigned int >& d, const std::vector< unsigned int >& s);
 
 #endif // __QSEARCH_NEIGHBOR_LIST_HPP
