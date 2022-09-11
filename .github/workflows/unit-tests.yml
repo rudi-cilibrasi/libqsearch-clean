@@ -1,0 +1,18 @@
+name: CI unit tests
+
+on: [push]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v2
+        
+        - name: Build libqsearch-clean:latest docker image
+          run: docker build -t libqsearch-clean .
+
+        - name: Run build
+          run: docker run --rm libqsearch-clean:latest ./runtests --build
+
+        - name: Run unit tests
+          run: docker run --rm libqsearch-clean:latest ./runtests --unit

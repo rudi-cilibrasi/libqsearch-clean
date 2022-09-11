@@ -1,0 +1,54 @@
+#!/bin/bash
+
+set -e
+
+function setAll() {
+  RUN_UNIT=1
+  RUN_BUILD=1
+}
+
+function showHelp() {
+  echo "Usage: ./runtests [OPTION]..."
+  echo
+  echo "  -u, --unit    unit tests (default)"
+  echo "  -b, --build   run build"
+  echo
+  echo "      --all     run all tests and validations"
+  echo "      --help    show this help"
+}
+
+function showInvalidArg() {
+  echo "runtests: unrecognized option '$1'"
+  echo "Try './runtests --help' for more information."
+}
+
+if [[ $# -eq 0 ]]; then
+  RUN_UNIT=1;
+fi
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    --help) showHelp; break;;
+    --all) setAll; break;;
+    -u | --unit) RUN_UNIT=1;;
+    -l | --lint) RUN_LINT=1;;
+    -e | --e2e) RUN_E2E=1;;
+    -b | --build) RUN_BUILD=1;;
+    *) showInvalidArg "$1"; exit 1;;
+  esac
+
+  shift
+done
+
+if [[ -n $RUN_BUILD || -n $RUN_UNIT ]]; then
+  mkdir build
+  cd build
+  cmake ..
+  make
+fi
+
+if [[ -n $RUN_UNIT ]]; then
+  ./test-qsearch
+fi
+
+exit 0
