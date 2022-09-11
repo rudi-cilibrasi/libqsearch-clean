@@ -1,0 +1,26 @@
+name: CI unit tests
+
+on: [push]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v2
+        
+        - name: Build libqsearch-clean:latest docker image
+          uses: whoan/docker-build-with-cache-action@v5
+          with:
+            username: rudi-cilibrasi
+            password: "${{ secrets.GITHUB_TOKEN }}"
+            registry: docker.pkg.github.com
+            image_name: libqsearch-clean
+
+        - name: Tag cached docker image
+          run: docker tag docker.pkg.github.com/rudi-cilibrasi/libqsearch-clean/libqsearch-clean:latest libqsearch-clean:latest
+
+        - name: Run build
+          run: docker run --rm libqsearch-clean:latest ./runtests --build
+
+        - name: Run unit tests
+          run: docker run --rm libqsearch-clean:latest ./runtests --unit
