@@ -3,7 +3,7 @@ WORKDIR /app
 
 # Install core dependencies
 RUN apt update
-RUN apt install git make g++ cmake build-essential
+RUN apt install -y git make g++ cmake build-essential
 
 COPY . ./
 
