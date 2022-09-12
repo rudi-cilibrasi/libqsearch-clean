@@ -444,7 +444,7 @@ void QSearchTree::simple_mutation()
   bool hm = false;
   int i;
   do {
-    i = rand() % 3;
+    i = rand_int(0,2);
     switch (i) {
       case 0: simple_mutation_leaf_swap(); hm = true; break;
       case 1: if (can_subtree_transfer()) { simple_mutation_subtree_transfer(); hm = true; } break;
@@ -603,7 +603,7 @@ void QSearchTree::mutate_order_complex()
   ms.last_order_simple_mutations = 0;
   do {
     mutate_order_simple();
-  } while (rand() % 2 == 0);
+  } while (fair_coin());
   ms.total_order_simple_mutations += ms.last_order_simple_mutations;
   ms.total_order_complex_mutations += 1;
 }
