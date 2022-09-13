@@ -1,4 +1,5 @@
 #include "QSearchNeighborList.hpp"
+#include <cassert>
 
 /* ?
 void qsearch_init(void) 
