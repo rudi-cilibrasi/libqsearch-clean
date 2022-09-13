@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cassert>
 #include "SimpleMatrix.hpp"
 
 template<class T> inline void QMatrix<T>::resize(const unsigned int &dim)
