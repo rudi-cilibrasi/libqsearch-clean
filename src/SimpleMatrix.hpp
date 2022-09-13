@@ -4,10 +4,8 @@
 #include <vector>
 #include <optional>
 #include <iostream>
+#include "StringTools.hpp"
 
-typedef std::vector<std::string> StringList;
-
-// Breaks a string up into a vector of substrings wherever separated by a given character
 void segment_string( StringList& v, const std::string& s, const unsigned char c );
 
 // Minimal matrix class supports only storage and retrieval of data

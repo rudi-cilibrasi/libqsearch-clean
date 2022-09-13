@@ -17,6 +17,13 @@ void testQMatrix() {
     q.to_string(s);
     std::cout << "\nString produced by matrix\n";
     std::cout << s;
+    std::cout << "\n";
+    write_whole_file( s, "../samples/squares.txt");
+    read_whole_file( s, "../samples/mammals.txt");
+    q.from_string(s);
+    std::cout << "\nMatrix read from file\n";
+    std::cout << s;
+    std::cout << "\n";
 }
 
 // for stand-alone test

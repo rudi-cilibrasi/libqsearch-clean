@@ -27,6 +27,8 @@ src/QSearchManager.hpp
 src/RandTools.hpp
 src/SimpleMatrix.cpp
 src/SimpleMatrix.hpp
+src/StringTools.cpp
+src/StringTools.hpp
 )
 
 add_library(qsearch ${QSEARCH_LIB_SRCS})
