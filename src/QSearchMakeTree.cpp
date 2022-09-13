@@ -1,6 +1,7 @@
 #include "QSearchMakeTree.hpp"
 
 static QSearchMakeTree *qsmaketree;
+static const std::string qsearch_package_version = "0.7.1"; 
 
 void MakeTreeObserver::operator()(QSearchTree& old, QSearchTree& improved)
 {
