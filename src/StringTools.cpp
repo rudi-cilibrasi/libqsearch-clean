@@ -1,16 +1,11 @@
 #include "StringTools.hpp"
 
-void segment_string( StringList& v, const std::string& s, const unsigned char c )
+void segment_string( StringList& v, const std::string& s, const char c )
 {
-    unsigned int segment_begin = 0;
-    unsigned int segment_end = 0;
-    for( ; segment_end < s.length(); segment_end++ ) {
-        if( (s[segment_end] == c) | (segment_end == s.length() - 1) ) {
-            if( segment_end > segment_begin) {
-                v.push_back( s.substr(segment_begin, segment_end-segment_begin) );
-            }
-            segment_begin = segment_end + 1;
-        }
+    v.clear();
+    std::istringstream sstream(s);
+    for (std::string a; std::getline(sstream, a, c); ) {
+        v.push_back(a);
     }
 }
 

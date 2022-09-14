@@ -23,8 +23,8 @@ struct MakeTreeObserver {
     void operator () (QSearchTree& old, QSearchTree& improved); // improve_fn
     void operator () (QSearchTree& final);                      // done_fn
 
-    MakeTreeObserver(QMatrix<double>& dm_init, QSearchMakeTree& make_tree_init, MakeTreeResult& mtr_init) 
-        : dm(dm_init), make_tree(make_tree_init), mtr(mtr_init) {}
+    MakeTreeObserver(QSearchMakeTree& make_tree_init, MakeTreeResult& mtr_init) 
+        : dm(mtr.mat), make_tree(make_tree_init), mtr(mtr_init) {}
 };
 
 struct QSearchMakeTree

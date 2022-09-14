@@ -19,58 +19,60 @@ void MakeTreeObserver::operator()(QSearchTree& final)
 
 MakeTreeResult QSearchMakeTree::process_options(char **argv) 
 {
-    QMatrix<double>& dm;     // reference or pointer? who owns matrix?
+    QMatrix<double> lm;     // owner of matrix?
     std::string matstr;
     char **cur;
     for (cur = argv+1; *cur; cur += 1) {
-        if (strcmp(*cur, "-o") == 0) {
-        if (cur[1] == NULL)
-            std::cout << "-o requires an argument";
+      if (strcmp(*cur, "-o") == 0) {
+      if (cur[1] == NULL)
+        std::cout << "-o requires an argument";
         filestem = cur[1];
         cur += 1;
         continue;
-        }
-        if (strcmp(*cur, "-v") == 0 || strcmp(*cur, "--version") == 0) {
+      }
+      if (strcmp(*cur, "-v") == 0 || strcmp(*cur, "--version") == 0) {
         printf("%s\n", qsearch_package_version);
         exit(0);
-        }
-        if (strcmp(*cur, "-n") == 0) {
+      }
+      if (strcmp(*cur, "-n") == 0) {
         output_nexus = true;
         continue;
-        }
-        if (qsmt->_priv->matrix_filename == NULL) {
-        qsmt->_priv->matrix_filename = *cur;
+      }
+      if (matrix_filename.length() == 0) {
+        matrix_filename = *cur;
         continue;
-    }
-    std::cout << "Unrecognized argument: " << *cur;
+      }
+      std::cout << "Unrecognized argument: " << *cur;
     }
     if (matrix_filename.empty())
     print_help_and_exit();
-    matstr = complearn_read_whole_file(qsmt->_priv->matrix_filename);
-    lm = complearn_load_any_matrix(matstr);
-    dm = lm->mat;
-    printf(_("Starting search on matrix size %d.\n"), dm->size1);
-    QSearchTreeMaster *cltm = qsearch_treemaster_new(dm);
-    MakeTreeResult *mtr = calloc(sizeof(*mtr), 1);
+    read_whole_file(matstr, matrix_filename);
+    lm.from_string(matstr);
+    std::cout << "Starting search on matrix size " << lm.dim << "\n";
+    QSearchManager cltm(lm);
+    QSearchTree tree(lm);
+    MakeTreeResult mtr(cltm,tree);
     mtr.mat = lm;
     mtr.tm = cltm;
-    qsearch_treemaster_add_observer(cltm, tree_search_started,
-        tried_to_improve, tree_search_done, mtr);
-    qsearch_treemaster_find_best_tree(cltm);
+    MakeTreeObserver mto( *this, mtr );
+    cltm.add_observer(mto, mto, mto);
+    QSearchTree answer(lm);
+    cltm.find_best_tree(answer);
     return mtr;
 }
 
 void QSearchMakeTree::write_tree_file(const MakeTreeResult& mtr) {
-  bool do_nexus = top().get_output_nexus();
-  if (do_nexus) {
+  if (output_nexus) {
+    /* deferred
     char *fname = g_strdup_printf("%s.nex", top().get_filestem());
     char *nex_str = qsearch_tree_to_nexus_full(mtr.tree, mtr.mat);
     GString *gf = g_string_new(nex_str);
     complearn_write_file(fname, gf); 
+    */
   }
   else {
-    char *fname = g_strdup_printf("%s.dot", filestem );
-    complearn_write_file(fname, qsearch_tree_to_dot(mtr.tree));
+    std::string fname = filestem + ".dot";
+    write_whole_file(fname, mtr.tree.to_dot());
   }
 }
 

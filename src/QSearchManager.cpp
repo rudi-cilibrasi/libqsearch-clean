@@ -32,13 +32,13 @@ void QSearchManager::try_to_improve_bucket(unsigned int i)
 {
   const int NUMTRIESPERBIGTRY = 24; // can this constant live somewhere else?
   int j;
-  ;
+
   auto& old = forest[i];
   tree_ptr cand( new QSearchTree(*old, NUMTRIESPERBIGTRY) ); // find better tree
   if (!was_search_stopped() && i == 0 && obs.size() > 0) {
-    for(auto& ob : obs) { ob.tried_to_improve(old, cand); }
+    for(auto& ob : obs) { ob.tried_to_improve(*old, *cand); }
   }
-  old = cand;
+  std::swap( old, cand ); // rather than setting one equal to the other, as they are unique
 }
 
 void QSearchManager::find_best_tree(QSearchTree& answer)
@@ -50,9 +50,9 @@ void QSearchManager::find_best_tree(QSearchTree& answer)
   for(auto ob: obs) ob.tree_search_started();
   do {
     for (i = 0; i < forest.size(); i += 1) {
-      osco = forest[i].score_tree();
+      osco = forest[i]->score_tree();
       try_to_improve_bucket(i);
-      nsco = forest[i].score_tree();
+      nsco = forest[i]->score_tree();
       if (nsco < osco) {
         fprintf(stderr, "Error, tree degraded: %f %f.\n", osco, nsco);
         exit(1);
@@ -61,7 +61,7 @@ void QSearchManager::find_best_tree(QSearchTree& answer)
         bestsco = nsco;
     }
   } while (!is_done());
-  QSearchTree answer = forest[0];
+  QSearchTree answer(*forest[0]);
   double gsco;
   gsco = answer.score_tree();
   if (!was_search_stopped()) {
@@ -96,11 +96,11 @@ bool QSearchManager::is_done()
   if (abort_search)
     return true;
   lmsd = -1.0;
-  QSearchTree& orig = forest[0];
+  QSearchTree& orig = *forest[0];
   double csco = orig.score_tree();
   int i;
   for(auto& tree : forest) {
-    double sco = tree.score_tree();
+    double sco = tree->score_tree();
     double deltasco = fabs(sco - csco);
     if (lmsd == -1.0 || lmsd < deltasco)
       lmsd = deltasco;
