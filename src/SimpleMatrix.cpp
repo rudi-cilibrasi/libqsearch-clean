@@ -57,7 +57,7 @@ template<class T> void QMatrix<T>::from_string( const std::string& s )
     // std::cout << "\nReading values from each row\n";
     for( auto& row_str : rows ) {
         StringList values;
-        row_str += " "; // add a space, just cuz
+        //row_str += " "; // add a space, just cuz
         segment_string( values, row_str, ' ' );
         if( values.size() == dim + 1 ) {    // has label
             labels.push_back( values[0] );
