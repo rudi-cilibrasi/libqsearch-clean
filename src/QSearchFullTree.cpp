@@ -1,5 +1,6 @@
 
 #include "QSearchFullTree.hpp"
+#include "RandTools.hpp"
 
 #include <cassert>
 
@@ -167,6 +168,14 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
     set_score();
 }
     
+void QSearchFullTree::random_pair(unsigned int& a, unsigned int& b) 
+{
+    a = rand_range(0, node_count-1);
+    b = a;
+    
+    while (b == a || move_to(a, b) == b ) b = rand_range(0, node_count-1);
+}
+
 bool QSearchFullTree::can_swap(const unsigned int& a, const unsigned int& b) 
 {
    if (a == b) return false; // no point in doing anything
@@ -302,19 +311,19 @@ void QSearchFullTree::swap_nodes(const unsigned int& a, const unsigned int& b)
    map[b].connections[ bToInteriorBranch ] = interiorA;
 }
 
-const QSearchTree& QSearchFullTree::to_searchtree() {
-    
-    QSearchTree clt(dm);
+std::unique_ptr< QSearchTree > QSearchFullTree::to_searchtree() 
+{
     int leaf_count = (node_count + 2)/2;
     int i,j;
-    
+    std::unique_ptr< QSearchTree > clt( new QSearchTree(dm));
+
     // write out resulting tree in clt
     for (i = 0; i < leaf_count; ++i) {
-        clt.leaf_placement[i] = i;
+        clt->leaf_placement[i] = i;
     }
     
     for (i = 0; i < node_count; ++i) {
-        QSearchNeighborList& lst = clt.n[i];
+        QSearchNeighborList& lst = clt->n[i];
         NodeList& n = lst.n;
         for (j = 0; j < 3; ++j) {
             unsigned int con = map[i].connections[j];
@@ -323,10 +332,11 @@ const QSearchTree& QSearchFullTree::to_searchtree() {
         }
     }
     
-    clt.score = (clt.dist_max - raw_score) / (clt.dist_max - clt.dist_min); 
+    clt->score = (clt->dist_max - raw_score) / (clt->dist_max - clt->dist_min); 
 
-    clt.must_recalculate_paths = true;
-    clt.f_score_good = true;
+    clt->must_recalculate_paths = true;
+    clt->f_score_good = true;
+
     return clt;
 }
 

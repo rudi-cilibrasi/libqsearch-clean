@@ -20,10 +20,18 @@ set(CMAKE_CXX_STANDARD 20)
 # src/QSearchNeighborList.hpp
 
 set(QSEARCH_LIB_SRCS
+src/QSearchConnectedNode.cpp
 src/QSearchConnectedNode.hpp
+src/QSearchFullTree.cpp
 src/QSearchFullTree.hpp
+src/QSearchMakeTree.cpp
 src/QSearchMakeTree.hpp
+src/QSearchManager.cpp
 src/QSearchManager.hpp
+src/QSearchNeighborList.hpp
+src/QSearchNeighborList.cpp
+src/QSearchTree.cpp
+src/QSearchTree.hpp
 src/RandTools.hpp
 src/SimpleMatrix.cpp
 src/SimpleMatrix.hpp

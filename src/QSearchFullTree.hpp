@@ -25,11 +25,10 @@ struct QSearchFullTree {
     QMatrix<double>& dm;
 
     QSearchFullTree(const QSearchTree& clt); // was qsearch_make_fulltree()
-    ~QSearchFullTree(); // was void qsearch_free_fulltree()
 
-    static void random_pair(unsigned int& A, unsigned int& B);    // from qsearch-tree.c
+    void random_pair(unsigned int& a, unsigned int& b);    // from qsearch-tree.c
     void set_score();
-    const QSearchTree& to_searchtree();
+    std::unique_ptr< QSearchTree > to_searchtree(); 
     unsigned int next_node(const unsigned int& from, const unsigned int& to);
     // bool can_swap(const unsigned int& A, const unsigned int& B); // deprecated - not called
     bool can_swap(const unsigned int& a, const unsigned int& b);

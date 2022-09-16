@@ -1,6 +1,7 @@
 #include "QSearchTree.hpp"
 #include <cmath> 
 #include <cassert>
+#include <algorithm>
 
 #include "RandTools.hpp"
 #include "QSearchNeighborList.hpp"
@@ -8,19 +9,11 @@
 #include "SimpleMatrix.hpp"
 #include "QSearchConnectedNode.hpp"
 
-QSearchTree::QSearchTree(QMatrix<double>& dm_init) : dm( dm_init)
+QSearchTree::QSearchTree(QMatrix<double>& dm_init) 
+  : dm( dm_init), total_node_count(dm_init.dim * 2 - 2), nodeflags(dm_init.dim * 2 - 2, 0),
+    n(dm_init.dim * 2 - 2), dist_calculated(false), must_recalculate_paths(true), spm(total_node_count)
 {
   assert(dm.dim >= 4);
-  total_node_count = dm.dim * 2 - 2;
-  int s = total_node_count;
-  dist_calculated = false;
-
-  // move to initializer
-  for (int i = 0; i < s; i += 1) {
-    nodeflags.push_back( NULL );
-  }
-  must_recalculate_paths = true;
-  spm.resize(s);
 
   for (int i = 0; i < dm.dim - 2; i++ ) {
     connect(i, dm.dim + i);
@@ -28,10 +21,9 @@ QSearchTree::QSearchTree(QMatrix<double>& dm_init) : dm( dm_init)
       connect(i + dm.dim-1, i + dm.dim);
   }
   connect(dm.dim - 2, dm.dim);
-  connect(dm.dim-1, s-1);
-  assert(s > 0);
-//  j = 0;
-  for (int i = 0; i < s; i += 1) {
+  connect(dm.dim-1, total_node_count-1);
+
+  for (int i = 0; i < total_node_count; i += 1) {
     if (get_neighbor_count(i) == 1) {
       leaf_placement.push_back( i );
     }
@@ -56,8 +48,7 @@ QSearchTree::QSearchTree(const QSearchTree& q) :
   ms.total_clonings++; 
 }
 
-// replaces qsearch_tree_find_better_tree()
-QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
+std::unique_ptr< QSearchTree > QSearchTree::find_better_tree(int howManyTries) 
 {
     if (!dist_calculated) {
         calc_min_max();
@@ -80,7 +71,7 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
   do {
 #endif
   for (i = 0; i < howManyTries; i += 1) {
-    cand.reset( new QSearchTree( q ) );
+    cand.reset( new QSearchTree( *this ) );
      
     //qsearch_tree_complex_mutation(cand);
     QSearchFullTree tree(*cand);
@@ -99,12 +90,12 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
 
         double cur = tree.raw_score;
 
-        if ( rand_int(0, 3) < 2) { 
+        if ( rand_int(0, 2) < 2) { 
             
             tree.swap_nodes(p1, p2);
             
             if (tree.raw_score <= best_score || fabs(tree.raw_score - best_score) < 1e-6) { 
-                cand.reset( new QSearchTree( tree.to_searchtree() ) );
+                cand = tree.to_searchtree();
                 best_score = tree.raw_score;
                 //printf("Score improved from %f to %f, raw: %f \n", curscore, cand->score, tree.raw_score);
             }
@@ -126,7 +117,7 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
             tree.swap_nodes(interior, p2);
             
             if (tree.raw_score <= best_score || fabs(tree.raw_score - best_score) < 1e-6) { 
-                cand.reset( new QSearchTree( tree.to_searchtree() ) );
+                cand = tree.to_searchtree();
                 best_score = tree.raw_score;
                 //printf("Score improved from %f to %f, raw: %f \n", curscore, cand->score, tree.raw_score);
             }
@@ -138,7 +129,7 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
             assert( tree.find_sibling(p1, sibling) == p2);
 
             if (tree.raw_score <= best_score || fabs(tree.raw_score - best_score) < 1e-6) { 
-                cand.reset( new QSearchTree( tree.to_searchtree() ) );
+                cand = tree.to_searchtree();
                 best_score = tree.raw_score;
                 //printf("Score improved from %f to %f, raw: %f \n", curscore, cand->score, tree.raw_score);
             }
@@ -185,12 +176,7 @@ QSearchTree::QSearchTree(QSearchTree& q, int howManyTries): dm(q.dm)
 #else
   } while (0);
 #endif
-  QSearchTree(*result);
-}
-
-unsigned int QSearchTree::get_node_count()
-{
-  return total_node_count;
+  return result;
 }
 
 unsigned int QSearchTree::get_leaf_node_count()
@@ -206,11 +192,11 @@ unsigned int QSearchTree::get_kernel_node_count()
 // possibly return unique pointer? call by reference?
 QMatrix< unsigned int> QSearchTree::get_adjacency_matrix()
 {
-  int s = get_node_count();
-  QMatrix<unsigned int> m(s);
+  QMatrix<unsigned int> m(total_node_count);
   int i, j;
-  for (i = 0; i < s; i += 1) {
-    for (j = i+1; j < s; j += 1) {
+  for (i = 0; i < total_node_count; i++) {
+    for (j = i+1; j < total_node_count; j++) {
+      assert( j < total_node_count );
       int b = is_connected( i, j) ? 1 : 0;
       m[i][j] = b;
       m[j][i] = b;
@@ -229,24 +215,25 @@ void QSearchTree::calc_min_max() {
                     double c1, c2, c3;
                     c1 = dm[i][j] + dm[k][l];
                     c2 = dm[i][k] + dm[j][l];
-                    c1 = dm[i][l] + dm[j][k];
+                    c3 = dm[i][l] + dm[j][k];
  
-                    dist_min += std::min( c1, c2, c3 ); dist_max += std::max( c1, c2, c3 );
+                    dist_min += std::min( { c1, c2, c3 } ); dist_max += std::max( { c1, c2, c3 } );
                 }
     // wheee!!
 }
 
 bool QSearchTree::is_connected(const unsigned int& a, const unsigned int& b) 
 {
-    assert(a >= 0 && b >= 0 && a < total_node_count && b < total_node_count);
-    if (a == b) return false;
-    return a > b ? n[a].has_neighbor(b) : n[b].has_neighbor(a); // backwards?
+  // std::cout << "QSearchTree::is_connected() - a = " << a << " b = " << b << "\n";
+  assert(a >= 0 && b >= 0 && a < total_node_count && b < total_node_count);
+  if (a == b) return false;
+  return a > b ? n[a].has_neighbor(b) : n[b].has_neighbor(a); // backwards?
 }
 
 bool QSearchTree::is_standard_tree()
 {
-  for (int i = 0; i < get_node_count(); i += 1) {
-    int nc = get_neighbor_count(i);
+  for (unsigned int i = 0; i < total_node_count; i++) {
+    unsigned int nc = get_neighbor_count(i);
     if (nc != 1 && nc != 3)
       return false;
   }
@@ -255,7 +242,8 @@ bool QSearchTree::is_standard_tree()
 
 unsigned int QSearchTree::get_neighbor_count(const unsigned int& a) {
   int acc = 0;
-  for (unsigned int i = 0; i < total_node_count; i += 1)
+  assert( a < total_node_count );
+  for (unsigned int i = 0; i < total_node_count; i++)
     if (is_connected(i, a))
       acc += 1;
   return acc;
@@ -263,6 +251,9 @@ unsigned int QSearchTree::get_neighbor_count(const unsigned int& a) {
 
 void QSearchTree::connect(const unsigned int& a, const unsigned int& b)
 {
+  //std::cout << "QSearchTree::connect() - a = " << a << " b = " << b << "\n";
+  assert( a < total_node_count );
+  assert( b < total_node_count );
   assert(is_connected(a,b) == false);
   assert(a != b);
   if (a < b)
@@ -341,6 +332,11 @@ void QSearchTree::freshen_spm()
 
 bool QSearchTree::is_consistent_quartet(unsigned int &a, unsigned int &b, unsigned int &c, unsigned int &d)
 {
+  assert( a < total_node_count );
+  assert( b < total_node_count );
+  assert( c < total_node_count );
+  assert( d < total_node_count );
+
   assert(get_neighbor_count(a) == 1);
   assert(get_neighbor_count(b) == 1);
   assert(get_neighbor_count(c) == 1);
@@ -361,7 +357,7 @@ unsigned int QSearchTree::get_random_node(const node_type& what_kind)
   assert(what_kind == NODE_TYPE_LEAF || what_kind == NODE_TYPE_KERNEL ||
            what_kind == NODE_TYPE_ALL);
   do {
-    result = rand_int(0, total_node_count);
+    result = rand_int(0, total_node_count - 1);
     n = get_neighbor_count(result);
   } while ((what_kind & (n == 1 ? NODE_TYPE_LEAF : NODE_TYPE_KERNEL)) == 0);
   return result;
@@ -381,7 +377,7 @@ unsigned int QSearchTree::get_random_neighbor(const unsigned int& who)
   unsigned int result;
   NodeList neighbors;
   get_neighbors(neighbors, who);
-  result = neighbors[ rand_int( 0, neighbors.size() ) ];
+  result = neighbors[ rand_int( 0, neighbors.size() - 1 ) ];
   return result;
 }
 
@@ -425,17 +421,18 @@ void QSearchTree::complex_mutation()
   ms.total_complex_mutations += 1;
 }
 
+// is this function time-critical? use lookup table?
 int QSearchTree::get_mutation_distribution_sample()
 {
   const int MAXMUT = 80;
-  std::vector<double> p;
+  std::vector<int> p;
 
   for (int i = 0; i < MAXMUT; i++) {
     double k = i + 4; /* to make single-mutations somewhat less common */
-    p.push_back(1.0 / (k * (log(k) / log(2.0)) * (log(k)/log(2.0))));
+    p.push_back((int)(1000000.0 / (k * (log(k) / log(2.0)) * (log(k)/log(2.0)))));
   }
   std::default_random_engine generator;
-  std::discrete_distribution<double> d(p.begin(),p.end());
+  std::discrete_distribution<> d(p.begin(),p.end());
   return d(generator)+1;
 }
 
@@ -586,7 +583,7 @@ unsigned int QSearchTree::get_column_number(const unsigned int& nodenum)
   for (unsigned int i = 0; i < leaf_placement.size(); i += 1)
     if (leaf_placement[i] == nodenum)
       return i;
-  throw("Bad column number %d", nodenum);
+  std::cout << "QSearchTree::get_column_number - Bad column number" << nodenum << "\n";
   return 0;
 }
 
@@ -744,8 +741,8 @@ if(0) // will skip loop
           if (x3)
             acc += c3;
           else {
-            throw("Error in program logic: no consistent quartets for "
-          " %d,%d,%d,%d  yielded %d,%d,%d",ni,nj,nk,nl,x1,x2,x3);
+            std::cout << "QSearchTree::score_tree() - Error in program logic: no consistent quartets for \n";
+            std::cout << ni << " " << nj << " " << nk << " " << nl << " yielded " << x1 << " " << x2 << " " << x3 << "\n";
           }
 #endif
         }
@@ -899,3 +896,65 @@ double QSearchTree::score_tree_fast_v2() {
     }
   return sum;
 }
+
+/* Deferred
+GString *qsearch_tree_to_dot(const QLabeledTree *tree) {
+  char *str;
+  int i, j;
+  gboolean show_details =
+          qsearch_maketree_get_dot_show_details(qsearch_maketree_top());
+  gboolean show_ring =
+          qsearch_maketree_get_dot_show_ring(qsearch_maketree_top());
+  GString *r = g_string_new("");
+  str = g_strdup_printf("graph \"%s\" {\n",
+          qsearch_maketree_get_dot_title(qsearch_maketree_top()));
+  g_string_append(r, str); g_free(str);
+  if (show_details) {
+    str = g_strdup_printf("label=\"S(T)=%f\";\n", qsearch_tree_score_tree(tree->qs, tree->mat));
+    g_string_append(r, str); g_free(str);
+  }
+  for (i = 0; i < tree->qs->total_node_count; i += 1) {
+    int nodenum = i;
+    if (qsearch_tree_get_neighbor_count(tree->qs, nodenum) == 1)
+      nodenum = qsearch_tree_get_column_number(tree->qs, nodenum);
+    str = g_strdup_printf("%d [label=\"%s\"];\n", nodenum, tree->labels[i]);
+    g_string_append(r, str); g_free(str);
+  }
+  for (i = 0; i < tree->qs->total_node_count; i += 1) {
+    int nodenumi = i;
+    if (qsearch_tree_get_neighbor_count(tree->qs, nodenumi) == 1)
+      nodenumi = qsearch_tree_get_column_number(tree->qs, nodenumi);
+    for (j = i+1; j < tree->qs->total_node_count; j += 1) {
+      int nodenumj = j;
+      if (qsearch_tree_get_neighbor_count(tree->qs, nodenumj) == 1)
+        nodenumj = qsearch_tree_get_column_number(tree->qs, nodenumj);
+      if (qsearch_tree_is_connected(tree->qs,i,j)) {
+        str = g_strdup_printf("%d -- %d [weight=\"2\"];\n", nodenumi, nodenumj);
+        g_string_append(r, str); g_free(str);
+      }
+    }
+  }
+  GArray *lcirc = qsearch_tree_walk_filtered(tree->qs, 0, NODE_TYPE_LEAF);
+  int qq=tree->qs->total_node_count+10000;
+  for (i = 0; i < lcirc->len; i += 1) {
+    int n1 = g_array_index(lcirc, guint32, i);
+    int n2 = g_array_index(lcirc, guint32, (i+1)%(lcirc->len));
+    int c1, c2;
+    double dist = gsl_matrix_get(tree->mat,
+            c1=qsearch_tree_get_column_number(tree->qs, n1),
+            c2=qsearch_tree_get_column_number(tree->qs, n2));
+    str = g_strdup_printf("%d -- %d [style=\"dotted\"%s];\n",c1,qq,show_ring?"":",color=\"white\"");
+    g_string_append(r, str); g_free(str);
+    str = g_strdup_printf("%d -- %d [style=\"dotted\"%s];\n",c2,qq,show_ring?"":",color=\"white\"");
+    g_string_append(r, str); g_free(str);
+    if (show_ring)
+      str = g_strdup_printf("%d [label=\"%03.3f\",color=\"white\"];\n",qq,dist);
+    else
+      str = g_strdup_printf("%d [label=\"\",color=\"white\"];\n",qq);
+    g_string_append(r, str); g_free(str);
+    qq += 1;
+  }
+  g_string_append(r, "}\n");
+  return r;
+}
+*/

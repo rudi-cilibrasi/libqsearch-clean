@@ -7,7 +7,9 @@ static std::mt19937 gen( rd() ); // start random engine
 static std::uniform_real_distribution<float> rand1( 0.0f, 1.0f );
 static std::uniform_int_distribution<unsigned int> random_bit( 0, 1 ); 
 static float rand_range(const float a, const float b) { return a + ( b - a ) * rand1( gen ); }
-static int   rand_int(const float a, const float b) { std::uniform_int_distribution<int> r(a,b); return r(gen); }
+// inclusive range - take care!
+static int rand_int(const int a, const int b) { std::uniform_int_distribution<int> r(a,b); return r(gen); }
+static unsigned int rand_int(const unsigned int a, const unsigned int b) { std::uniform_int_distribution<unsigned int> r(a,b); return r(gen); }
 static bool fair_coin() { return ( random_bit(gen) == 1 ); }
 
 // potentially unfair coin - returns 1 with probability a

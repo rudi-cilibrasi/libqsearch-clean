@@ -2,13 +2,12 @@
 #define __QSEARCH_NEIGHBOR_LIST_HPP
 
 #include <vector>
-#include "QSearchTree.hpp"
 
 struct QSearchNeighborList {
-    NodeList n; // list of unsigned int neighbors
+    std::vector< unsigned int > n; // list of unsigned int neighbors
 
     QSearchNeighborList() {}
-    QSearchNeighborList(const QSearchNeighborList& q ); // replaces qsearch_neighborlist_clone()
+    QSearchNeighborList(const QSearchNeighborList& q ) : n(q.n) {}
 
     void add_neighbor(const unsigned int& w);
     void remove_neighbor(const unsigned int& w);

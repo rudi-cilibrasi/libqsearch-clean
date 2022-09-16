@@ -41,7 +41,7 @@ typedef std::unique_ptr< QSearchTree > tree_ptr;
 struct QSearchManager
 {
     std::vector< tree_ptr > forest;   // vector of pointers?
-    QMatrix<double>  dm; // owner of matrix?
+    QMatrix<double>&  dm; 
     std::vector< QSearchObserver > obs;  // vector of pointers?
     double lmsd;
     bool abort_search;
@@ -51,7 +51,7 @@ struct QSearchManager
 
     void add_observer( start_fn tree_search_started, improve_fn tried_to_improve, done_fn tree_search_done);
     void try_to_improve_bucket(unsigned int i);
-    void find_best_tree(QSearchTree& result); // changed to call by reference
+    QSearchTree find_best_tree(); // changed to call by reference
     bool was_search_stopped();
     void stop_search();
     double get_lmsd();
