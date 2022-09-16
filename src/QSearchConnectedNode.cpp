@@ -11,7 +11,8 @@ inline int QSearchConnectedNode::find_branch(const int &to) {
     return -1;
 }
 
-QSearchConnectedNodeMap::QSearchConnectedNodeMap(const QSearchTree &clt) {
+QSearchConnectedNodeMap::QSearchConnectedNodeMap(const QSearchTree &clt) : map(clt.total_node_count)
+{
     const int node_count = clt.total_node_count;
     const int leaf_count = (node_count + 2)/2;
        
