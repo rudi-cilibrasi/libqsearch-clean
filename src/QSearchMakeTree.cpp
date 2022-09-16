@@ -1,4 +1,5 @@
 #include "QSearchMakeTree.hpp"
+#include <cstring>
 
 static QSearchMakeTree *qsmaketree;
 static const std::string qsearch_package_version = "0.7.1"; 
