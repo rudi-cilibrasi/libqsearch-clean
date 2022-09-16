@@ -44,27 +44,17 @@ struct QSearchTree {
   double score;
   std::vector< QSearchNeighborList > n;   
   NodeList p1, p2;
-  QMatrix<unsigned int > spm; // Do we need to be copying this around?
+  QMatrix<unsigned int > spm; 
   std::vector< unsigned int > nodeflags;
   NodeList leaf_placement;
   // distance matrix
   QMatrix<double>& dm; // Using reference here as we don't want to be copying this big matrix a lot
 
-  // QSearchTree(); // should default constructor exist?
-  QSearchTree(QMatrix<double>& dm_init);    // is how_many_leaves needed in C++?
+  QSearchTree(QMatrix<double>& dm_init);   
   QSearchTree(const QSearchTree& q);   
-  // copy constructor replaces clone()
-  QSearchTree(QSearchTree& q, int howManyTries); // replaces qsearch_tree_find_better_tree()
-  // qsearch_tree_free() would become ~QSearchTree()
-  // however implicit destructor is all that is needed as C++ objects clean their own memory
-  //~QSearchTree();
 
-  //    std::string to_s(); // deprecated - not called 
-
-  // function declared but not implemented in C - deprecated
-  // bool is_leaf_node(const int& whichNode);
+  std::unique_ptr< QSearchTree > find_better_tree(int howManyTries);
   void calc_min_max();
-  unsigned int get_node_count();
   unsigned int get_leaf_node_count();
   unsigned int get_kernel_node_count();
   QMatrix<unsigned int> get_adjacency_matrix();
@@ -109,10 +99,9 @@ struct QSearchTree {
   bool set_connected(const unsigned int& a, const unsigned int& b, bool newconstate);
   void clear_all_connections();
   double score_tree();
-  // double score_tree_fast(); - deprecated - not called
   double score_tree_fast_v2();
 
-  // deferred. Is dm needed? Could this be constructor?
+  // deferred. Is dm needed? 
     double read_from_dot(std::string treedot, QMatrix<unsigned int>& dm);  
   // from QLabeledTree - deferred
     std::string to_dot();

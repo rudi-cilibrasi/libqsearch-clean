@@ -17,9 +17,9 @@ void MakeTreeObserver::operator()(QSearchTree& final)
     make_tree.write_tree_file(mtr);
 }
 
-MakeTreeResult QSearchMakeTree::process_options(char **argv) 
+void QSearchMakeTree::process_options(char **argv) 
 {
-    QMatrix<double> lm;     // owner of matrix?
+    QMatrix<double> dm;     // owner of matrix?
     std::string matstr;
     char **cur;
     for (cur = argv+1; *cur; cur += 1) {
@@ -31,7 +31,7 @@ MakeTreeResult QSearchMakeTree::process_options(char **argv)
         continue;
       }
       if (strcmp(*cur, "-v") == 0 || strcmp(*cur, "--version") == 0) {
-        printf("%s\n", qsearch_package_version);
+        std::cout << qsearch_package_version << "\n";
         exit(0);
       }
       if (strcmp(*cur, "-n") == 0) {
@@ -44,23 +44,20 @@ MakeTreeResult QSearchMakeTree::process_options(char **argv)
       }
       std::cout << "Unrecognized argument: " << *cur;
     }
-    if (matrix_filename.empty())
-    print_help_and_exit();
+    if (matrix_filename.empty()) print_help_and_exit();
     read_whole_file(matstr, matrix_filename);
-    lm.from_string(matstr);
-    std::cout << "Starting search on matrix size " << lm.dim << "\n";
-    QSearchManager cltm(lm);
-    QSearchTree tree(lm);
+    dm.from_string(matstr);
+    std::cout << "Starting search on matrix size " << dm.dim << "\n";
+    QSearchManager cltm(dm);
+    QSearchTree tree(dm);
     MakeTreeResult mtr(cltm,tree);
-    mtr.mat = lm;
-    mtr.tm = cltm;
     MakeTreeObserver mto( *this, mtr );
     cltm.add_observer(mto, mto, mto);
-    QSearchTree answer(lm);
-    cltm.find_best_tree(answer);
-    return mtr;
+    cltm.find_best_tree();
+//  return mtr; // problem - tree goes out of scope
 }
 
+// Full implementation deferred
 void QSearchMakeTree::write_tree_file(const MakeTreeResult& mtr) {
   if (output_nexus) {
     /* deferred
@@ -72,11 +69,11 @@ void QSearchMakeTree::write_tree_file(const MakeTreeResult& mtr) {
   }
   else {
     std::string fname = filestem + ".dot";
-    write_whole_file(fname, mtr.tree.to_dot());
+    // write_whole_file(fname, mtr.tree.to_dot());
   }
 }
 
-void QSearchMakeTree::print_help_and_exit() 
+void QSearchMakeTree::print_help_and_exit() // Say "friend" and enter
 {
   std::cout << "Usage:\n\n";
   std::cout << "maketree [-v] [-n] <distmatrix>\n";

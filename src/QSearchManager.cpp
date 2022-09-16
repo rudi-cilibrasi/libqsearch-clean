@@ -34,14 +34,14 @@ void QSearchManager::try_to_improve_bucket(unsigned int i)
   int j;
 
   auto& old = forest[i];
-  tree_ptr cand( new QSearchTree(*old, NUMTRIESPERBIGTRY) ); // find better tree
+  tree_ptr cand = old->find_better_tree(NUMTRIESPERBIGTRY) ; // find better tree
   if (!was_search_stopped() && i == 0 && obs.size() > 0) {
     for(auto& ob : obs) { ob.tried_to_improve(*old, *cand); }
   }
   std::swap( old, cand ); // rather than setting one equal to the other, as they are unique
 }
 
-void QSearchManager::find_best_tree(QSearchTree& answer)
+QSearchTree QSearchManager::find_best_tree()
 {
   int i, j;
   double bestsco = -1.0;
@@ -61,7 +61,7 @@ void QSearchManager::find_best_tree(QSearchTree& answer)
         bestsco = nsco;
     }
   } while (!is_done());
-  QSearchTree answer(*forest[0]);
+  QSearchTree& answer = *forest[0];
   double gsco;
   gsco = answer.score_tree();
   if (!was_search_stopped()) {
@@ -73,6 +73,7 @@ void QSearchManager::find_best_tree(QSearchTree& answer)
   if (!was_search_stopped() && obs.size() > 0) {
     for (auto& ob : obs) { ob.tree_search_done(answer); }
   }
+  return answer;
 }
 
 bool QSearchManager::was_search_stopped()

@@ -1,12 +1,6 @@
 #include "QSearchNeighborList.hpp"
 #include <cassert>
 
-/* ?
-void qsearch_init(void) 
-{
-}
-*/
-
 int QSearchNeighborList::find_index(const unsigned int& w)
 {
   for (int i = 0; i < n.size(); i++)
