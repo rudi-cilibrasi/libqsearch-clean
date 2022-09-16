@@ -5,9 +5,11 @@ struct QSearchConnectedNode {
     int done;
     int connections[3];
     int leaf_count[3];
-    char *node_branch; // pointing in the direction where to find a node (?)
+    std::vector< char > node_branch; // pointing in the direction where to find a node (?)
 
     int find_branch(const int& to);
+
+    QSearchConnectedNode( const unsigned int& branches ) : node_branch(branches) {}
 };
 
 struct QSearchConnectedNodeMap {
