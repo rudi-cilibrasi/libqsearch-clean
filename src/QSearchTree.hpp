@@ -2,6 +2,7 @@
 #define __QSEARCHTREE_HPP
 
 #include <vector>
+#include <memory>
 #include "SimpleMatrix.hpp"
 #include "QSearchNeighborList.hpp"
 
