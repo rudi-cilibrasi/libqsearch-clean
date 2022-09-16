@@ -421,17 +421,18 @@ void QSearchTree::complex_mutation()
   ms.total_complex_mutations += 1;
 }
 
+// is this function time-critical? use lookup table?
 int QSearchTree::get_mutation_distribution_sample()
 {
   const int MAXMUT = 80;
-  std::vector<double> p;
+  std::vector<int> p;
 
   for (int i = 0; i < MAXMUT; i++) {
     double k = i + 4; /* to make single-mutations somewhat less common */
-    p.push_back(1.0 / (k * (log(k) / log(2.0)) * (log(k)/log(2.0))));
+    p.push_back((int)(1000000.0 / (k * (log(k) / log(2.0)) * (log(k)/log(2.0)))));
   }
   std::default_random_engine generator;
-  std::discrete_distribution<double> d(p.begin(),p.end());
+  std::discrete_distribution<> d(p.begin(),p.end());
   return d(generator)+1;
 }
 
