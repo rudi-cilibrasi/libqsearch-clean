@@ -227,7 +227,7 @@ bool QSearchTree::is_connected(const unsigned int& a, const unsigned int& b)
   // std::cout << "QSearchTree::is_connected() - a = " << a << " b = " << b << "\n";
   assert(a >= 0 && b >= 0 && a < total_node_count && b < total_node_count);
   if (a == b) return false;
-  return a > b ? n[a].has_neighbor(b) : n[b].has_neighbor(a); // backwards?
+  return a > b ?  n[b].has_neighbor(a) : n[a].has_neighbor(b); // backwards? fixed
 }
 
 bool QSearchTree::is_standard_tree()
@@ -421,7 +421,6 @@ void QSearchTree::complex_mutation()
   ms.total_complex_mutations += 1;
 }
 
-// is this function time-critical? use lookup table?
 int QSearchTree::get_mutation_distribution_sample()
 {
   const int MAXMUT = 80;
