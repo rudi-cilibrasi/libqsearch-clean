@@ -51,6 +51,7 @@ QSearchTree QSearchManager::find_best_tree()
   do {
     for (i = 0; i < forest.size(); i += 1) {
       osco = forest[i]->score_tree();
+      std::cout << "osco is " << osco << std::endl;
       try_to_improve_bucket(i);
       nsco = forest[i]->score_tree();
       if (nsco < osco) {
