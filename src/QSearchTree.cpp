@@ -354,20 +354,25 @@ unsigned int QSearchTree::get_random_node(const node_type& what_kind)
 {
   unsigned int result;
   unsigned int n;
+  std::cout << "QSearchTree::get_random_node()\n";
   assert(what_kind == NODE_TYPE_LEAF || what_kind == NODE_TYPE_KERNEL ||
            what_kind == NODE_TYPE_ALL);
   do {
     result = rand_int(0, total_node_count - 1);
+    std::cout << "result = " << result;
     n = get_neighbor_count(result);
+    std::cout << " n = " << n << "\n";
   } while ((what_kind & (n == 1 ? NODE_TYPE_LEAF : NODE_TYPE_KERNEL)) == 0);
   return result;
 }
 
 unsigned int QSearchTree::get_random_node_but_not(const node_type& what_kind, const unsigned int& but_not)
 {
+  std::cout << "QSearchTree::get_random_node_but_not() but_not = " << but_not << "\n";
   unsigned int result;
   do {
     result = get_random_node(what_kind);
+    std::cout << "result = " << result << "\n";
   } while (result == but_not);
   return result;
 }
@@ -441,6 +446,7 @@ void QSearchTree::simple_mutation()
   int i;
   do {
     i = rand_int(0,2);
+    std::cout << "simple mutation type " << i << "\n";
     switch (i) {
       case 0: simple_mutation_leaf_swap(); hm = true; break;
       case 1: if (can_subtree_transfer()) { simple_mutation_subtree_transfer(); hm = true; } break;
