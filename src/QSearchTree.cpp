@@ -172,6 +172,7 @@ std::unique_ptr< QSearchTree > QSearchTree::find_better_tree(int howManyTries)
       result.reset();
       std::swap(result,cand);
       curscore = candscore;
+      std::cout << "Got better score " << curscore << std::endl;
     }
     else
       cand.reset();
