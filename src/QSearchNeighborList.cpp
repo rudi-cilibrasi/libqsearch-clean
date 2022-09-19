@@ -17,7 +17,7 @@ bool QSearchNeighborList::has_neighbor(const unsigned int& w)
 void QSearchNeighborList::remove_neighbor(const unsigned int& w)
 {
   assert(has_neighbor(w));
-  n.erase( n.begin() + w );
+  n.erase( n.begin() + find_index(w) );
 }
 
 void QSearchNeighborList::add_neighbor(const unsigned int& w)

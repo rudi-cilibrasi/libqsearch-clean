@@ -26,10 +26,11 @@ struct MutationStatistics {
   int last_order_simple_mutations;
 };
 
+// bit mask
 typedef enum {
-  NODE_TYPE_LEAF,
-  NODE_TYPE_KERNEL,
-  NODE_TYPE_ALL
+  NODE_TYPE_LEAF = 0x01,
+  NODE_TYPE_KERNEL = 0x02,
+  NODE_TYPE_ALL = 0x03
 } node_type;
 
 typedef std::vector< unsigned int > NodeList;
