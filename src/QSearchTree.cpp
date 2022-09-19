@@ -10,12 +10,17 @@
 #include "QSearchConnectedNode.hpp"
 
 QSearchTree::QSearchTree(QMatrix<double>& dm_init) 
-  : dm( dm_init), total_node_count(dm_init.dim * 2 - 2), nodeflags(dm_init.dim * 2 - 2, 0),
-    n(dm_init.dim * 2 - 2), dist_calculated(false), must_recalculate_paths(true), spm(total_node_count)
-{
+  : dm( dm_init), 
+    total_node_count(dm_init.dim * 2 - 2), 
+    nodeflags(dm_init.dim * 2 - 2, 0),
+    n(dm_init.dim * 2 - 2), 
+    dist_calculated(false), 
+    must_recalculate_paths(true), 
+    spm(dm_init.dim * 2 - 2)
+  {
   assert(dm.dim >= 4);
 
-  for (int i = 0; i < dm.dim - 2; i++ ) {
+  for(int i = 0; i < dm.dim - 2; i++ ) {
     connect(i, dm.dim + i);
     if (i > 0)
       connect(i + dm.dim-1, i + dm.dim);
@@ -23,7 +28,7 @@ QSearchTree::QSearchTree(QMatrix<double>& dm_init)
   connect(dm.dim - 2, dm.dim);
   connect(dm.dim-1, total_node_count-1);
 
-  for (int i = 0; i < total_node_count; i += 1) {
+  for(int i = 0; i < total_node_count; i += 1) {
     if (get_neighbor_count(i) == 1) {
       leaf_placement.push_back( i );
     }
@@ -284,6 +289,7 @@ void QSearchTree::find_path(NodeList& result, unsigned int a, unsigned int b) {
 // changed argument order
 void QSearchTree::find_path_fast(NodeList& result, unsigned int a, unsigned int b)
 {
+  result.clear();
   assert(a >= 0 && b >= 0 && a < total_node_count && b < total_node_count);
   freshen_spm();
   
@@ -297,6 +303,9 @@ void QSearchTree::find_path_fast(NodeList& result, unsigned int a, unsigned int 
       break;
     a = spm[b][a];
   }
+  std::cout << "QSearchTree::find_path_fast() - result ";
+  for(auto r : result) std::cout << r << " ";
+  std::cout <<  "\n";
   if (a != b)
     std::cout << "Error, broken path from " << a << " to " << b << " for tree.\n";
 }
@@ -387,6 +396,7 @@ unsigned int QSearchTree::get_random_neighbor(const unsigned int& who)
 }
 
 void QSearchTree::get_neighbors(NodeList& neighbors, const unsigned int &who) {
+  neighbors.clear();
   for (int i = 0; i < total_node_count; i++) 
     if (is_connected(i, who)) neighbors.push_back(i);
 }
@@ -524,6 +534,7 @@ bool QSearchTree::can_subtree_interchange()
 
 void QSearchTree::walk_tree(NodeList& result, const unsigned int& fromwhere, bool f_bfs)
 {
+  result.clear();
   NodeList todo;
   unsigned int d = 0, s = total_node_count, v = fromwhere;
   todo.push_back(v);
