@@ -975,3 +975,20 @@ GString *qsearch_tree_to_dot(const QLabeledTree *tree) {
   return r;
 }
 */
+
+  std::string QSearchTree::to_dot() {
+    std::ostringstream oss;
+    oss << "graph \"" << "untitled" << "\" {\n";
+    for (int i = 0; i < total_node_count; i += 1) {
+      oss << i << " [label=\"node " << i << "\"];\n";
+    }
+    for (int i = 0; i < total_node_count; i += 1) {
+      for (int j = i; j < total_node_count; j += 1) {
+        if (is_connected(i, j)) {
+          oss << i << " -- " << j << " [weight=\"2\"];\n";
+        }
+      }
+    }
+    oss << "}\n";
+    return oss.str();
+  }

@@ -16,6 +16,11 @@ QSearchManager::QSearchManager(QMatrix<double>& dm_init): dm(dm_init)  // was QS
   int fs = recommended_tree_duplicity(dm.dim);
   for (int i = 0; i < fs; i++) {
     forest.push_back( tree_ptr( new QSearchTree( dm ) ) );
+    if (i == 0) {
+      std::ofstream f("treefile.dot");
+      f << forest[i]->to_dot();
+      f.close();
+    }
     forest[i]->complex_mutation();
     forest[i]->complex_mutation();
   }
