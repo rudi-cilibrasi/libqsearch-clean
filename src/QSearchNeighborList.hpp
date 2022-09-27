@@ -6,7 +6,6 @@
 struct QSearchNeighborList {
     std::vector< unsigned int > n; // list of unsigned int neighbors
 
-    QSearchNeighborList() {}
     QSearchNeighborList(const QSearchNeighborList& q ) : n(q.n) {}
 
     void add_neighbor(const unsigned int& w);

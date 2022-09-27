@@ -802,7 +802,7 @@ if(0) // will skip loop
   }
         
   //int nanos2 = ((end_time.tv_sec - start_time.tv_sec) * nanos_per_second + end_time.tv_nsec - start_time.tv_nsec);
-
+#define SKIP_ORIGINAL
 #ifdef SKIP_ORIGINAL
     acc = score2;
 #endif
@@ -836,7 +836,7 @@ if(0) // will skip loop
     //printf("nanos org = %d nanos new = %d speedup factor = %f \n", nanos1, nanos2, (double)nanos1/(double)nanos2);
     //printf("Score: %f %f\n", acc, score2);
 
-    if (fabs(score2-acc) > 1e-6) {
+    if (fabs((score2-acc)/score2) > 1e-6) {
         
         fprintf(stderr, "Error, score should be %f, was %f\n", acc, score2);
             
