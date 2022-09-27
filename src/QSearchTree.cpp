@@ -304,9 +304,9 @@ void QSearchTree::find_path_fast(NodeList& result, unsigned int a, unsigned int 
       break;
     a = spm[b][a];
   }
-  std::cout << "QSearchTree::find_path_fast() - result ";
-  for(auto r : result) std::cout << r << " ";
-  std::cout <<  "\n";
+  //std::cout << "QSearchTree::find_path_fast() - result ";
+  //for(auto r : result) std::cout << r << " ";
+  //std::cout <<  "\n";
   if (a != b)
     std::cout << "Error, broken path from " << a << " to " << b << " for tree.\n";
 }
@@ -342,6 +342,7 @@ void QSearchTree::freshen_spm()
 
 bool QSearchTree::is_consistent_quartet(unsigned int &a, unsigned int &b, unsigned int &c, unsigned int &d)
 {
+  //std::cout << "QSearchTree::is_consistent_quartet()\n";
   assert( a < total_node_count );
   assert( b < total_node_count );
   assert( c < total_node_count );
@@ -352,11 +353,15 @@ bool QSearchTree::is_consistent_quartet(unsigned int &a, unsigned int &b, unsign
   assert(get_neighbor_count(c) == 1);
   assert(get_neighbor_count(d) == 1);
   
-  for( auto flag : nodeflags) flag &= ~NODE_FLAG_QUARTETINT;
+  // std::cout << "nodeflags size " << nodeflags.size() << "\n";
+  for( auto& flag : nodeflags) flag &= ~NODE_FLAG_QUARTETINT;
   find_path_fast(p1, a, b);
   for( auto node : p1 ) nodeflags[node] |= NODE_FLAG_QUARTETINT;
   find_path_fast(p2, c, d);
-  for( auto node : p2 ) if( nodeflags[node] & NODE_FLAG_QUARTETINT) return false;
+  for( auto node : p2 ) if( nodeflags[node] & NODE_FLAG_QUARTETINT) {
+    // std::cout << "QSearchTree::is_consistent_quartet() false - collision at node #" << node << "\n";
+    return false;
+  }
   return true;
 }
 
@@ -478,6 +483,7 @@ void QSearchTree::simple_mutation_leaf_swap()
 
 void QSearchTree::simple_mutation_subtree_transfer()
 {
+  std::cout << "QSearchTree::simple_mutation_subtree_transfer()\n";
   assert(can_subtree_transfer());
   unsigned int k1, k2, i1, m1, m2, m3;
   do {
@@ -703,10 +709,11 @@ gdouble QSearchTree::read_from_dot(GString *treedot, LabeledMatrix *lm)
 
 double QSearchTree::score_tree()
 {
-    if (!dist_calculated) {
-        calc_min_max();
-        dist_calculated = true;
-    }
+  std::cout << "QSearchTree::score_tree()\n";
+  if (!dist_calculated) {
+      calc_min_max();
+      dist_calculated = true;
+  }
 
   if (f_score_good)
     return score;
@@ -760,6 +767,10 @@ if(0) // will skip loop
           else {
             std::cout << "QSearchTree::score_tree() - Error in program logic: no consistent quartets for \n";
             std::cout << ni << " " << nj << " " << nk << " " << nl << " yielded " << x1 << " " << x2 << " " << x3 << "\n";
+            std::ofstream f("treefile.dot");
+            f << to_dot();
+            f.close();
+            assert(0); 
           }
 #endif
         }
@@ -798,6 +809,12 @@ if(0) // will skip loop
   
   double ERRTOL = 1.0e-6;  // ERRTOL undefined in C version repository. 
   amin = dist_min; amax=dist_max;
+  if( acc < amin - ERRTOL ) {
+    std::ofstream f("treefile_assert.dot");
+    f << to_dot();
+    f.close(); 
+    assert(0);
+  }
   assert(amax >= amin - ERRTOL);
   assert(acc >= amin - ERRTOL);
   assert(acc <= amax + ERRTOL);
