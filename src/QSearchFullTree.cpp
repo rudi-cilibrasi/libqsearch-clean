@@ -39,6 +39,9 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
     node_count = clt.total_node_count;  // ?
     
     NodeList todo(node_count - leaf_count);
+    if (map.size() < node_count) {
+      map.resize(node_count);
+    }
 
     for (i = 0; i < node_count; ++i) {
         FullNode& node = map[i];
