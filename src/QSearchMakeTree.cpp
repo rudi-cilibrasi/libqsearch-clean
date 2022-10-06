@@ -6,6 +6,7 @@ static const std::string qsearch_package_version = "0.7.1";
 
 void MakeTreeObserver::operator()(QSearchTree& old, QSearchTree& improved)
 {
+    std::cout << "MakeTreeObserver::operator() improved\n";
     std::cout << improved.score_tree() << "   (lmsd=" << mtr.tm.get_lmsd() << ")\n";
     // mtr.tree = qsearch_tree_add_labels(improved, mtr.mat); obsolete?
     make_tree.write_tree_file(mtr);
@@ -13,6 +14,7 @@ void MakeTreeObserver::operator()(QSearchTree& old, QSearchTree& improved)
 
 void MakeTreeObserver::operator()(QSearchTree& final)
 {
+    std::cout << "MakeTreeObserver::operator() final\n";
     std::cout << final.score_tree() << "\n";
     // mtr.tree = qsearch_tree_add_labels(final, mtr.mat);obsolete?
     make_tree.write_tree_file(mtr);

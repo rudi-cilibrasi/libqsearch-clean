@@ -1,7 +1,14 @@
 #include "QSearchConnectedNode.hpp"
 #include "QSearchNeighborList.hpp"
-
 #include <cassert>
+
+QSearchConnectedNode::QSearchConnectedNode( const unsigned int& branches ) : node_branch(branches), done(0)
+    {
+        for(int i = 0; i<3; i++) {
+            connections[i] = 0;
+            leaf_count[i] = 0;
+        }
+    }
 
 inline int QSearchConnectedNode::find_branch(const int &to) {
     if (connections[0] == to) return 0;
@@ -38,23 +45,23 @@ QSearchConnectedNodeMap::QSearchConnectedNodeMap(const QSearchTree &clt)
     for (int i = 0; i < node_count; ++i) {
         const QSearchNeighborList& cln = clt.n[i];
         // add to connected nodes
-        for( auto& j : cln.n ) {
-        //for (j = 0; j < cln.n.len; ++j) {
-            //int node = cln.n[j];
-        
+        //for( auto& node : cln.n ) {
+        for (int j = 0; j < cln.size(); ++j) {
+            unsigned int node = cln[j];
+            // std::cout << "QSearchConnectedNodeMap::QSearchConnectedNodeMap() node = " << node << "\n";
             // find unfilled branch
-            int branch = map[j].find_branch(-1);
-            map[j].connections[branch] = i; // set connection
+            int branch = map[node].find_branch(-1);
+            map[node].connections[branch] = i; // set connection
             
             if (i < leaf_count) {
-                map[j].leaf_count[branch] = 1; // set leaf
+                map[node].leaf_count[branch] = 1; // set leaf
             }
-            map[j].node_branch[i] = branch; // leaf can be found in branch
+            map[node].node_branch[i] = branch; // leaf can be found in branch
 
             // set connection back to this node
             branch = map[i].find_branch(-1);
-            map[i].connections[branch] = j;
-            map[i].node_branch[j] = branch;
+            map[i].connections[branch] = node;
+            map[i].node_branch[node] = branch;
         }
     }
 

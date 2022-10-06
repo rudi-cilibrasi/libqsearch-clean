@@ -9,7 +9,7 @@ struct QSearchConnectedNode {
 
     int find_branch(const int& to);
 
-    QSearchConnectedNode( const unsigned int& branches ) : node_branch(branches) {}
+    QSearchConnectedNode( const unsigned int& branches );
 };
 
 struct QSearchConnectedNodeMap {

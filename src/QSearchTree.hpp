@@ -24,6 +24,16 @@ struct MutationStatistics {
   int total_order_simple_mutations;
   int total_order_complex_mutations;
   int last_order_simple_mutations;
+
+  MutationStatistics() : 
+    total_complex_mutations(0),
+    total_simple_mutations(0),
+    total_successful_mutations(0),
+    last_simple_mutations(0),
+    total_clonings(0),
+    total_order_simple_mutations(0),
+    total_order_complex_mutations(0),
+    last_order_simple_mutations(0) {}
 };
 
 // bit mask
@@ -101,6 +111,7 @@ struct QSearchTree {
   bool set_connected(const unsigned int& a, const unsigned int& b, bool newconstate);
   void clear_all_connections();
   double score_tree();
+  double score_only_v2();
   double score_tree_fast_v2();
 
   // deferred. Is dm needed? 

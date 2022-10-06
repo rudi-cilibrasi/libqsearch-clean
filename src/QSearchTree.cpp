@@ -16,8 +16,12 @@ QSearchTree::QSearchTree(QMatrix<double>& dm_init)
     n(dm_init.dim * 2 - 2), 
     dist_calculated(false), 
     must_recalculate_paths(true), 
-    spm(dm_init.dim * 2 - 2)
-  {
+    spm(dm_init.dim * 2 - 2),
+    score(0.0),
+    dist_min(0.0), 
+    dist_max(0.0),
+    f_score_good(false)
+{
   assert(dm.dim >= 4);
 
   for(int i = 0; i < dm.dim - 2; i++ ) {
@@ -38,12 +42,12 @@ QSearchTree::QSearchTree(QMatrix<double>& dm_init)
 QSearchTree::QSearchTree(const QSearchTree& q) : 
   total_node_count(q.total_node_count), 
   must_recalculate_paths(true), 
-  dist_calculated(q.dist_calculated),
+  dist_calculated(false),
   score(q.score),
   spm(q.spm),
   f_score_good(false), 
-  dist_min(q.dist_min), 
-  dist_max(q.dist_max),
+  dist_min(0.0), 
+  dist_max(0.0),
   ms(q.ms), 
   n(q.n),
   nodeflags(q.nodeflags),
@@ -64,6 +68,7 @@ std::unique_ptr< QSearchTree > QSearchTree::find_better_tree(int howManyTries)
   int i, totmuts;
   double candscore;
   double best_score;
+  assert( this );
   double curscore = score_tree();
   std::unique_ptr< QSearchTree > cand, result;
 #if QSOPENMP_ENABLED
@@ -107,7 +112,7 @@ std::unique_ptr< QSearchTree > QSearchTree::find_better_tree(int howManyTries)
 
             // calculate acceptance
             double now = tree.raw_score;
-            if (drand48() >= exp(beta * (cur-now) )) { // reject
+            if (rand1(gen) >= exp(beta * (cur-now) )) { // reject
                 tree.swap_nodes(p1, p2);
             } 
 
@@ -141,7 +146,7 @@ std::unique_ptr< QSearchTree > QSearchTree::find_better_tree(int howManyTries)
             
             // calculate acceptance
             double now = tree.raw_score;
-            if (drand48() >= exp(beta*(cur-now) )) { // reject
+            if (rand1(gen) >= exp(beta*(cur-now) )) { // reject
                 tree.swap_nodes(sibling, p2);
                 tree.swap_nodes(interior, p2);
             } 
@@ -153,6 +158,7 @@ std::unique_ptr< QSearchTree > QSearchTree::find_better_tree(int howManyTries)
     
     //cand->f_score_good = 0;
     //double org = cand->score;
+    assert( cand.get() != NULL);
     candscore  = cand->score_tree();
     
     //if (fabs(org-cand->score) > 1e-6) {
@@ -212,20 +218,26 @@ QMatrix< unsigned int> QSearchTree::get_adjacency_matrix()
 }
 
 void QSearchTree::calc_min_max() {
-    dist_min = 0;
-    dist_max = 0;
-    for (int i = 0; i < leaf_placement.size(); i += 1)
-        for (int j = i+1; j < leaf_placement.size(); j += 1)
-            for (int k = j+1; k < leaf_placement.size(); k += 1)
-                for (int l = k+1; l < leaf_placement.size(); l += 1) {
-                    double c1, c2, c3;
-                    c1 = dm[i][j] + dm[k][l];
-                    c2 = dm[i][k] + dm[j][l];
-                    c3 = dm[i][l] + dm[j][k];
- 
-                    dist_min += std::min( { c1, c2, c3 } ); dist_max += std::max( { c1, c2, c3 } );
-                }
-    // wheee!!
+  //std::cout << "\nQSearchTree::calc_min_max()\n";
+  //std::fflush( stdout );
+
+  dist_min = 0.0;
+  dist_max = 0.0;
+  for (int i = 0; i < leaf_placement.size(); i += 1)
+      for (int j = i+1; j < leaf_placement.size(); j += 1)
+          for (int k = j+1; k < leaf_placement.size(); k += 1)
+              for (int l = k+1; l < leaf_placement.size(); l += 1) {
+                  double c1, c2, c3;
+                  c1 = dm[i][j] + dm[k][l];
+                  c2 = dm[i][k] + dm[j][l];
+                  c3 = dm[i][l] + dm[j][k];
+
+                  dist_min += std::min( { c1, c2, c3 } ); dist_max += std::max( { c1, c2, c3 } );
+              }
+  // wheee!!
+  //std::cout << "\nQSearchTree::calc_min_max() complete\n";
+  //std::fflush( stdout );
+
 }
 
 bool QSearchTree::is_connected(const unsigned int& a, const unsigned int& b) 
@@ -304,9 +316,9 @@ void QSearchTree::find_path_fast(NodeList& result, unsigned int a, unsigned int 
       break;
     a = spm[b][a];
   }
-  std::cout << "QSearchTree::find_path_fast() - result ";
-  for(auto r : result) std::cout << r << " ";
-  std::cout <<  "\n";
+  //std::cout << "QSearchTree::find_path_fast() - result ";
+  //for(auto r : result) std::cout << r << " ";
+  //std::cout <<  "\n";
   if (a != b)
     std::cout << "Error, broken path from " << a << " to " << b << " for tree.\n";
 }
@@ -352,7 +364,7 @@ bool QSearchTree::is_consistent_quartet(unsigned int &a, unsigned int &b, unsign
   assert(get_neighbor_count(c) == 1);
   assert(get_neighbor_count(d) == 1);
   
-  for( auto flag : nodeflags) flag &= ~NODE_FLAG_QUARTETINT;
+  for( auto& flag : nodeflags) flag &= ~NODE_FLAG_QUARTETINT;
   find_path_fast(p1, a, b);
   for( auto node : p1 ) nodeflags[node] |= NODE_FLAG_QUARTETINT;
   find_path_fast(p2, c, d);
@@ -364,25 +376,25 @@ unsigned int QSearchTree::get_random_node(const node_type& what_kind)
 {
   unsigned int result;
   unsigned int n;
-  std::cout << "QSearchTree::get_random_node()\n";
+  //std::cout << "QSearchTree::get_random_node()\n";
   assert(what_kind == NODE_TYPE_LEAF || what_kind == NODE_TYPE_KERNEL ||
            what_kind == NODE_TYPE_ALL);
   do {
     result = rand_int(0, total_node_count - 1);
-    std::cout << "result = " << result;
+    //std::cout << "result = " << result;
     n = get_neighbor_count(result);
-    std::cout << " n = " << n << "\n";
+    //std::cout << " n = " << n << "\n";
   } while ((what_kind & (n == 1 ? NODE_TYPE_LEAF : NODE_TYPE_KERNEL)) == 0);
   return result;
 }
 
 unsigned int QSearchTree::get_random_node_but_not(const node_type& what_kind, const unsigned int& but_not)
 {
-  std::cout << "QSearchTree::get_random_node_but_not() but_not = " << but_not << "\n";
+  //std::cout << "QSearchTree::get_random_node_but_not() but_not = " << but_not << "\n";
   unsigned int result;
   do {
     result = get_random_node(what_kind);
-    std::cout << "result = " << result << "\n";
+    //std::cout << "result = " << result << "\n";
   } while (result == but_not);
   return result;
 }
@@ -457,7 +469,7 @@ void QSearchTree::simple_mutation()
   int i;
   do {
     i = rand_int(0,2);
-    std::cout << "simple mutation type " << i << "\n";
+    //std::cout << "simple mutation type " << i << "\n";
     switch (i) {
       case 0: simple_mutation_leaf_swap(); hm = true; break;
       case 1: if (can_subtree_transfer()) { simple_mutation_subtree_transfer(); hm = true; } break;
@@ -701,21 +713,71 @@ gdouble QSearchTree::read_from_dot(GString *treedot, LabeledMatrix *lm)
 }
 */
 
+double QSearchTree::score_only_v2()
+{
+  std::cout << "\nQSearchTree::score_tree()\n";
+  assert(this);
+  if (!dist_calculated) {
+    calc_min_max();
+    dist_calculated = true;
+  }
+
+/*
+  if (f_score_good) { 
+    std::cout << "\nQSearchTree::score_tree() - score good, returning " << score << "\n";
+    std::fflush( stdout );
+    return score;
+  }
+  */
+   
+  double score2 = score_tree_fast_v2();
+  
+  double acc = score2;
+
+  double ERRTOL = 1.0e-6;  // ERRTOL undefined in C version repository. 
+  double amin = dist_min; 
+  double amax=dist_max;
+  std::cout << "acc = " << acc << " amin = " << amin << " amax = " << amax << "\n";
+  assert(amax >= amin - ERRTOL);
+  assert(acc >= amin - ERRTOL);
+  assert(acc <= amax + ERRTOL);
+  score = (amax-acc)/(amax-amin);
+  f_score_good = true;
+  assert(score >= 0.0);
+  assert(score <= 1.0);
+
+  std::cout << "\nQSearchTree::score_tree() complete score = " << score << "\n";
+
+  return score;
+}
+
 double QSearchTree::score_tree()
 {
-    if (!dist_calculated) {
-        calc_min_max();
-        dist_calculated = true;
-    }
+  //std::cout << "\nQSearchTree::score_tree()\n";
+  if (!dist_calculated) {
+    calc_min_max();
+    dist_calculated = true;
+  }
 
-  if (f_score_good)
+/*
+  if (f_score_good) { 
+    std::cout << "\nQSearchTree::score_tree() - score good, returning " << score << "\n";
+    std::fflush( stdout );
     return score;
+  }
+*/
+
   unsigned int i, j, k, l;
   double acc = 0.0;
-  double amin=0, amax=0;
+  double amin=0.0, amax=0.0;
 
   // assert matrix values are nonnegative
-  for(auto v : dm.m) for(auto w : v) assert(w >= 0.0);  
+  //std::string s;
+  //dm.to_string(s);
+  //std::cout << s;
+  //std::cout << "\nassert matrix values are nonnegative\n";
+  //std::fflush( stdout );
+  //for(auto& v : dm.m) for(auto& w : v) assert(w >= 0.0);  
     //freshen_spm();
     
     //struct timespec start_time;
@@ -723,15 +785,16 @@ double QSearchTree::score_tree()
     //clockid_t clockid = CLOCK_REALTIME; 
     //clock_gettime(clockid, &start_time);
     
-
 #ifdef SKIP_ORIGINAL
 if(0) // will skip loop
 #endif
 
-  for (i = 0; i < leaf_placement.size(); i += 1)
-    for (j = i+1; j < leaf_placement.size(); j += 1)
-      for (k = j+1; k < leaf_placement.size(); k += 1)
-        for (l = k+1; l < leaf_placement.size(); l += 1) {
+  unsigned int lps = leaf_placement.size();
+
+  for (i = 0; i < lps; i += 1) {
+    for (j = i+1; j < lps; j += 1) {
+      for (k = j+1; k < lps; k += 1) {
+        for (l = k+1; l < lps; l += 1) {
           unsigned int ni = leaf_placement[i];
           unsigned int nj = leaf_placement[j];
           unsigned int nk = leaf_placement[k];
@@ -763,6 +826,9 @@ if(0) // will skip loop
           }
 #endif
         }
+      }
+    }
+  }
 
   //long nanos_per_second = 1000000000L;
   //clock_gettime(clockid, &end_time);
@@ -771,7 +837,7 @@ if(0) // will skip loop
     
    //qsearch_optimize_tree(dm);
    static int nEvals = 0;
-   if (++nEvals % 10 == 0) { printf("Evals: %d\r", nEvals); fflush(stdout); }
+   if (++nEvals % 10 == 0) { std::cout << "Evals: " << nEvals << "\n"; }
    
    double score2 = score_tree_fast_v2();
   //clock_gettime(clockid, &end_time);
@@ -792,12 +858,14 @@ if(0) // will skip loop
         
   //int nanos2 = ((end_time.tv_sec - start_time.tv_sec) * nanos_per_second + end_time.tv_nsec - start_time.tv_nsec);
 
+
 #ifdef SKIP_ORIGINAL
     acc = score2;
 #endif
   
   double ERRTOL = 1.0e-6;  // ERRTOL undefined in C version repository. 
   amin = dist_min; amax=dist_max;
+  //std::cout << "acc = " << acc << " amin = " << amin << " amax = " << amax << "\n";
   assert(amax >= amin - ERRTOL);
   assert(acc >= amin - ERRTOL);
   assert(acc <= amax + ERRTOL);
@@ -819,17 +887,20 @@ if(0) // will skip loop
     //printf("nanos org = %d nanos new = %d speedup factor = %f \n", nanos1, nanos2, (double)nanos1/(double)nanos2);
     //printf("Score: %f %f\n", acc, score2);
 
-    if (fabs(score2-acc) > 1e-6) {
-        
-        fprintf(stderr, "Error, score should be %f, was %f\n", acc, score2);
+    if (fabs(score2-acc) > ERRTOL) {
+
+        std::cout << "score difference " << score2 - acc << "\n";
+        //std::cout << "score should be " << acc << ", was " << score2 << "\n";
             
-        exit(EXIT_FAILURE);
+        //exit(EXIT_FAILURE);
     }
+    //std::cout << "\nQSearchTree::score_tree() complete\n";
 
   return score;
 }
 
 double QSearchTree::score_tree_fast_v2() {
+  //std::cout << "\nQSearchTree::score_tree_fast_v2()\n";
   QSearchConnectedNodeMap map(*this);
   
   // run over all pairs
@@ -839,7 +910,7 @@ double QSearchTree::score_tree_fast_v2() {
 
   double sum = 0.0;
   
-  /* loop over internal nodes. As we have know where leafs are, we can now, for each internal node
+  /* loop over internal nodes. As we have know where leaves are, we can now, for each internal node
     * calculate the number of consistent pairs that participate in the sum
     *
     * Suppose we have 8 leafs, and an internal node structured as:
@@ -911,6 +982,8 @@ double QSearchTree::score_tree_fast_v2() {
         }
     }
     }
+  //std::cout << "\nQSearchTree::score_tree_fast_v2() complete\n";
+
   return sum;
 }
 

@@ -13,13 +13,24 @@ struct FullNode {
     double      dist[3];
 
     std::vector<unsigned char> node_branch; // pointing in the direction where to find a node
+
+    FullNode( const unsigned int& size );
+
+    int find_branch(int to);
 };
 
-typedef std::vector< FullNode > FullNodeList;
+struct FullNodeList {
+    std::vector< FullNode > nodes;
+
+    FullNodeList( const unsigned int& size ) : nodes( size, FullNode( size ) ) {}
+
+    FullNode  operator [](const unsigned int& i) const { return nodes[i]; }
+    FullNode& operator [](const unsigned int& i)       { return nodes[i]; }
+};
 
 // roll into QSearchTree?
 struct QSearchFullTree {
-    unsigned int node_count;
+    unsigned int node_count, leaf_count;
     double       raw_score;
     FullNodeList map;
     QMatrix<double>& dm;

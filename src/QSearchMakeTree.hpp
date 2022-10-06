@@ -9,8 +9,7 @@ struct MakeTreeResult {
     QMatrix<double>& mat; 
     QSearchTree& tree;
 
-    // proposed constructor
-        MakeTreeResult( QSearchManager& tm_init, QSearchTree& tree_init ) : tm( tm_init ), tree( tree_init ), mat( tree_init.dm ) {}
+    MakeTreeResult( QSearchManager& tm_init, QSearchTree& tree_init ) : tm( tm_init ), tree( tree_init ), mat( tree_init.dm ) {}
 };
 
 struct QSearchMakeTree
