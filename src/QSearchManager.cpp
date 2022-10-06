@@ -1,5 +1,6 @@
 #include "QSearchManager.hpp"
 #include <cmath>
+#include <cassert>
 
 static int recommended_tree_duplicity(int how_many_leaves)
 {
