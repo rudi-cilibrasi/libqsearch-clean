@@ -4,13 +4,22 @@
 
 #include <cassert>
 
-unsigned int QSearchFullTree::next_node(const unsigned int& from, const unsigned int& to) {
-    return map[from].connections[ (int) map[from].node_branch[to] ];
+FullNode::FullNode( const unsigned int& size ) : node_branch( size ) 
+{
+    for( int i = 0; i < 3; i++ ) {
+        connections[i] = 0;
+        leaf_count[i] = 0;
+        dist[i] = 0;
+    }
 }
 
-static inline double npairs(double n) { return n * (n-1)/2; }
-
-inline static int find_branch(int connections[3], int to) {
+int FullNode::find_branch(int to) {
+    /*
+    std::cout << "find_branch() to= " << to << "\n";
+    std::cout << "connections[0] = " << connections[0] << "\n";
+    std::cout << "connections[1] = " << connections[0] << "\n";
+    std::cout << "connections[2] = " << connections[0] << "\n";
+*/
     if (connections[0] == to) return 0;
     if (connections[1] == to) return 1;
     if (connections[2] == to) return 2;
@@ -18,31 +27,31 @@ inline static int find_branch(int connections[3], int to) {
     return -1;
 }
 
+unsigned int QSearchFullTree::next_node(const unsigned int& from, const unsigned int& to) {
+    return map[from].connections[ (int) map[from].node_branch[to] ];
+}
+
+static inline double npairs(double n) { return n * (n-1)/2; }
+
 void QSearchFullTree::set_score() {
     // calculate the score
     raw_score = 0;
     int i;
-    for (i = (node_count + 2)/2; i < node_count; ++i) {
+    for (i = leaf_count; i < node_count; ++i) {
         raw_score += npairs(map[i].leaf_count[0]) * map[i].dist[0];
         raw_score += npairs(map[i].leaf_count[1]) * map[i].dist[1];
         raw_score += npairs(map[i].leaf_count[2]) * map[i].dist[2];
     }
 }
 
-
-QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
-    
+QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ), map( clt.total_node_count ), 
+    node_count( clt.total_node_count ), leaf_count( clt.dm.dim )
+{ 
     unsigned int i,j; 
-    unsigned int node_count = clt.total_node_count;
-    unsigned int leaf_count = (node_count + 2)/2;
-    
-    node_count = clt.total_node_count;  // ?
     
     NodeList todo(node_count - leaf_count);
-    if (map.size() < node_count) {
-      map.resize(node_count);
-    }
-
+ 
+    // build initial node map
     for (i = 0; i < node_count; ++i) {
         FullNode& node = map[i];
         
@@ -51,8 +60,6 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
             map[i].leaf_count[j] = 0;
             map[i].dist[j] = 0;
         }
-        
-        node.node_branch.resize(node_count);
 
         if (i < leaf_count) {
             for (j=0; j < node_count; ++j) node.node_branch[j] = 0;
@@ -68,11 +75,11 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
 
         const QSearchNeighborList& cln = clt.n[i];
         // add to connected nodes
-        for (j = 0; j < clt.n.size(); ++j) {
-            unsigned int node = cln.n[j];
-        
+        for (j = 0; j < cln.size(); ++j) {
+            unsigned int node = cln[j];
+
             // find unfilled branch
-            int branch = find_branch(map[node].connections, -1);
+            int branch = map[node].find_branch(-1);
             map[node].connections[branch] = i; // set connection
             
             if (i < leaf_count) {
@@ -81,7 +88,7 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
             map[node].node_branch[i] = branch; // leaf can be found in branch
 
             // set connection back to this node
-            branch = find_branch(map[i].connections, -1);
+            branch = map[i].find_branch(-1);
             map[i].connections[branch] = node;
             map[i].node_branch[node] = branch;
         }
@@ -95,7 +102,7 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
                         
             for (j = 0; j < 3; ++j) {
                 unsigned int connected_node = map[this_node].connections[j];
-                unsigned int branch = find_branch(map[connected_node].connections, this_node);
+                unsigned int branch = map[connected_node].find_branch(this_node);
 
                 if (map[connected_node].leaf_count[branch] == 0) {
                     unsigned int first = (3 + j-1) % 3;
@@ -135,7 +142,7 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
                 if (this_node < leaf_count) continue;
                 unsigned int connected_node = map[this_node].connections[j];
                 // find connection
-                unsigned int branch = find_branch(map[connected_node].connections, this_node);
+                unsigned int branch = map[connected_node].find_branch(this_node);
                 if (map[connected_node].leaf_count[branch] == 0) {
                     done = 0;
                     break;
@@ -143,7 +150,6 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
             }
             
             if (done) {
-                //printf("Removing node %d, counts %d %d %d\n", i, map[this_node].leaf_count[0], map[this_node].leaf_count[1], map[this_node].leaf_count[2]);
                 todo.erase( todo.begin() + i );
                 --i;
             }
@@ -157,12 +163,11 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ) {
             for (k = j+1; k < leaf_count; ++k) {
 
                 int b1 = map[i].node_branch[j];
-                int b2 = map[i].node_branch[k];
+                int b2 = map[i].node_branch[k];              
                 
                 if (b1 == b2) continue;
 
                 int b3 = 3 - b1 - b2;
-
                 map[i].dist[b3] += dm[j][k];
             }
         }
@@ -197,12 +202,9 @@ void QSearchFullTree::swap_nodes(const unsigned int& a, const unsigned int& b)
    if (a == b) return; // no point in doing anything
     
    unsigned int interiorA = map[a].connections[ map[a].node_branch[b] ];
-   unsigned int interiorB = map[b].connections[ (int) map[b].node_branch[a] ];
+   unsigned int interiorB = map[b].connections[ map[b].node_branch[a] ];
    
    if (interiorA == interiorB || interiorA == b) return; // swap does not change score
-   
-   unsigned int node_count = node_count;
-   unsigned int leaf_count = (node_count + 2)/2;
 
    unsigned int aToInteriorBranch = map[a].node_branch[interiorA];
    unsigned int bToInteriorBranch = map[b].node_branch[interiorB];
@@ -229,6 +231,7 @@ void QSearchFullTree::swap_nodes(const unsigned int& a, const unsigned int& b)
         }
    }
 
+
    // move towards B 
    while (node != b) {
 
@@ -240,8 +243,8 @@ void QSearchFullTree::swap_nodes(const unsigned int& a, const unsigned int& b)
         raw_score -= npairs(map[node].leaf_count[1]) * map[node].dist[1];
         raw_score -= npairs(map[node].leaf_count[2]) * map[node].dist[2];
         
-        //printf("Node %d\n", node);
-        //printf("Score now %f, distances %f %f %f\n", raw_score, map[node].dist[0], map[node].dist[1], map[node].dist[2]);
+        //std::cout << "\nNode " << node << "\n";
+        //std::cout << "Score now " << raw_score << ", distances " << map[node].dist[0] << " " << map[node].dist[1] << " " << map[node].dist[2] << "\n";
         
         map[node].leaf_count[aBranch] += countB - countA;
         map[node].leaf_count[bBranch] += countA - countB;
@@ -270,7 +273,7 @@ void QSearchFullTree::swap_nodes(const unsigned int& a, const unsigned int& b)
                 }
             }
         } 
-        
+
             
         // update the branches that point to elements from B
         for (i = 0; i < bNodes.size(); ++i) {
@@ -300,7 +303,6 @@ void QSearchFullTree::swap_nodes(const unsigned int& a, const unsigned int& b)
         raw_score += npairs(map[node].leaf_count[1]) * map[node].dist[1];
         raw_score += npairs(map[node].leaf_count[2]) * map[node].dist[2];
         
-        //printf("Score now2 %f, distances %f %f %f\n", raw_score, map[node].dist[0], map[node].dist[1], map[node].dist[2]);
         
         node = map[node].connections[ bBranch ];
    }
@@ -327,11 +329,12 @@ std::unique_ptr< QSearchTree > QSearchFullTree::to_searchtree()
     
     for (i = 0; i < node_count; ++i) {
         QSearchNeighborList& lst = clt->n[i];
-        NodeList& n = lst.n;
+        lst.clear();                           
+        //NodeList& n = lst.n;
         for (j = 0; j < 3; ++j) {
-            unsigned int con = map[i].connections[j];
+            int con = map[i].connections[j];
             if (con <= i) continue; // no need to write
-            n.push_back(con);
+            lst.add_neighbor((unsigned int)con);
         }
     }
     
@@ -394,5 +397,3 @@ void QSearchFullTree::get_children(const unsigned int&  node, const unsigned int
     child1 = map[node].connections[ (3 + branch-1) % 3];
     child2 = map[node].connections[ (branch + 1) % 3];
 }
-
-
