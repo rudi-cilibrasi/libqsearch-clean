@@ -354,6 +354,7 @@ void QSearchTree::freshen_spm()
 
 bool QSearchTree::is_consistent_quartet(unsigned int &a, unsigned int &b, unsigned int &c, unsigned int &d)
 {
+  //std::cout << "QSearchTree::is_consistent_quartet()\n";
   assert( a < total_node_count );
   assert( b < total_node_count );
   assert( c < total_node_count );
@@ -368,7 +369,10 @@ bool QSearchTree::is_consistent_quartet(unsigned int &a, unsigned int &b, unsign
   find_path_fast(p1, a, b);
   for( auto node : p1 ) nodeflags[node] |= NODE_FLAG_QUARTETINT;
   find_path_fast(p2, c, d);
-  for( auto node : p2 ) if( nodeflags[node] & NODE_FLAG_QUARTETINT) return false;
+  for( auto node : p2 ) if( nodeflags[node] & NODE_FLAG_QUARTETINT) {
+    // std::cout << "QSearchTree::is_consistent_quartet() false - collision at node #" << node << "\n";
+    return false;
+  }
   return true;
 }
 
@@ -490,6 +494,7 @@ void QSearchTree::simple_mutation_leaf_swap()
 
 void QSearchTree::simple_mutation_subtree_transfer()
 {
+  std::cout << "QSearchTree::simple_mutation_subtree_transfer()\n";
   assert(can_subtree_transfer());
   unsigned int k1, k2, i1, m1, m2, m3;
   do {
@@ -753,7 +758,6 @@ double QSearchTree::score_only_v2()
 
 double QSearchTree::score_tree()
 {
-  //std::cout << "\nQSearchTree::score_tree()\n";
   if (!dist_calculated) {
     calc_min_max();
     dist_calculated = true;
@@ -823,6 +827,10 @@ if(0) // will skip loop
           else {
             std::cout << "QSearchTree::score_tree() - Error in program logic: no consistent quartets for \n";
             std::cout << ni << " " << nj << " " << nk << " " << nl << " yielded " << x1 << " " << x2 << " " << x3 << "\n";
+            std::ofstream f("treefile.dot");
+            f << to_dot();
+            f.close();
+            assert(0); 
           }
 #endif
         }
@@ -858,14 +866,12 @@ if(0) // will skip loop
         
   //int nanos2 = ((end_time.tv_sec - start_time.tv_sec) * nanos_per_second + end_time.tv_nsec - start_time.tv_nsec);
 
-
 #ifdef SKIP_ORIGINAL
     acc = score2;
 #endif
   
   double ERRTOL = 1.0e-6;  // ERRTOL undefined in C version repository. 
   amin = dist_min; amax=dist_max;
-  //std::cout << "acc = " << acc << " amin = " << amin << " amax = " << amax << "\n";
   assert(amax >= amin - ERRTOL);
   assert(acc >= amin - ERRTOL);
   assert(acc <= amax + ERRTOL);
@@ -887,10 +893,12 @@ if(0) // will skip loop
     //printf("nanos org = %d nanos new = %d speedup factor = %f \n", nanos1, nanos2, (double)nanos1/(double)nanos2);
     //printf("Score: %f %f\n", acc, score2);
 
+
     if (fabs(score2-acc) > ERRTOL) {
 
         std::cout << "score difference " << score2 - acc << "\n";
         //std::cout << "score should be " << acc << ", was " << score2 << "\n";
+
             
         //exit(EXIT_FAILURE);
     }
@@ -987,64 +995,19 @@ double QSearchTree::score_tree_fast_v2() {
   return sum;
 }
 
-/* Deferred
-GString *qsearch_tree_to_dot(const QLabeledTree *tree) {
-  char *str;
-  int i, j;
-  gboolean show_details =
-          qsearch_maketree_get_dot_show_details(qsearch_maketree_top());
-  gboolean show_ring =
-          qsearch_maketree_get_dot_show_ring(qsearch_maketree_top());
-  GString *r = g_string_new("");
-  str = g_strdup_printf("graph \"%s\" {\n",
-          qsearch_maketree_get_dot_title(qsearch_maketree_top()));
-  g_string_append(r, str); g_free(str);
-  if (show_details) {
-    str = g_strdup_printf("label=\"S(T)=%f\";\n", qsearch_tree_score_tree(tree->qs, tree->mat));
-    g_string_append(r, str); g_free(str);
-  }
-  for (i = 0; i < tree->qs->total_node_count; i += 1) {
-    int nodenum = i;
-    if (qsearch_tree_get_neighbor_count(tree->qs, nodenum) == 1)
-      nodenum = qsearch_tree_get_column_number(tree->qs, nodenum);
-    str = g_strdup_printf("%d [label=\"%s\"];\n", nodenum, tree->labels[i]);
-    g_string_append(r, str); g_free(str);
-  }
-  for (i = 0; i < tree->qs->total_node_count; i += 1) {
-    int nodenumi = i;
-    if (qsearch_tree_get_neighbor_count(tree->qs, nodenumi) == 1)
-      nodenumi = qsearch_tree_get_column_number(tree->qs, nodenumi);
-    for (j = i+1; j < tree->qs->total_node_count; j += 1) {
-      int nodenumj = j;
-      if (qsearch_tree_get_neighbor_count(tree->qs, nodenumj) == 1)
-        nodenumj = qsearch_tree_get_column_number(tree->qs, nodenumj);
-      if (qsearch_tree_is_connected(tree->qs,i,j)) {
-        str = g_strdup_printf("%d -- %d [weight=\"2\"];\n", nodenumi, nodenumj);
-        g_string_append(r, str); g_free(str);
+  std::string QSearchTree::to_dot() {
+    std::ostringstream oss;
+    oss << "graph \"" << "untitled" << "\" {\n";
+    for (int i = 0; i < total_node_count; i += 1) {
+      oss << i << " [label=\"node " << i << "\"];\n";
+    }
+    for (int i = 0; i < total_node_count; i += 1) {
+      for (int j = i; j < total_node_count; j += 1) {
+        if (is_connected(i, j)) {
+          oss << i << " -- " << j << " [weight=\"2\"];\n";
+        }
       }
     }
+    oss << "}\n";
+    return oss.str();
   }
-  GArray *lcirc = qsearch_tree_walk_filtered(tree->qs, 0, NODE_TYPE_LEAF);
-  int qq=tree->qs->total_node_count+10000;
-  for (i = 0; i < lcirc->len; i += 1) {
-    int n1 = g_array_index(lcirc, guint32, i);
-    int n2 = g_array_index(lcirc, guint32, (i+1)%(lcirc->len));
-    int c1, c2;
-    double dist = gsl_matrix_get(tree->mat,
-            c1=qsearch_tree_get_column_number(tree->qs, n1),
-            c2=qsearch_tree_get_column_number(tree->qs, n2));
-    str = g_strdup_printf("%d -- %d [style=\"dotted\"%s];\n",c1,qq,show_ring?"":",color=\"white\"");
-    g_string_append(r, str); g_free(str);
-    str = g_strdup_printf("%d -- %d [style=\"dotted\"%s];\n",c2,qq,show_ring?"":",color=\"white\"");
-    g_string_append(r, str); g_free(str);
-    if (show_ring)
-      str = g_strdup_printf("%d [label=\"%03.3f\",color=\"white\"];\n",qq,dist);
-    else
-      str = g_strdup_printf("%d [label=\"\",color=\"white\"];\n",qq);
-    g_string_append(r, str); g_free(str);
-    qq += 1;
-  }
-  g_string_append(r, "}\n");
-  return r;
-}
-*/

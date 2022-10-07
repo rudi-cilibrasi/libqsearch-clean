@@ -50,6 +50,9 @@ QSearchFullTree::QSearchFullTree(const QSearchTree& clt) : dm( clt.dm ), map( cl
     unsigned int i,j; 
     
     NodeList todo(node_count - leaf_count);
+    if (map.size() < node_count) {
+      map.resize(node_count);
+    }
 
     // build initial node map
     for (i = 0; i < node_count; ++i) {
