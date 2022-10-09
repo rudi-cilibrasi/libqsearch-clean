@@ -74,5 +74,32 @@ template<class T> void QMatrix<T>::from_string( const std::string& s )
     assert( ( labels.size() == 0 ) || ( labels.size() == dim ) );
 }
 
+template<class T> bool QMatrix<T>::is_symmetric() {
+    bool result = true;
+    for(int i=0; i< dim; i++ ) {
+        for(int j=0; j< dim; j++ ) {
+            if( m[i][j] != m[j][i] ) {
+                result = false;
+                std::cout << "matrix asymmetry " << i << " " << j << " " << m[i][j] << " " << m[j][i] << "\n";
+            }
+        }
+    }
+    return result;
+}
+
+// assure that matrix is symmetric and zero-diagonal
+template<class T> void QMatrix<T>::make_symmetric() {
+for(int i=0; i< dim; i++ ) {
+    for(int j=0; j< dim; j++ ) {
+        if( i == j ) { m[i][j] = 0; }
+        else {
+            T avg = (m[i][j] + m[j][i]) / 2;    // use the average of differing values across the diagonal
+            m[i][j] = avg;
+            m[j][i] = avg;
+        }
+        }
+    }
+}
+
 template class QMatrix<unsigned int>;
 template class QMatrix<double>;

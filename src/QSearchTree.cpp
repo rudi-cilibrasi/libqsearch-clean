@@ -178,7 +178,7 @@ std::unique_ptr< QSearchTree > QSearchTree::find_better_tree(int howManyTries)
       result.reset();
       std::swap(result,cand);
       curscore = candscore;
-      std::cout << "Got better score " << curscore << std::endl;
+      //std::cout << "Got better score " << curscore << std::endl;
     }
     else
       cand.reset();
@@ -718,22 +718,14 @@ gdouble QSearchTree::read_from_dot(GString *treedot, LabeledMatrix *lm)
 }
 */
 
-double QSearchTree::score_only_v2()
+double QSearchTree::score_tree()
 {
-  std::cout << "\nQSearchTree::score_tree()\n";
+  //std::cout << "\nQSearchTree::score_tree()\n";
   assert(this);
   if (!dist_calculated) {
     calc_min_max();
     dist_calculated = true;
   }
-
-/*
-  if (f_score_good) { 
-    std::cout << "\nQSearchTree::score_tree() - score good, returning " << score << "\n";
-    std::fflush( stdout );
-    return score;
-  }
-  */
    
   double score2 = score_tree_fast_v2();
   
@@ -742,7 +734,7 @@ double QSearchTree::score_only_v2()
   double ERRTOL = 1.0e-6;  // ERRTOL undefined in C version repository. 
   double amin = dist_min; 
   double amax=dist_max;
-  std::cout << "acc = " << acc << " amin = " << amin << " amax = " << amax << "\n";
+  //std::cout << "acc = " << acc << " amin = " << amin << " amax = " << amax << "\n";
   assert(amax >= amin - ERRTOL);
   assert(acc >= amin - ERRTOL);
   assert(acc <= amax + ERRTOL);
@@ -751,12 +743,10 @@ double QSearchTree::score_only_v2()
   assert(score >= 0.0);
   assert(score <= 1.0);
 
-  std::cout << "\nQSearchTree::score_tree() complete score = " << score << "\n";
-
   return score;
 }
 
-double QSearchTree::score_tree()
+double QSearchTree::score_tree_original()
 {
   if (!dist_calculated) {
     calc_min_max();
@@ -941,7 +931,7 @@ double QSearchTree::score_tree_fast_v2() {
     *
     */
   
-  std::vector< std::vector< long long > > tmpmat( node_count, std::vector< long long >(leaf_count * leaf_count));
+  std::vector< std::vector< long long > > tmpmat( node_count, std::vector< long long >(leaf_count * leaf_count, 0ll));
 
   int node;
   int branch, n, npairs, first, second, ni, nj;
@@ -959,7 +949,7 @@ double QSearchTree::score_tree_fast_v2() {
                 first = (3 + branch - 1) % 3;
                 second = (branch + 1) % 3;
                 
-//                double sumdistance = 0;
+//              double sumdistance = 0;
                  
                 for (i = 0; i < leaf_count; ++i) {
                     
@@ -970,7 +960,7 @@ double QSearchTree::score_tree_fast_v2() {
                         nj = leaf_placement[j];
                         if ( map[node].node_branch[nj] != second) continue; // this leaf is in the wrong branch
                         
-                        tmpmat[node][i + leaf_count*j] += npairs;
+                        if(i!=j) tmpmat[node][i + leaf_count*j] += npairs; 
                         //double dist  = dm[i][j];
                         //sumdistance += dist;
                     }
@@ -982,7 +972,7 @@ double QSearchTree::score_tree_fast_v2() {
     }
 }
     
-    sum = 0;
+    sum = 0.0;
     for (node = leaf_count; node < node_count; ++node) {
     for (i = 0; i < leaf_count; ++i) {
         for (j = 0; j < leaf_count; ++j) {
@@ -995,19 +985,20 @@ double QSearchTree::score_tree_fast_v2() {
   return sum;
 }
 
-  std::string QSearchTree::to_dot() {
-    std::ostringstream oss;
-    oss << "graph \"" << "untitled" << "\" {\n";
-    for (int i = 0; i < total_node_count; i += 1) {
-      oss << i << " [label=\"node " << i << "\"];\n";
-    }
-    for (int i = 0; i < total_node_count; i += 1) {
-      for (int j = i; j < total_node_count; j += 1) {
-        if (is_connected(i, j)) {
-          oss << i << " -- " << j << " [weight=\"2\"];\n";
-        }
+std::string QSearchTree::to_dot() {
+  std::ostringstream oss;
+  oss << "graph \"" << "untitled" << "\" {\n";
+  for (int i = 0; i < total_node_count; i += 1) {
+    if( ( i < dm.dim ) && dm.has_labels() ) oss << i << " [label=\"" << dm.labels[i] << "\"];\n";
+    else oss << i << " [label=\"node " << i << "\"];\n";
+  }
+  for (int i = 0; i < total_node_count; i += 1) {
+    for (int j = i; j < total_node_count; j += 1) {
+      if (is_connected(i, j)) {
+        oss << i << " -- " << j << " [weight=\"2\"];\n";
       }
     }
-    oss << "}\n";
-    return oss.str();
   }
+  oss << "}\n";
+  return oss.str();
+}
