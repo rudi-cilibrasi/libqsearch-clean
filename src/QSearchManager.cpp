@@ -18,11 +18,11 @@ QSearchManager::QSearchManager(QMatrix<double>& dm_init) // was QSearchTreeMaste
   int fs = recommended_tree_duplicity(dm.dim);
   for (int i = 0; i < fs; i++) {
     forest.push_back( tree_ptr( new QSearchTree( dm ) ) );
-    if (i == 0) {
+    /* if (i == 0) {
       std::ofstream f("treefile.dot");
       f << forest[i]->to_dot();
       f.close();
-    }
+    } */
     forest[i]->complex_mutation();
     forest[i]->complex_mutation();
   }
@@ -62,7 +62,7 @@ QSearchTree QSearchManager::find_best_tree()
       assert( forest[i].get() != NULL);
       osco = forest[i]->score_tree();
       assert( osco <= 1.0 );
-      std::cout << "osco is " << osco << std::endl;
+      //std::cout << "osco is " << osco << std::endl;
       try_to_improve_bucket(i);
       assert( forest[i].get() != NULL);
       nsco = forest[i]->score_tree();

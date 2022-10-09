@@ -1,5 +1,11 @@
 #include "StringTools.hpp"
 
+std::string remove_extension(const std::string& filename) {
+    size_t lastdot = filename.find_last_of(".");
+    if (lastdot == std::string::npos) return filename;
+    return filename.substr(0, lastdot); 
+}
+
 void segment_string( StringList& v, const std::string& s, const char c )
 {
     v.clear();
@@ -22,7 +28,11 @@ bool read_whole_file( std::string& s, const std::string& filename )
         sstr << ifs.rdbuf();
         s = sstr.str();
     }
-    catch(std::exception& exc)  { return false; }
+    catch(std::exception& exc)  { 
+                std::cout << "file write error\n";
+        std::cout << "file read error\n";
+        return false; 
+    }
     return true;
 }
 
@@ -32,6 +42,9 @@ bool write_whole_file( const std::string& s, const std::string& filename )
         std::ofstream ofs(filename, std::ios_base::binary); 
         ofs << s; 
     }
-    catch(std::exception& exc)  { return false; }
+    catch(std::exception& exc)  { 
+        std::cout << "file write error\n";
+        return false; 
+    }
     return true;
 }

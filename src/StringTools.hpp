@@ -9,6 +9,7 @@
 
 typedef std::vector<std::string> StringList;
 
+std::string remove_extension(const std::string& filename);
 // Breaks a string up into a vector of substrings wherever separated by a given character
 void segment_string( StringList& v, const std::string& s, const char c );
 void print_string_list( const StringList& v, const std::string spacer );

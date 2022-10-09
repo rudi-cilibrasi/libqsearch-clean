@@ -28,6 +28,8 @@ template<class T> struct QMatrix {
     void to_string(std::string& s);
     void from_string( const std::string& s );
     void resize(const unsigned int& new_dim);
+    bool is_symmetric();
+    void make_symmetric();  // assure that matrix is symmetric and zero-diagonal
 };
 
 #endif // __SIMPLE_MATRIX_HPP

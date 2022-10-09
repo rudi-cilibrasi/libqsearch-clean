@@ -111,16 +111,16 @@ struct QSearchTree {
   bool set_connected(const unsigned int& a, const unsigned int& b, bool newconstate);
   void clear_all_connections();
   double score_tree();
-  double score_only_v2();
+  double score_tree_original();
   double score_tree_fast_v2();
 
-  // deferred. Is dm needed? 
-    double read_from_dot(std::string treedot, QMatrix<unsigned int>& dm);  
-  // from QLabeledTree - deferred
-    std::string to_dot();
-    std::string to_nexus();
-    std::string to_nexus_full(QMatrix< unsigned int >& dm); // could be an overload of to_nexus()
+  std::string to_dot();
 
+  // deferred. Is dm needed? 
+    //double read_from_dot(std::string treedot, QMatrix<unsigned int>& dm);  
+  // from QLabeledTree - deferred
+    //std::string to_nexus();
+    //std::string to_nexus_full(QMatrix< unsigned int >& dm); // could be an overload of to_nexus()
 };
 
 #endif // __QSEARCHTREE_HPP

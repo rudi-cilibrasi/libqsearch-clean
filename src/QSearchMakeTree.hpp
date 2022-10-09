@@ -30,7 +30,7 @@ struct QSearchMakeTree
     {}
 
     void process_options(char **argv);
-    void write_tree_file(const MakeTreeResult& mtr);
+    void write_tree_file(QSearchTree& tree);
     void print_help_and_exit();
 };
 
