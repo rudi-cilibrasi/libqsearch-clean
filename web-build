@@ -1,0 +1,3 @@
+#!/usr/bin/bash
+cd $(dirname $0)/
+em++ src/maketree.cpp src/QSearchConnectedNode.cpp src/QSearchFullTree.cpp src/QSearchMakeTree.cpp src/QSearchManager.cpp src/QSearchNeighborList.cpp src/QSearchTree.cpp src/SimpleMatrix.cpp src/StringTools.cpp -o build/index.html -s WASM=1

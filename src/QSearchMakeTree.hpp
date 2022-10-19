@@ -30,6 +30,8 @@ struct QSearchMakeTree
     {}
 
     void process_options(char **argv);
+    void process_options_unix(char **argv);
+    void process_options_web(char **argv);
     void write_tree_file(QSearchTree& tree);
     void print_help_and_exit();
 };
