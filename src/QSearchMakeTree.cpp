@@ -71,9 +71,23 @@ gibbon 0.852812 0.923614 0.943204 0.941398 0.926042 0.949129 0.841267 0.918229 0
 graySeal 0.935368 0.890485 0.935632 0.934247 0.879032 0.939430 0.929297 0.893477 0.883482 0.919522 0.910034 0.925756 0.890884 0.897267 0.924796 0.919609 0.914076 0.897068 0.922209 0.915619 0.910448 0.383852 0.930610 0.903451 0.934224 0.917614 0.921355 0.899461 0.926591 0.889288 0.928102 0.893078 0.929797 0.000000 
 )";
 
-void QSearchMakeTree::process_options_web(char **argv) 
+void QSearchMakeTree::make_tree(const std::string& matstr)
 {
     QMatrix<double> dm;     // owner of matrix?
+
+    dm.from_string(matstr);
+    dm.make_symmetric();
+    std::cout << "Starting search on matrix size " << dm.dim << "\n";
+    QSearchManager cltm(dm);
+    QSearchTree tree(dm);
+    MakeTreeResult mtr(cltm,tree);
+    MakeTreeObserver mto( *this, mtr );
+    cltm.add_observer(mto, mto, mto);
+    cltm.find_best_tree();
+}
+
+void QSearchMakeTree::process_options_web(char **argv) 
+{
     std::string matstr;
     char **cur;
     for (cur = argv+1; *cur; cur += 1) {
@@ -96,56 +110,38 @@ void QSearchMakeTree::process_options_web(char **argv)
     }
     matstr = smallTestMatrix;
     filestem = "-";
-    dm.from_string(matstr);
-    dm.make_symmetric();
-    std::cout << "Starting search on matrix size " << dm.dim << "\n";
-    QSearchManager cltm(dm);
-    QSearchTree tree(dm);
-    MakeTreeResult mtr(cltm,tree);
-    MakeTreeObserver mto( *this, mtr );
-    cltm.add_observer(mto, mto, mto);
-    cltm.find_best_tree();
+    make_tree(matstr);
 }
 
 void QSearchMakeTree::process_options_unix(char **argv) 
 {
-    QMatrix<double> dm;     // owner of matrix?
-    std::string matstr;
-    char **cur;
-    for (cur = argv+1; *cur; cur += 1) {
-      if (strcmp(*cur, "-o") == 0) {
-      if (cur[1] == NULL)
-        std::cout << "-o requires an argument";
-        filestem = cur[1];
-        cur += 1;
-        continue;
-      }
-      if (strcmp(*cur, "-v") == 0 || strcmp(*cur, "--version") == 0) {
-        std::cout << qsearch_package_version << "\n";
-        exit(0);
-      }
-      if (strcmp(*cur, "-n") == 0) {
-        output_nexus = true;
-        continue;
-      }
-      if (matrix_filename.length() == 0) {
-        matrix_filename = *cur;
-        continue;
-      }
-      std::cout << "Unrecognized argument: " << *cur;
+  std::string matstr;
+  char **cur;
+  for (cur = argv+1; *cur; cur += 1) {
+    if (strcmp(*cur, "-o") == 0) {
+    if (cur[1] == NULL)
+      std::cout << "-o requires an argument";
+      filestem = cur[1];
+      cur += 1;
+      continue;
     }
-    if (matrix_filename.empty()) print_help_and_exit();
-    read_whole_file(matstr, matrix_filename);
-    dm.from_string(matstr);
-    dm.make_symmetric();
-    std::cout << "Starting search on matrix size " << dm.dim << "\n";
-    QSearchManager cltm(dm);
-    QSearchTree tree(dm);
-    MakeTreeResult mtr(cltm,tree);
-    MakeTreeObserver mto( *this, mtr );
-    cltm.add_observer(mto, mto, mto);
-    cltm.find_best_tree();
-//  return mtr; // problem - tree goes out of scope
+    if (strcmp(*cur, "-v") == 0 || strcmp(*cur, "--version") == 0) {
+      std::cout << qsearch_package_version << "\n";
+      exit(0);
+    }
+    if (strcmp(*cur, "-n") == 0) {
+      output_nexus = true;
+      continue;
+    }
+    if (matrix_filename.length() == 0) {
+      matrix_filename = *cur;
+      continue;
+    }
+    std::cout << "Unrecognized argument: " << *cur;
+  }
+  if (matrix_filename.empty()) print_help_and_exit();
+  read_whole_file(matstr, matrix_filename);
+  make_tree(matstr);
 }
 
 // Full implementation deferred

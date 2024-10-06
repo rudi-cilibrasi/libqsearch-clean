@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qsearch Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #output {
+            background-color: #f4f4f4;
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 100%;
+            height: 200px;
+            overflow-y: auto;
+        }
+        button {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Qsearch Test</h1>
+
+<div>
+    <button id="runButton">Run QSearch</button>
+</div>
+
+<script type="module">
+    import createQSearchModule from './qsearch.js';  // Loads the qsearch.js module
+
+    let qsearchModule;
+
+    // Load the module
+    createQSearchModule().then(module => {
+        qsearchModule = module;
+        console.log('QSearch module loaded');
+        console.log('QSearch module loaded');
+    });
+
+    // Add an event listener to the button
+    document.getElementById('runButton').addEventListener('click', () => {
+        if (!qsearchModule) {
+            console.log('Module not loaded yet.');
+            return;
+        }
+        try {
+            // Call a function from the qsearchModule
+            qsearchModule._main(); // Assuming _main() is the entry point
+            console.log('QSearch code executed.');
+        } catch (err) {
+            console.log('Error executing QSearch code: ' + err);
+        }
+    });
+
+</script>
+
+</body>
+</html>

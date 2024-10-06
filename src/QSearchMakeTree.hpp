@@ -29,6 +29,8 @@ struct QSearchMakeTree
         dot_title("tree")
     {}
 
+    void make_tree(const std::string& matstr);
+
     void process_options(char **argv);
     void process_options_unix(char **argv);
     void process_options_web(char **argv);
