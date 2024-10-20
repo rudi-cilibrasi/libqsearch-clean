@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QSearch DOM Web App</title>
+    <script type="module">
+        const runButton = document.getElementById('runButton');
+
+        // Create and initialize the Web Worker
+        const worker = new Worker('qsearchWorker.js?version=' + new Date().getTime(), { type: 'module' });
+
+        // Event listener for running Qsearch
+        runButton.addEventListener('click', () => {
+            worker.postMessage({ action: 'runQsearch' });
+        });
+
+        // Event listener for receiving messages from the worker
+        worker.addEventListener('message', (event) => {
+            //console.log('Received message from worker:', event.data);
+            if (event.data.action === 'qsearchComplete') {
+                console.log("Qsearch complete");
+                } else if (event.data.action === 'qsearchError') {
+                console.error("Qsearch error: " + event.data.message);
+                } else if (event.data.action === 'consoleLog') {
+                console.log(event.data.message);
+                } else if (event.data.action === 'consoleError') {
+                console.error("error: " + event.data.message);
+            }
+        });
+
+    </script>
+    <style>
+        #container {
+            display: flex;
+            gap: 20px;
+        }
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1> Multithreaded WASM test</h1>
+    <h2>Quartet Search Tree</h2>
+
+    <div>
+        <button id="runButton">Run QSearch</button>
+    </div>
+    <p>Qsearch web app using a web worker and HTML DOM.</p>
+</body>
+</html>
