@@ -1,4 +1,4 @@
-import Module from './qsearch.js';
+import Module from '../wasm/qsearch.js';
 
 let qsearchModule = null;
 

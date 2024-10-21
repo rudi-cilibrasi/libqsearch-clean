@@ -1,12 +1,15 @@
 #include "QSearchMakeTree.hpp"
+#include <emscripten/bind.h>
 
-int main(int argc, char **argv)
-{
+void run_qsearch() {
     QSearchMakeTree mt;
     std::string matstr;
     read_whole_file(matstr, "samples/SmallTest.txt");
     mt.make_tree(matstr);    
     read_whole_file(matstr, "samples/Mammals.txt");
     mt.make_tree(matstr);
-    return 0;
+}
+
+EMSCRIPTEN_BINDINGS(my_module) {
+    emscripten::function("run_qsearch", &run_qsearch);
 }
