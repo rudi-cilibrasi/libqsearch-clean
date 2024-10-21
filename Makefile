@@ -10,10 +10,10 @@ EMCCFLAGS = --embed-file samples \
 SRC_DIR = src
 BUILD_DIR_SINGLE_THREAD = qsearch_single_thread
 BUILD_DIR_WORKER_DOM = qsearch_worker_DOM
-# BUILD_DIR_REACT_APP = qsearch_worker_react/src/wasm
+BUILD_DIR_REACT_APP = qsearch_worker_react/src/wasm
 TARGET_SINGLE_THREAD = $(BUILD_DIR_SINGLE_THREAD)/qsearch.js
 TARGET_WORKER_DOM = $(BUILD_DIR_WORKER_DOM)/qsearch.js
-# TARGET_REACT_APP = $(BUILD_DIR_REACT_APP)/qsearch.js
+TARGET_REACT_APP = $(BUILD_DIR_REACT_APP)/qsearch.js
 
 # List of source files to include in the build
 SRC_FILES := \
@@ -30,8 +30,7 @@ SRC_FILES := \
 # Corresponding object files in web_build directory
 OBJ_FILES := $(patsubst src/%.cpp,web_build/%.o,$(SRC_FILES))
 
-all: $(TARGET_SINGLE_THREAD) $(TARGET_WORKER_DOM) 
-# $(TARGET_REACT_APP)
+all: $(TARGET_SINGLE_THREAD) $(TARGET_WORKER_DOM) $(TARGET_REACT_APP)
 
 # Include dependency files
 -include $(OBJ_FILES:.o=.d)
@@ -44,9 +43,9 @@ $(TARGET_WORKER_DOM): $(OBJ_FILES)
 	@mkdir -p $(BUILD_DIR_WORKER_DOM)
 	$(EMCC) $(EMCCFLAGS) -s ENVIRONMENT=worker $(OBJ_FILES) -o $(TARGET_WORKER_DOM)
 
-# $(TARGET_REACT_APP): $(OBJ_FILES)
-# 	@mkdir -p $(BUILD_DIR_REACT_APP)
-# 	$(EMCC) $(EMCCFLAGS) -s ENVIRONMENT=worker $(OBJ_FILES) -o $(TARGET_REACT_APP)
+$(TARGET_REACT_APP): $(OBJ_FILES)
+	@mkdir -p $(BUILD_DIR_REACT_APP)
+	$(EMCC) $(EMCCFLAGS) -s ENVIRONMENT=worker $(OBJ_FILES) -o $(TARGET_REACT_APP)
 
 # General rule for compiling each .cpp file to .o with -O3 optimization
 web_build/%.o: src/%.cpp | web_build
@@ -60,6 +59,6 @@ clean:
 	rm -rf web_build
 	rm $(TARGET_SINGLE_THREAD)
 	rm $(TARGET_WORKER_DOM)
-# rm $(TARGET_REACT_APP)
+	rm $(TARGET_REACT_APP)
 
 .PHONY: all clean
