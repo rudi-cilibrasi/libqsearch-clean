@@ -56,7 +56,8 @@ Module({
       // Format the NCD matrix as a string for passing to QSearch
       let matrixString = "";
       for (let i = 0; i < ncdMatrix.length; i++) {
-        matrixString += labels[i] + " " + ncdMatrix[i].join(" ") + "\n";
+        const sanitizedLabel = labels[i].replace(/\s+/g, "_"); // Replace all whitespace with underscores
+        matrixString += sanitizedLabel + " " + ncdMatrix[i].join(" ") + "\n";
       }
 
       self.postMessage({ action: 'consoleLog', message: "Sending matrix to qsearch WASM \n" + matrixString });
