@@ -75,7 +75,7 @@ void QSearchMakeTree::make_tree(const std::string& matstr)
 {
     QMatrix<double> dm;     // owner of matrix?
 
-    dm.from_string(testMatrix);
+    dm.from_string(matstr);
     dm.make_symmetric();
     std::cout << "Starting search on matrix size " << dm.dim << "\n";
     QSearchManager cltm(dm);

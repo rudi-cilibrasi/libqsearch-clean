@@ -55,13 +55,15 @@ QSearchTree QSearchManager::find_best_tree()
   int i, j;
   double bestsco = -1.0;
   double osco, nsco;
+  double ERRTOL = 1.0e-6;  // ERRTOL undefined in C version repository. 
+
   abort_search = false;
   for(auto ob: obs) ob.tree_search_started();
   do {
     for (i = 0; i < forest.size(); i += 1) {
       assert( forest[i].get() != NULL);
       osco = forest[i]->score_tree();
-      assert( osco <= 1.0 );
+      assert( osco <= 1.0 + ERRTOL);
       //std::cout << "osco is " << osco << std::endl;
       try_to_improve_bucket(i);
       assert( forest[i].get() != NULL);

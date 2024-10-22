@@ -740,8 +740,9 @@ double QSearchTree::score_tree()
   assert(acc <= amax + ERRTOL);
   score = (amax-acc)/(amax-amin);
   f_score_good = true;
-  assert(score >= 0.0);
-  assert(score <= 1.0);
+  std::cout << "QSearchTree::score_tree() - returning " << score << "\n";
+  assert(score >= 0.0 - ERRTOL);
+  assert(score <= 1.0 + ERRTOL);
 
   return score;
 }
@@ -867,8 +868,8 @@ if(0) // will skip loop
   assert(acc <= amax + ERRTOL);
   score = (amax-acc)/(amax-amin);
   f_score_good = true;
-  assert(score >= 0.0);
-  assert(score <= 1.0);
+  assert(score >= 0.0 - ERRTOL);
+  assert(score <= 1.0 + ERRTOL);
 
     /*static double best_score = 0;
     if (0 && score > best_score) {
