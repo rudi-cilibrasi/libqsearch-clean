@@ -86,6 +86,22 @@ void QSearchMakeTree::make_tree(const std::string& matstr)
     cltm.find_best_tree();
 }
 
+void QSearchMakeTree::make_tree(const std::string& matstr, start_fn tree_search_started, improve_fn tried_to_improve, done_fn tree_search_done)
+{
+    QMatrix<double> dm;     // owner of matrix?
+
+    dm.from_string(matstr);
+    dm.make_symmetric();
+    std::cout << "Starting search on matrix size " << dm.dim << "\n";
+    QSearchManager cltm(dm);
+    QSearchTree tree(dm);
+    MakeTreeResult mtr(cltm,tree);
+    MakeTreeObserver mto( *this, mtr );
+    cltm.add_observer(mto, mto, mto);
+    cltm.add_observer(tree_search_started, tried_to_improve, tree_search_done);
+    cltm.find_best_tree();
+}
+
 void QSearchMakeTree::process_options_web(char **argv) 
 {
     std::string matstr;
