@@ -1,18 +1,46 @@
-name: CI unit tests
+name: CI Build and Unit Tests
 
-on: [push]
+on: [ push ]
 
 jobs:
-  tests:
+  qsearch-tests:
     runs-on: ubuntu-latest
     steps:
-        - uses: actions/checkout@v2
-        
-        - name: Build libqsearch-clean:latest docker image
-          run: docker build -t libqsearch-clean .
+      - uses: actions/checkout@v2
 
-        - name: Run build
-          run: docker run --rm libqsearch-clean:latest ./runtests --build
+      - name: Build libqsearch-clean:latest docker image
+        run: docker build -t libqsearch-clean .
 
-        - name: Run unit tests
-          run: docker run --rm libqsearch-clean:latest ./runtests --unit
+      - name: Run C++ build
+        run: docker run --rm libqsearch-clean:latest ./runtests --build
+
+      - name: Run C++ unit tests
+        run: docker run --rm libqsearch-clean:latest ./runtests --unit
+
+  ncd-calculator-gui-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [ 18.x, 20.x, 22.x ]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ./ncd-calculator/package.json
+      - name: Change to ncd-calculator
+        run: cd ncd-calculator
+      - name: Install Dependencies
+        run: npm i
+        working-directory: ncd-calculator
+      - name: Build Project
+        run: npm run build --if-present
+        working-directory: ncd-calculator
+      - name: Run Tests
+        run: npm test
+        working-directory: ncd-calculator
