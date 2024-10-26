@@ -63,8 +63,12 @@ Module({
       self.postMessage({ action: 'consoleLog', message: "Sending matrix to qsearch WASM \n" + matrixString });
 
       try {
+        const callback = (treeJSON) => {
+          // Send interim points to the main thread
+          self.postMessage({ action: 'treeJSON', result: treeJSON });
+        };
         // Pass the matrix string to the C++ function
-        qsearchModule.run_qsearch(matrixString);
+        qsearchModule.run_qsearch(matrixString, callback);
         self.postMessage({ action: 'qsearchComplete' });
       } catch (error) {
         self.postMessage({ action: 'qsearchError', message: "QSearch internal error " + error.message });

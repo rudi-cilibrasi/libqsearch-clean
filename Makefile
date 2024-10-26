@@ -49,7 +49,7 @@ $(TARGET_REACT_APP): $(OBJ_FILES)
 
 # General rule for compiling each .cpp file to .o with -O3 optimization
 web_build/%.o: src/%.cpp | web_build
-	em++ -O3 -MMD -MP -std=c++20 -Wall -Wextra $< -c -o $@
+	em++ -O3 -MMD -MP -std=c++20 $< -c -o $@
 
 # Create the web_build directory if it doesn't exist
 web_build:

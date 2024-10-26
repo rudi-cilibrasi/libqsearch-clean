@@ -30,6 +30,7 @@ struct QSearchMakeTree
     {}
 
     void make_tree(const std::string& matstr);
+    void make_tree(const std::string& matstr, start_fn tree_search_started, improve_fn tried_to_improve, done_fn tree_search_done);
 
     void process_options(char **argv);
     void process_options_unix(char **argv);
