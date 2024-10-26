@@ -15,7 +15,7 @@ jobs:
         run: docker run --rm libqsearch-clean:latest ./runtests --build
 
       - name: Run C++ unit tests
-        run: docker run --rm libqsearch-clean:latest ./runtests --unit
+        run: docker run --rm libqsearch-clean:latest ./runtests --unita
 
   ncd-calculator-gui-tests:
     runs-on: ubuntu-latest
@@ -36,7 +36,7 @@ jobs:
       - name: Change to ncd-calculator
         run: cd ncd-calculator
       - name: Install Dependencies
-        run: npm i
+        run: npm ci
         working-directory: ncd-calculator
       - name: Build Project
         run: npm run build --if-present
@@ -44,4 +44,3 @@ jobs:
       - name: Run Tests
         run: npm test
         working-directory: ncd-calculator
-
