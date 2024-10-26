@@ -15,21 +15,26 @@ jobs:
         run: docker run --rm libqsearch-clean:latest ./runtests --build
 
       - name: Run C++ unit tests
-        run: docker run --rm libqsearch-clean:latest ./runtests --unit
+        run: docker run --rm libqsearch-clean:latest ./runtests --unita
 
-  ncd-calculator-gui:
+  ncd-calculator-gui-tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [ 18.x, 20.x, 22.x ]
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
       - name: Set Up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+          cache-dependency-path: ./ncd-calculator/package.json
       - name: Change to ncd-calculator
         run: cd ncd-calculator
-
       - name: Install Dependencies
         run: npm ci
         working-directory: ncd-calculator
