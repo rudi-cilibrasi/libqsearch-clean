@@ -2,12 +2,18 @@ import {useEffect, useRef, useState} from "react";
 import {workerCode} from "../workers/ncdWorker.js";
 import {FileDrop} from "./FileDrop.jsx";
 import MatrixTable from "./MatrixTable.jsx";
-import {getFastaAccessionNumbersFromIds, getFastaIdsBySearchTerm, getFastaList, parseFasta} from "../functions/getPublicFasta.js";
+import {
+    getFastaAccessionNumbersFromIds,
+    getFastaIdsBySearchTerm,
+    getFastaList,
+    parseFasta
+} from "../functions/getPublicFasta.js";
 import {
     cacheAccession, cacheSearchTermAccessions, getCachedDataByAccession, getCachedDataBySearchTerm, initCache
 } from '../functions/cache.js'
 
-import QSearchWorker from '../workers/qSearchWorker.js?worker';
+import QSearchWorker from '../workers/qsearchWorker.js?worker';
+import {TwoDTreeVisualizer} from "./2dTreeVisualizer.jsx";
 
 export const FastaSearch = () => {
     const MAX_IDS_FETCH = 40;
@@ -21,6 +27,7 @@ export const FastaSearch = () => {
     const [confirmedSearchTerm, setConfirmedSearchTerm] = useState('');
     const [executionTime, setExecutionTime] = useState(performance.now());
     const qSearchWorkerRef = useRef(null);
+    const [qSearchTreeResult, setQSearchTreeResult] = useState(null);
 
     const setSearchTermRemoveErr = (searchTerm) => {
         setSearchTerm(searchTerm);
@@ -47,7 +54,7 @@ export const FastaSearch = () => {
         setNcdMatrix(ncdMatrix);
         setHasMatrix(true);
         setErrorMsg('')
-        qSearchWorkerRef.current.postMessage({ action: 'processNcdMatrix', labels, ncdMatrix });
+        qSearchWorkerRef.current.postMessage({action: 'processNcdMatrix', labels, ncdMatrix});
     };
 
     const runNCDWorker = () => {
@@ -119,7 +126,7 @@ export const FastaSearch = () => {
                         labels: [...data.labels, ...parsed.labels]
                     }
                     let len = data.labels.length;
-                    for(let j = 0; j < numItems - len; j++) {
+                    for (let j = 0; j < numItems - len; j++) {
                         data.labels.push(parsed.labels[j]);
                         data.contents.push(parsed.contents[j]);
                     }
@@ -155,6 +162,7 @@ export const FastaSearch = () => {
 
     const handleQsearchMessage = (event) => {
         let newMessage = '';
+        console.log('Received message from QSearchWorker: ', JSON.stringify(event.data));
         if (event.data.action === 'qsearchComplete') {
             newMessage = 'Qsearch complete';
         } else if (event.data.action === 'qsearchError') {
@@ -165,8 +173,10 @@ export const FastaSearch = () => {
         } else if (event.data.action === 'consoleError') {
             console.error(event.data.message);
             newMessage = 'Error: ' + event.data.message;
+        } else if (event.data.action === 'treeJSON') {
+            console.log('Received tree JSON: ', JSON.stringify(event.data.result));
+            setQSearchTreeResult(JSON.parse(event.data.result));
         }
-        console.log('message: ' + JSON.stringify(event.data) + '\n');
     };
 
     return (<div style={{margin: "20px", textAlign: "center"}}>
@@ -234,17 +244,21 @@ export const FastaSearch = () => {
         </div>
 
         <div style={{marginTop: "10px", textAlign: "left"}}>
-            {hasMatrix && (<div style={{overflowX: "auto", maxWidth: "100%"}}>
-                <p style={{fontSize: "18px"}}>
-                    NCD matrix for <b><i>{confirmedSearchTerm}</i></b> (total time: {executionTime.toFixed(2)}ms)
-                </p>
-                <MatrixTable ncdMatrix={ncdMatrix} labels={labels}/>
-            </div>)}
+            {hasMatrix && (
+                <div style={{ overflowX: "auto", maxWidth: "100%" }}>
+                    <MatrixTable ncdMatrix={ncdMatrix} labels={labels} searchTerm={confirmedSearchTerm} executionTime={executionTime}/>
+                </div>
+            )}
 
             <div style={{display: "flex", justifyContent: "center", alignItems: "center"}}>
                 {errorMsg && errorMsg.includes("no result") && (<p style={{fontSize: "18px"}}>
                     There is no result for <b><i>{searchTerm}</i></b>
                 </p>)}
+            </div>
+            <div>
+                {qSearchTreeResult &&
+                    <TwoDTreeVisualizer data={qSearchTreeResult}></TwoDTreeVisualizer>
+                }
             </div>
         </div>
     </div>);
