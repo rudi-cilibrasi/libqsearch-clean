@@ -87,6 +87,7 @@ export const FastaSearch = () => {
         }
         setExecutionTime(performance.now());
         let searchTermCache = getCachedDataBySearchTerm(searchTerm);
+        setQSearchTreeResult([]);
         if (!searchTermCache || searchTermCache.length === 0) {
             resetDisplay();
             console.log('Cache miss for search term: ' + searchTerm);
@@ -110,6 +111,7 @@ export const FastaSearch = () => {
                 setNcdMatrix([]);
                 setLabels([]);
                 setHasMatrix(false);
+                setQSearchTreeResult([]);
                 return;
             }
         } else {

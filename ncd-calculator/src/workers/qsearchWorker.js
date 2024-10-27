@@ -35,19 +35,19 @@ let qsearchModule = null;
 Module({
     print: (text) => {
         // Capture the standard output and send it to the main thread
-        self.postMessage({ action: 'consoleLog', message: text });
+        self.postMessage({action: 'consoleLog', message: text});
     },
     printErr: (text) => {
         // Capture the error output and send it to the main thread
-        self.postMessage({ action: 'consoleError', message: text });
+        self.postMessage({action: 'consoleError', message: text});
     }
 }).then((initializedModule) => {
     qsearchModule = initializedModule;
-    self.postMessage({ action: 'consoleLog', message: "Emscripten Module Initialized" });
+    self.postMessage({action: 'consoleLog', message: "Emscripten Module Initialized"});
 
     self.addEventListener('message', (event) => {
         const action = event.data.action;
-        self.postMessage({ action: 'consoleLog', message: "qsearchWorker received message " + action });
+        self.postMessage({action: 'consoleLog', message: "qsearchWorker received message " + action});
 
         // Handle the processNcdMatrix action
         if (action === 'processNcdMatrix') {
@@ -56,18 +56,18 @@ Module({
 
             // Format the NCD matrix as a string for passing to QSearch
             let matrixString = getTreeInput({labels, ncdMatrix});
-            self.postMessage({ action: 'consoleLog', message: "Sending matrix to qsearch WASM \n" + matrixString });
+            self.postMessage({action: 'consoleLog', message: "Sending matrix to qsearch WASM \n" + matrixString});
             try {
                 const callback = (treeJSON) => {
                     console.log('tree json we have haha: ' + treeJSON + '\n');
                     // Send interim points to the main thread
-                    self.postMessage({ action: 'treeJSON', result: treeJSON });
+                    self.postMessage({action: 'treeJSON', result: treeJSON});
                 };
                 // Pass the matrix string to the C++ function
                 qsearchModule.run_qsearch(matrixString, callback);
-                self.postMessage({ action: 'qsearchComplete' });
+                self.postMessage({action: 'qsearchComplete'});
             } catch (error) {
-                self.postMessage({ action: 'qsearchError', message: "QSearch internal error " + error.message });
+                self.postMessage({action: 'qsearchError', message: "QSearch internal error " + error.message});
             }
         }
     });

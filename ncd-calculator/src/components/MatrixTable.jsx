@@ -1,6 +1,7 @@
 import React from "react";
 
 const MatrixTable = ({ncdMatrix, labels, confirmedSearchTerm, executionTime}) => {
+    console.log('matrix we have now: ' + JSON.stringify(ncdMatrix));
     const getCellStyle = (value) => {
         const red = Math.round(255 * value);
         const green = Math.round(255 * (1 - value));
@@ -16,7 +17,7 @@ const MatrixTable = ({ncdMatrix, labels, confirmedSearchTerm, executionTime}) =>
 
             <table style={{
                 borderCollapse: "collapse",
-                margin: "20px auto",
+                margin: "15px auto",
                 width: "80%",
                 maxWidth: "600px",
                 overflowX: "auto"

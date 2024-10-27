@@ -3,6 +3,9 @@ import React from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 
 export const TwoDTreeVisualizer = ({ data }) => {
+    if (!data || !data.nodes || data.nodes.length === 0) {
+        return <div></div>
+    }
     const nodes = data.nodes.map((node) => ({
         id: node.index,
         label: node.label.toUpperCase(),
@@ -24,25 +27,21 @@ export const TwoDTreeVisualizer = ({ data }) => {
             nodeAutoColorBy="id"
             linkDirectionalParticles={2}
             linkDirectionalParticleSpeed={0.005}
-            linkWidth={0} // Remove the edge lines
-            linkDistance={100} // Adjust this value to increase spacing between connected nodes
+            linkWidth={1}
+            linkDistance={100}
             nodeCanvasObject={(node, ctx, globalScale) => {
                 const fontSize = Math.max(8, 12 / globalScale);
                 ctx.font = `${fontSize}px Arial`;
                 ctx.textAlign = 'center';
-
-                // Draw node circle
                 ctx.fillStyle = 'blue';
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, 8, 0, 2 * Math.PI, false);
                 ctx.fill();
-
-                // Draw label with adjusted size and color
                 ctx.fillStyle = 'white';
                 ctx.fillText(node.label, node.x, node.y - 10);
             }}
-            width={800}
-            height={600}
+            width={700}
+            height={500}
         />
     );
 };

@@ -1,4 +1,5 @@
 export const getTreeInput = ncdOutput => {
+    console.log("Received NCD output: ", ncdOutput);
     const { labels, ncdMatrix } = ncdOutput;
     let treeInput= '';
     for(let i = 0; i < labels.length; i++) {
@@ -9,6 +10,5 @@ export const getTreeInput = ncdOutput => {
        }
        treeInput += (str.trim()) + "\n";
     }
-    console.log("Generated tree input from NCD output: " + treeInput);
     return treeInput;
 }
