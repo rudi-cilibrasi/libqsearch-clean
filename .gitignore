@@ -5,3 +5,7 @@ qsearch_worker_DOM/qsearch.js
 */qsearch.js
 qsearch_worker_react/src/wasm/qsearch.js
 .DS_Store
+**/node_modules
+**/package-lock.json
+**/package.json
+.idea

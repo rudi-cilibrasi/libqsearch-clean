@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {workerCode} from "../workers/ncdWorker.js";
 import {FileDrop} from "./FileDrop.jsx";
 import MatrixTable from "./MatrixTable.jsx";
@@ -7,6 +7,8 @@ import {
     cacheAccession, cacheSearchTermAccessions, getCachedDataByAccession, getCachedDataBySearchTerm, initCache
 } from '../functions/cache.js'
 
+import QSearchWorker from '../workers/qSearchWorker.js?worker';
+
 export const FastaSearch = () => {
     const MAX_IDS_FETCH = 40;
     const [searchTerm, setSearchTerm] = useState("");
@@ -14,10 +16,11 @@ export const FastaSearch = () => {
     const [ncdMatrix, setNcdMatrix] = useState([]);
     const [labels, setLabels] = useState([]);
     const [hasMatrix, setHasMatrix] = useState(false);
-    const [worker, setWorker] = useState(null);
+    const [ncdWorker, setNcdWorker] = useState(null);
     const [errorMsg, setErrorMsg] = useState('');
     const [confirmedSearchTerm, setConfirmedSearchTerm] = useState('');
     const [executionTime, setExecutionTime] = useState(performance.now());
+    const qSearchWorkerRef = useRef(null);
 
     const setSearchTermRemoveErr = (searchTerm) => {
         setSearchTerm(searchTerm);
@@ -27,11 +30,13 @@ export const FastaSearch = () => {
     useEffect(() => {
         initCache();
         runNCDWorker();
+        qSearchWorkerRef.current = new QSearchWorker();
+        qSearchWorkerRef.current.onmessage = handleQsearchMessage;
     }, []);
 
     const handleFastaData = (data) => {
         const parsed = parseFasta(data);
-        worker.postMessage({
+        ncdWorker.postMessage({
             labels: parsed.labels, contents: parsed.contents,
         });
     };
@@ -42,6 +47,7 @@ export const FastaSearch = () => {
         setNcdMatrix(ncdMatrix);
         setHasMatrix(true);
         setErrorMsg('')
+        qSearchWorkerRef.current.postMessage({ action: 'processNcdMatrix', labels, ncdMatrix });
     };
 
     const runNCDWorker = () => {
@@ -63,7 +69,7 @@ export const FastaSearch = () => {
                 })
             }
         };
-        setWorker(worker);
+        setNcdWorker(worker);
     };
 
 
@@ -87,7 +93,7 @@ export const FastaSearch = () => {
                 let list = await getFastaList(ids);
                 if (list && list !== '') {
                     let parsed = parseFasta(list);
-                    worker.postMessage({
+                    ncdWorker.postMessage({
                         labels: parsed.labels, contents: parsed.contents,
                     });
                     await cacheAccession(parsed);
@@ -127,7 +133,7 @@ export const FastaSearch = () => {
                 }
             }
             console.log('Cache hit for term: ' + searchTerm + ', existing accessions: ' + searchTermCache);
-            worker.postMessage(data);
+            ncdWorker.postMessage(data);
         }
         setConfirmedSearchTerm(searchTerm);
     }
@@ -144,6 +150,23 @@ export const FastaSearch = () => {
         if (e.key === "Enter") {
             await performSearch();
         }
+    };
+
+
+    const handleQsearchMessage = (event) => {
+        let newMessage = '';
+        if (event.data.action === 'qsearchComplete') {
+            newMessage = 'Qsearch complete';
+        } else if (event.data.action === 'qsearchError') {
+            newMessage = 'Qsearch error: ' + event.data.message;
+        } else if (event.data.action === 'consoleLog') {
+            console.log(event.data.message);
+            newMessage = event.data.message;
+        } else if (event.data.action === 'consoleError') {
+            console.error(event.data.message);
+            newMessage = 'Error: ' + event.data.message;
+        }
+        console.log('message: ' + JSON.stringify(event.data) + '\n');
     };
 
     return (<div style={{margin: "20px", textAlign: "center"}}>

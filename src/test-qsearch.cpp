@@ -1,4 +1,4 @@
-#include <SimpleMatrix.hpp>
+#include "SimpleMatrix.hpp"
 
 // test for QMatrix - used in main() in initial testing
 void testQMatrix() {
