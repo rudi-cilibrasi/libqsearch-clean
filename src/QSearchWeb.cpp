@@ -21,14 +21,17 @@ void onDone(QSearchTree& final) {
 }
 
 // Modified run_qsearch function to accept the NCD matrix as input
-void run_qsearch(const std::string matstr,  emscripten::val callback) {
-    global_callback = callback;
-    QSearchMakeTree mt;
-    std::cout << "Running QSearch with matrix: " << matstr << std::endl;
-    mt.make_tree(matstr, onStart, onImprove, onDone); 
-}
+extern "C" {
+
+    void run_qsearch(const std::string matstr,  emscripten::val callback) {
+        global_callback = callback;
+        QSearchMakeTree mt;
+        std::cout << "Running QSearch with matrix: " << matstr << std::endl;
+        mt.make_tree(matstr, onStart, onImprove, onDone);
+    }
 
 // Binding the modified run_qsearch function
 EMSCRIPTEN_BINDINGS(my_module) {
     emscripten::function("run_qsearch", &run_qsearch);
+}
 }
