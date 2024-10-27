@@ -85,6 +85,8 @@ const App = () => {
     let newMessage = '';
     if (event.data.action === 'qsearchComplete') {
       newMessage = 'Qsearch complete';
+    } else if (event.data.action === 'treeJSON') {
+      newMessage = 'Qsearch tree JSON: ' + event.data.result;
     } else if (event.data.action === 'qsearchError') {
       newMessage = 'Qsearch error: ' + event.data.message;
     } else if (event.data.action === 'consoleLog') {

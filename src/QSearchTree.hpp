@@ -115,6 +115,7 @@ struct QSearchTree {
   double score_tree_fast_v2();
 
   std::string to_dot();
+  std::string to_json();
 
   // deferred. Is dm needed? 
     //double read_from_dot(std::string treedot, QMatrix<unsigned int>& dm);  

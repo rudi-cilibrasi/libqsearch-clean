@@ -740,7 +740,7 @@ double QSearchTree::score_tree()
   assert(acc <= amax + ERRTOL);
   score = (amax-acc)/(amax-amin);
   f_score_good = true;
-  std::cout << "QSearchTree::score_tree() - returning " << score << "\n";
+  //std::cout << "QSearchTree::score_tree() - returning " << score << "\n";
   assert(score >= 0.0 - ERRTOL);
   assert(score <= 1.0 + ERRTOL);
 
@@ -1001,5 +1001,46 @@ std::string QSearchTree::to_dot() {
     }
   }
   oss << "}\n";
+  return oss.str();
+}
+
+#include <string>
+#include <sstream>
+
+std::string QSearchTree::to_json() {
+  std::ostringstream oss;
+  oss << "{\n  \"nodes\": [\n";
+
+  for (int i = 0; i < total_node_count; i += 1) {
+    oss << "    {\n";
+    oss << "      \"index\": " << i << ",\n";
+    if ((i < dm.dim) && dm.has_labels()) {
+      oss << "      \"label\": \"" << dm.labels[i] << "\",\n";
+    } else {
+      oss << "      \"label\": \"node " << i << "\",\n";
+    }
+
+    // Add connected nodes
+    oss << "      \"connections\": [";
+    bool first = true;
+    for (int j = 0; j < total_node_count; j += 1) {
+      if (is_connected(i, j)) {
+        if (!first) {
+          oss << ", ";
+        }
+        oss << j;
+        first = false;
+      }
+    }
+    oss << "]\n    }";
+
+    if (i < total_node_count - 1) {
+      oss << ",\n";
+    } else {
+      oss << "\n";
+    }
+  }
+
+  oss << "  ]\n}";
   return oss.str();
 }
