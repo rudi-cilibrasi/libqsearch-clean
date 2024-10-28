@@ -13,7 +13,7 @@ import {
 } from '../functions/cache.js'
 
 import QSearchWorker from '../workers/qsearchWorker.js?worker';
-import {TwoDTreeVisualizer} from "./2dTreeVisualizer.jsx";
+import {QSearchTree3D} from "./QSearchTree3D.jsx";
 
 export const FastaSearch = () => {
     const MAX_IDS_FETCH = 40;
@@ -28,7 +28,6 @@ export const FastaSearch = () => {
     const [executionTime, setExecutionTime] = useState(performance.now());
     const qSearchWorkerRef = useRef(null);
     const [qSearchTreeResult, setQSearchTreeResult] = useState(null);
-
     const setSearchTermRemoveErr = (searchTerm) => {
         setSearchTerm(searchTerm);
         setErrorMsg('')
@@ -164,22 +163,28 @@ export const FastaSearch = () => {
 
     const handleQsearchMessage = (event) => {
         let newMessage = '';
-        console.log('Received message from QSearchWorker: ', JSON.stringify(event.data));
         if (event.data.action === 'qsearchComplete') {
             newMessage = 'Qsearch complete';
         } else if (event.data.action === 'qsearchError') {
             newMessage = 'Qsearch error: ' + event.data.message;
         } else if (event.data.action === 'consoleLog') {
-            console.log(event.data.message);
             newMessage = event.data.message;
         } else if (event.data.action === 'consoleError') {
             console.error(event.data.message);
             newMessage = 'Error: ' + event.data.message;
         } else if (event.data.action === 'treeJSON') {
-            console.log('Received tree JSON: ', JSON.stringify(event.data.result));
             setQSearchTreeResult(JSON.parse(event.data.result));
         }
     };
+
+    const cameraRef = useRef();
+    useEffect(() => {
+        // Reset camera position when a new tree is rendered
+        if (cameraRef.current) {
+            cameraRef.current.position.set(0, 0, 100);
+            cameraRef.current.lookAt(0, 0, 0);
+        }
+    }, [qSearchTreeResult]);
 
     return (<div style={{margin: "20px", textAlign: "center"}}>
         <h1 style={{marginBottom: "20px"}}>NCD Calculator</h1>
@@ -247,8 +252,9 @@ export const FastaSearch = () => {
 
         <div style={{marginTop: "10px", textAlign: "left"}}>
             {hasMatrix && (
-                <div style={{ overflowX: "auto", maxWidth: "100%" }}>
-                    <MatrixTable ncdMatrix={ncdMatrix} labels={labels} searchTerm={confirmedSearchTerm} executionTime={executionTime}/>
+                <div style={{overflowX: "auto", maxWidth: "100%"}}>
+                    <MatrixTable ncdMatrix={ncdMatrix} labels={labels} searchTerm={confirmedSearchTerm}
+                                 executionTime={executionTime}/>
                 </div>
             )}
 
@@ -258,8 +264,8 @@ export const FastaSearch = () => {
                 </p>)}
             </div>
             <div>
-                {qSearchTreeResult &&
-                    <TwoDTreeVisualizer data={qSearchTreeResult}></TwoDTreeVisualizer>
+                {qSearchTreeResult && (qSearchTreeResult.nodes && qSearchTreeResult.nodes.length !== 0) &&
+                    <QSearchTree3D data={qSearchTreeResult}/>
                 }
             </div>
         </div>
