@@ -59,7 +59,6 @@ Module({
             self.postMessage({action: 'consoleLog', message: "Sending matrix to qsearch WASM \n" + matrixString});
             try {
                 const callback = (treeJSON) => {
-                    console.log('tree json we have haha: ' + treeJSON + '\n');
                     // Send interim points to the main thread
                     self.postMessage({action: 'treeJSON', result: treeJSON});
                 };
