@@ -11,8 +11,8 @@ export const getCachedDataByAccession = accessionNum => {
 
 
 export const initCache = () => {
-   initSearchTermCacheAndGet();
-   initAccessionCacheAndGet();
+    initSearchTermCacheAndGet();
+    initAccessionCacheAndGet();
 }
 
 const initSearchTermCacheAndGet = () => {
@@ -40,44 +40,73 @@ export const getCachedDataBySearchTerm = searchTerm => {
 }
 
 
-export const cacheAccessionSequence = async (accession, sequence) => {
+export const cacheAccessionSequence = (accession, sequence) => {
     accession = parseAccessionNumber(accession);
-    const accessionCache = JSON.parse(localStorage.getItem(ACCESSION_CACHE_ID));
+    let accessionCache = JSON.parse(localStorage.getItem(ACCESSION_CACHE_ID));
+    if (!accessionCache) {
+        accessionCache = JSON.parse(initAccessionCacheAndGet());
+    }
     accessionCache[accession] = sequence;
     const str = JSON.stringify(accessionCache);
     localStorage.setItem(ACCESSION_CACHE_ID, str);
 }
 
 
-export const cacheAccession = async (parsedFastaList) => {
-    const { labels, contents } = parsedFastaList;
-    let accessions = labels.map(parseAccessionNumber);
+export const cacheAccession = (parsedFastaList) => {
+    let {contents, accessions} = parsedFastaList;
     accessions = filterEmptyAccessions(accessions);
-    for(let i = 0; i < accessions.length; i++) {
-        await cacheAccessionSequence(accessions[i], contents[i]);
+    for (let i = 0; i < accessions.length; i++) {
+        cacheAccessionSequence(accessions[i], contents[i]);
     }
 }
 
-export const cacheSearchTermAccessions = (searchTerm, accessions) => {
-    accessions = filterEmptyAccessions(accessions).map(parseAccessionNumber);
+export const cacheSearchTermAccessions = (searchTerm, accessions, labels) => {
     const term = searchTerm.trim().toLowerCase();
     const cache = localStorage.getItem(SEARCH_TERM_CACHE_ID);
     const searchTermCache = JSON.parse(cache);
+    const val = [];
+    for (let i = 0; i < accessions.length; i++) {
+        val.push({
+            "label": labels[i],
+            "accession": accessions[i],
+        })
+    }
     if (!searchTermCache || Object.keys(searchTermCache).length === 0) {
-       searchTermCache[searchTerm] = accessions;
+        searchTermCache[searchTerm] = val;
     } else {
         const c = searchTermCache[term];
         if (!c) {
-            searchTermCache[term] = Array.from(new Set([...accessions]));
+            searchTermCache[term] = val;
         } else {
-            searchTermCache[term] = Array.from(new Set([...c, ...accessions]));
+            searchTermCache[term] = merge(c, val);
         }
     }
     const str = JSON.stringify(searchTermCache);
     localStorage.setItem(SEARCH_TERM_CACHE_ID, str);
 
 }
-const filterEmptyAccessions = (accessions) => {
+
+
+const merge = (existingArr, newArr) => {
+    let res = existingArr;
+    for (let i = 0; i < newArr.length; i++) {
+        const exist = res.find(e => e.accession === newArr[i].accession);
+        const item = newArr[i];
+        if (!exist) {
+            res.push(item);
+        } else {
+            for (let j = 0; j < res.length; j++) {
+                if (res[j].accession === item.accession) {
+                    res[j] = item;
+                    break;
+                }
+            }
+        }
+    }
+    return res;
+}
+
+export const filterEmptyAccessions = (accessions) => {
     return accessions.filter(accession => accession != null && accession !== '').map(accession => parseAccessionNumber(accession));
 }
 

@@ -1,8 +1,9 @@
-import {parseAccessionNumber} from "./cache.js";
+import {parseAccessionNumber } from "./cache.js";
+import { getApiResponseText } from "./fetch.js";
 
 export const getFastaList = async (idList) => {
     const FETCH_URI = await getFastaListUri(idList) ;
-    return await getApiResponse(FETCH_URI);
+    return await getApiResponseText(FETCH_URI);
 }
 
 
@@ -21,30 +22,24 @@ export const getFastaAccessionNumbersFromIdsUri = (idList) => {
 
 export const getFastaAccessionNumbersFromIds = async (idList) => {
     const FETCH_URI = getFastaAccessionNumbersFromIdsUri(idList) ;
-    let accessions = await getApiResponse(FETCH_URI);
+    let accessions = await getApiResponseText(FETCH_URI);
     if (accessions && accessions !== '') {
         return accessions.split("\n").filter(accession => accession != null);
     }
     return [];
 }
 
-export const getApiResponse = async (uri) => {
-    const response = await fetch(uri);
-    if (!response.ok) {
-        throw new Error("Network response was not ok");
-    }
-    return await response.text();
-}
 
-export const getFastaIdsBySearchTermUri  = async (searchTerm, numItems) => {
+
+export const getSequenceIdsBySearchTermUri  = async (searchTerm, numItems) => {
     searchTerm = searchTerm.trim() + " AND mitochondrion[title] AND genome[title]";
     return encodeURI(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=${searchTerm}&retmode=text&rettype=fasta&retmax=${numItems}`);
 }
 
-export const getFastaIdsBySearchTerm = async (searchTerm, numItems) => {
-    const ID_LIST_URI = await getFastaIdsBySearchTermUri(searchTerm, numItems)
+export const getSequenceIdsBySearchTerm = async (searchTerm, numItems) => {
+    const ID_LIST_URI = await getSequenceIdsBySearchTermUri(searchTerm, numItems)
     let idList = [];
-    const searchResult = await getApiResponse(ID_LIST_URI);
+    const searchResult = await getApiResponseText(ID_LIST_URI);
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(searchResult, "text/xml");
     idList = Array.from(xmlDoc.getElementsByTagName("Id")).map(
