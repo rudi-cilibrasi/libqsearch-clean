@@ -59,10 +59,11 @@ export const FastaSearch = () => {
 
   const displayNcdMatrix = (response) => {
     const { labels, ncdMatrix } = response;
-    const displayNames = [];
+    let displayNames = [];
     for (let i = 0; i < labels.length; i++) {
       displayNames.push(labelMapRef.current.get(labels[i]));
     }
+    displayNames = displayNames.filter(d => d != null).length === 0 ? labels : displayNames;
     setLabels(displayNames);
     setNcdMatrix(ncdMatrix);
     setHasMatrix(true);
@@ -80,6 +81,7 @@ export const FastaSearch = () => {
     const worker = new Worker(workerURL);
     worker.onmessage = function (e) {
       const message = e.data;
+      console.log('receive worker message: ' + JSON.stringify(message));
       if (message.type === "progress") {
       } else if (message.type === "result") {
         if (
@@ -341,7 +343,7 @@ export const FastaSearch = () => {
       </div>
 
       <div style={{ marginTop: "10px", textAlign: "left" }}>
-        {hasMatrix && confirmedSearchTerm && (
+        {hasMatrix && labels.length !== 0 && (
           <div style={{ overflowX: "auto", maxWidth: "100%" }}>
             <MatrixTable
               ncdMatrix={ncdMatrix}
