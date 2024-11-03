@@ -1,5 +1,20 @@
+const CACHE_VERSION = 1;
+const CACHE_VERSION_KEY = "cache_version";
 const ACCESSION_CACHE_ID = "accession_cache";
 const SEARCH_TERM_CACHE_ID = "search_cache";
+
+const clearAllCaches = () => {
+    localStorage.removeItem(ACCESSION_CACHE_ID);
+    localStorage.removeItem(SEARCH_TERM_CACHE_ID);
+}
+
+const checkAndUpdateVersion = () => {
+    const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
+    if (!storedVersion || parseInt(storedVersion) < CACHE_VERSION) {
+        clearAllCaches();
+        localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION.toString());
+    }
+}
 
 export const getCachedDataByAccession = accessionNum => {
     let cache = JSON.parse(localStorage.getItem(ACCESSION_CACHE_ID));
@@ -9,8 +24,8 @@ export const getCachedDataByAccession = accessionNum => {
     return cache[accessionNum] || null;
 }
 
-
 export const initCache = () => {
+    checkAndUpdateVersion();
     initSearchTermCacheAndGet();
     initAccessionCacheAndGet();
 }
@@ -39,7 +54,6 @@ export const getCachedDataBySearchTerm = searchTerm => {
     return cache[searchTerm] || null;
 }
 
-
 export const cacheAccessionSequence = (accession, sequence) => {
     accession = parseAccessionNumber(accession);
     let accessionCache = JSON.parse(localStorage.getItem(ACCESSION_CACHE_ID));
@@ -50,7 +64,6 @@ export const cacheAccessionSequence = (accession, sequence) => {
     const str = JSON.stringify(accessionCache);
     localStorage.setItem(ACCESSION_CACHE_ID, str);
 }
-
 
 export const cacheAccession = (parsedFastaList) => {
     let {contents, accessions} = parsedFastaList;
@@ -83,9 +96,7 @@ export const cacheSearchTermAccessions = (searchTerm, accessions, labels) => {
     }
     const str = JSON.stringify(searchTermCache);
     localStorage.setItem(SEARCH_TERM_CACHE_ID, str);
-
 }
-
 
 const merge = (existingArr, newArr) => {
     let res = existingArr;
