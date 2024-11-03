@@ -5,23 +5,75 @@ export const FileDrop = ({ onFastaData }) => {
     (event) => {
       event.preventDefault();
       const files = Array.from(event.dataTransfer.files);
-      const fastaFiles = files.filter((file) => file.name.endsWith(".fasta"));
       const fileContents = [];
+
+      const isFastaFormat = (content) => {
+        const lines = content.split("\n").filter((line) => line.trim());
+        if (lines.length === 0) return false;
+
+        if (!lines[0].startsWith(">")) return false;
+
+        let hasSequenceData = false;
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line.startsWith(">")) {
+            if (!hasSequenceData) return false;
+          } else {
+            if (!/^[A-Za-z*\-\.]+$/.test(line)) return false;
+            hasSequenceData = true;
+          }
+        }
+        return hasSequenceData;
+      };
 
       const readFiles = (file) => {
         return new Promise((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => {
-            fileContents.push(e.target.result);
+            const content = e.target.result;
+            if (isFastaFormat(content)) {
+              fileContents.push({
+                filename: file.name,
+                content: content,
+                isValid: true,
+              });
+            } else {
+              console.warn(`File ${file.name} is not in valid FASTA format`);
+              fileContents.push({
+                filename: file.name,
+                content: content,
+                isValid: false,
+                error: "Invalid FASTA format",
+              });
+            }
+            resolve();
+          };
+          reader.onerror = () => {
+            fileContents.push({
+              filename: file.name,
+              isValid: false,
+              error: "Error reading file",
+            });
             resolve();
           };
           reader.readAsText(file);
         });
       };
 
-      Promise.all(fastaFiles.map(readFiles)).then(() => {
-        const data = fileContents.join("\n");
-        onFastaData(data);
+      Promise.all(files.map(readFiles)).then(() => {
+        const validFastaData = fileContents
+          .filter((file) => file.isValid)
+          .map((file) => file.content)
+          .join("\n");
+
+        if (validFastaData) {
+          onFastaData(validFastaData);
+        }
+
+        const invalidFiles = fileContents.filter((file) => !file.isValid);
+        if (invalidFiles.length > 0) {
+          console.warn("Invalid files:", invalidFiles);
+        }
       });
     },
     [onFastaData]
