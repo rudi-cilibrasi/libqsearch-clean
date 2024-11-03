@@ -131,7 +131,10 @@ export const FastaSearch = () => {
         );
         ids = ids.slice(0, numItems); // here we will only fetch the top `numItems` elements, the rest will be fetched on the next call
         accessions = filterEmptyAccessions(accessions).map(parseAccessionNumber);
-        let parsedSequences = await getGenbankSequences(ids);
+        let parsedSequences = await getGenbankSequences(ids, numItems, {
+          skipDuplicates: true,
+          showAccession: true,
+        });
         if (accessions && accessions.length !== 0) {
           cacheSearchTermAccessions(
             searchTerm,
@@ -163,7 +166,7 @@ export const FastaSearch = () => {
         setQSearchTreeResult([]);
       }
     } else {
-      handleCacheHit(searchTerm, searchTermCache, itemsNum);
+      await handleCacheHit(searchTerm, searchTermCache, itemsNum);
     }
   };
 
@@ -216,7 +219,10 @@ export const FastaSearch = () => {
         labels: input.accessions, // here we use accessions as labels
       });
     } else {
-      const fetchedSequences = await getGenbankSequences(Array.from(new Set([...idsToFetch])));
+      const fetchedSequences = await getGenbankSequences(Array.from(new Set([...idsToFetch])), numItems, {
+        skipDuplicates: true,
+        showAccession: true,
+      });
       for (let i = 0; i < fetchedSequences.contents.length; i++) {
         input.contents.push(fetchedSequences.contents[i]);
         input.labels.push(fetchedSequences.labels[i]);

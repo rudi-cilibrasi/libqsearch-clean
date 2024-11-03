@@ -1,10 +1,12 @@
 import { parseAccessionNumber } from "./cache";
 import { getApiResponseText } from "./fetch";
+
 const parseGenbankEntry = (entry) => {
   const sourceMatch = entry.match(/SOURCE\s+([^\n]+)/);
   let commonName = "";
   let scientificName = "";
   let source = "";
+
   if (sourceMatch) {
     source = sourceMatch[1];
     const commonNameMatch = source.match(/\((.*?)\)/);
@@ -26,109 +28,107 @@ const parseGenbankEntry = (entry) => {
     sequence = originMatch[1].replace(/\d+/g, "").replace(/\s+/g, "").trim();
   }
 
-  let displayName = "";
-  if (commonName) {
-    displayName = commonName;
-  } else if (scientificName) {
-    displayName = scientificName;
-  } else {
-    displayName = accessionNumber;
-  }
-  const response = {
+  return {
     commonName,
     scientificName,
     accessionNumber,
     sequence,
+    displayName: "",
+    isUnique: true
   };
-  return response;
 };
 
-const parseGenbankList = (text) => {
+const parseGenbankList = (text, maxResults, options = { skipDuplicates: false, showAccession: false, showScientific: false }) => {
   if (!text) {
     return {};
   }
   const list = text
-    .split("//")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== "");
-  const parsedSequences = list
-    .map(parseGenbankEntry)
-    .filter(
-      (sequence) =>
-        sequence.accessionNumber && sequence.accessionNumber.trim() !== ""
-    );
-  let labels = determineDisplayName(parsedSequences);
-  let contents = [];
-  let accessionNumbers = [];
-  for (let i = 0; i < parsedSequences.length; i++) {
-    const sequence = parsedSequences[i];
-    contents.push(sequence["sequence"]);
-    accessionNumbers.push(sequence["accessionNumber"]);
-  }
-  const resp = {
-    labels: labels,
-    contents: contents,
-    accessions: accessionNumbers.map(parseAccessionNumber),
-  };
-  return resp;
-};
+      .split("//")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== "");
 
-const hasDuplicates = (arr) => {
-  const counts = {};
-  for (const item of arr) {
-    if (item) {
-      counts[item] = (counts[item] || 0) + 1;
-      if (counts[item] > 1) return true;
-    }
-  }
-  return false;
-};
+  let parsedSequences = list
+      .map(parseGenbankEntry)
+      .filter(seq => seq.accessionNumber && seq.accessionNumber.trim() !== "");
 
-const determineDisplayName = (sequences) => {
-  const commonNames = sequences.map((seq) => seq.commonName);
-  const scientificNames = sequences.map((seq) => seq.scientificName);
+  const seenNames = new Set();
+  parsedSequences.forEach(seq => {
+    const baseName = seq.commonName || seq.scientificName;
+    if (!baseName) return;
 
-  const hasCommonNameDuplicates = hasDuplicates(commonNames);
-  const hasScientificNameDuplicates = hasDuplicates(scientificNames);
-
-  return sequences.map((seq) => {
-    let name = "";
-    if (hasCommonNameDuplicates) {
-      if (hasScientificNameDuplicates) {
-        name = seq.commonName;
-      } else {
-        name = seq.scientificName;
-      }
+    if (seenNames.has(baseName)) {
+      seq.isUnique = false;
     } else {
-      if (seq.commonName) {
-        name = seq.commonName;
-      } else if (seq.scientificName) {
-        name = seq.scientificName;
-      } else {
-        name = seq.accessionNumber;
-      }
-    }
-    if (name === "") {
-      return seq.accessionNumber;
-    } else {
-      if (name !== seq.accessionNumber) {
-        return `${name} (${seq.accessionNumber})`;
-      } else {
-        return name;
-      }
+      seq.isUnique = true;
+      seenNames.add(baseName);
     }
   });
+
+  parsedSequences = parsedSequences.slice(0, maxResults);
+  const labels = generateDisplayNames(parsedSequences, options);
+
+  return formatResponse(parsedSequences, labels);
+};
+
+const generateDisplayNames = (sequences, options) => {
+  const nameCounts = new Map();
+
+  return sequences.map(seq => {
+    let displayParts = [];
+
+    let baseName;
+    if (options.showScientific && seq.scientificName) {
+      baseName = seq.scientificName;
+    } else if (seq.commonName) {
+      baseName = seq.commonName;
+    } else if (seq.scientificName) {
+      baseName = seq.scientificName;
+    } else {
+      baseName = seq.accessionNumber;
+    }
+    displayParts.push(baseName);
+
+    if (!seq.isUnique) {
+      const count = (nameCounts.get(baseName) || 0) + 1;
+      nameCounts.set(baseName, count);
+      displayParts[0] = `${baseName} ${count + 1}`;
+    }
+
+    if (options.showAccession) {
+      displayParts.push(`(${seq.accessionNumber})`);
+    }
+
+    return displayParts.join(" ");
+  });
+};
+
+const formatResponse = (sequences, labels) => {
+  return {
+    labels,
+    contents: sequences.map(seq => seq.sequence),
+    accessions: sequences.map(seq => parseAccessionNumber(seq.accessionNumber)),
+    metadata: sequences.map(seq => ({
+      commonName: seq.commonName,
+      scientificName: seq.scientificName,
+      accessionNumber: seq.accessionNumber,
+      isUnique: seq.isUnique
+    }))
+  };
 };
 
 const getGenbankListUri = (ids) => {
   const IDS = ids.join(",");
   return encodeURI(
-    `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${IDS}&rettype=genbank&retmode=text`
+      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${IDS}&rettype=genbank&retmode=text`
   );
 };
 
-export const getGenbankSequences = async (ids) => {
+export const getGenbankSequences = async (ids, maxResults, options = {}) => {
   const uri = getGenbankListUri(ids);
   const textResponse = await getApiResponseText(uri);
-  return parseGenbankList(textResponse);
+  return parseGenbankList(textResponse, maxResults, {
+    skipDuplicates: options.skipDuplicates || false,
+    showAccession: options.showAccession || false,
+    showScientific: options.showScientific || false
+  });
 };
