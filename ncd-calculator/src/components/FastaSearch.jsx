@@ -3,7 +3,7 @@ import { workerCode } from "../workers/ncdWorker.js";
 import { FileDrop } from "./FileDrop.jsx";
 import MatrixTable from "./MatrixTable.jsx";
 import {
-    getFastaAccessionNumbersFromIds,
+    getFastaAccessionNumbersFromIds, getFastaList,
     getSequenceIdsBySearchTerm,
     parseFasta,
 } from "../functions/getPublicFasta.js";
@@ -14,7 +14,6 @@ import {
     getCachedSequenceByAccession,
     getCachedAccessionBySearchTerm,
     initCache,
-    parseAccessionNumber,
 } from "../functions/cache.js";
 
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
@@ -24,8 +23,6 @@ import ListEditor from "./ListEditor.jsx";
 
 export const FastaSearch = () => {
     const MAX_IDS_FETCH = 40;
-    const [searchTerm, setSearchTerm] = useState("");
-    const [numItems, setNumItems] = useState(5);
     const [ncdMatrix, setNcdMatrix] = useState([]);
     const [labels, setLabels] = useState([]);
     const [hasMatrix, setHasMatrix] = useState(false);
@@ -38,10 +35,6 @@ export const FastaSearch = () => {
     const [labelMap, setLabelMap] = useState(new Map());
     const labelMapRef = useRef(labelMap);
 
-    const setSearchTermRemoveErr = (searchTerm) => {
-        setSearchTerm(searchTerm);
-        setErrorMsg("");
-    };
 
     useEffect(() => {
         initCache();
@@ -50,8 +43,21 @@ export const FastaSearch = () => {
         qSearchWorkerRef.current.onmessage = handleQsearchMessage;
     }, []);
 
-    const handleFastaData = (data) => {
+    const handleFastaData = (data, fileNames) => {
         const parsed = parseFasta(data);
+        if (fileNames) {
+            const map = {
+                displayLabels: [],
+                accessions: [],
+            }
+            for(let i = 0; i < parsed.contents.length; i++) {
+                map.displayLabels.push(fileNames[i]);
+                map.accessions.push(parsed.labels[i]);
+            }
+            const labelMap = getLabelMap(map);
+            setLabelMap(labelMap);
+            labelMapRef.current = labelMap;
+        }
         ncdWorker.postMessage({
             labels: parsed.labels,
             contents: parsed.contents,
@@ -103,10 +109,10 @@ export const FastaSearch = () => {
         setNcdWorker(worker);
     };
 
-    const getLabelMap = (parsedSequences) => {
+    const getLabelMap = (projectedInput) => {
         let map = new Map();
-        const accessions = parsedSequences.accessions;
-        const labels = parsedSequences.labels;
+        const accessions = projectedInput.accessions;
+        const labels = projectedInput.displayLabels;
         for (let i = 0; i < accessions.length; i++) {
             map.set(accessions[i], labels[i]);
         }
@@ -114,10 +120,7 @@ export const FastaSearch = () => {
     };
 
     const emptySearchTerms = (searchTerms) => {
-        if (!searchTerms || searchTerms.length === 0) {
-            return true;
-        }
-        return false;
+        return !searchTerms || searchTerms.length === 0;
     }
     
     
@@ -125,6 +128,7 @@ export const FastaSearch = () => {
         if (emptySearchTerms(searchTerms)) {
             return;
         }
+        searchTerms = searchTerms.map(term => term.toLowerCase().trim());
         const results = [];
         for(let i = 0; i < searchTerms.length; i++) {
             const rs = await getSearchResult(searchTerms[i]);
@@ -149,23 +153,24 @@ export const FastaSearch = () => {
                 scientificNames: []
             }
             for (let i = 0; i < results.length; i++) {
-                const rs = results[i];
+                let rs = results[i];
                 if (rs.cacheHit) {
-                    const seq = rs.sequences[0];
+                    const seq = rs.contents[0];
                     const accession = rs.accessions[0];
                     if (seq && seq.trim() !== '') {
                         putNonProjectedItem(nonProjectedInput, rs);
                     } else {
-                        const data = await getGenbankSequences(accession, 1);
+                        const data = await getFastaSequence(accession);
                         putNonProjectedItem(nonProjectedInput, data);
-                        cacheSearchTermAccessions(searchTerm, data);
-                        getCachedSequenceByAccession(data.accessions[0], data.contents[0]);
+                        rs = data;
                     }
                 } else {
-                    putNonProjectedItem(nonProjectedInput, rs);
-                    cacheSearchTermAccessions(rs.accessions[0], rs);
-                    cacheAccession(rs);
+                    const data = await getFastaSequence(rs.accessions[0]);
+                    putNonProjectedItem(nonProjectedInput, data);
+                    rs = data;
                 }
+                cacheSearchTermAccessions(searchTerms[i], rs);
+                cacheAccession(rs);
             }
             const map = new Map();
             for(let i = 0; i < nonProjectedInput.accessions.length; i++) {
@@ -205,12 +210,45 @@ export const FastaSearch = () => {
                 contents: projectedInput.contents,
                 labels: projectedInput.accessions
             }
+            projectedInput.displayLabels = determineDisplayLabels(projectedInput, projectionOptions);
             let labelMap = getLabelMap(projectedInput);
             labelMapRef.current = labelMap;
             setLabelMap(labelMap);
-            setConfirmedSearchTerm(searchTerm);
             ncdWorker.postMessage(ncdInput);
         }
+    }
+
+
+    const determineDisplayLabels = (projectedInput, projectionOptions) => {
+        let displayLabels = [];
+        if (projectionOptions.CommonName && projectedInput.commonNames.length > 0) {
+            const uniqueCommonNames = [...new Set(projectedInput.commonNames)];
+            displayLabels = [...displayLabels, ...uniqueCommonNames];
+        }
+        if (projectionOptions.ScientificName && projectedInput.scientificNames.length > 0) {
+            const uniqueScientificNames = [...new Set(projectedInput.scientificNames)];
+            displayLabels = [...displayLabels, ...uniqueScientificNames];
+        }
+        if (projectionOptions.Accession && projectedInput.accessions.length > 0) {
+            const uniqueAccessions = [...new Set(projectedInput.accessions)];
+            displayLabels = [...displayLabels, ...uniqueAccessions];
+        }
+        if (projectionOptions.FileName && projectedInput.labels.length > 0) {
+            const uniqueLabels = [...new Set(projectedInput.labels)];
+            displayLabels = [...displayLabels, ...uniqueLabels];
+        }
+        return [...new Set(displayLabels)];
+    };
+
+
+    const getFastaSequence = async (id) => {
+        const data = await getGenbankSequences([id], 1);
+        if (!data.contents[0] || data.contents[0].trim().length === 0) {
+            const fasta = await getFastaList([id]);
+            let parsedFasta = parseFasta(fasta);
+            data.contents[0] = parsedFasta.contents[0];
+        }
+        return data;
     }
 
     const getUniqueAccessions = (projectedInput, uniqueField) => {
@@ -253,65 +291,6 @@ export const FastaSearch = () => {
     }
 
 
-
-    const performSearch1 = async (searchTerms, projectionOptions) => {
-        if (emptySearchTerms(searchTerms)) {
-            setErrorMsg("The search input is empty");
-            return;
-        }
-        const itemsNum = numItems;
-        setExecutionTime(performance.now());
-        let searchTermCache = getCachedAccessionBySearchTerm(searchTerm);
-        setQSearchTreeResult([]);
-        if (!searchTermCache || searchTermCache.length === 0) {
-            resetDisplay();
-            console.log("Cache miss for search term: " + searchTerm);
-            let ids = await getSequenceIdsBySearchTerm(searchTerm, MAX_IDS_FETCH);
-            if (ids && ids.length !== 0) {
-                let accessions = (await getFastaAccessionNumbersFromIds(ids)).filter(
-                    (accession) => accession != null
-                );
-                ids = ids.slice(0, numItems); // here we will only fetch the top `numItems` elements, the rest will be fetched on the next call
-                accessions = filterValidAccessionAndParse(accessions).map(parseAccessionNumber);
-                let parsedSequences = await getGenbankSequences(ids, numItems, {
-                    skipDuplicates: true,
-                    showAccession: true,
-                });
-                if (accessions && accessions.length !== 0) {
-                    cacheSearchTermAccessions(
-                        searchTerm,
-                        accessions,
-                        parsedSequences.labels
-                    );
-                }
-                let contents = parsedSequences.contents;
-                let accessionNumbers = parsedSequences.accessions;
-                if (parsedSequences && Object.keys(parsedSequences).length !== 0) {
-                    const input = {
-                        contents: contents,
-                        labels: accessionNumbers,
-                    };
-                    let map = getLabelMap(parsedSequences);
-                    labelMapRef.current = map;
-                    setLabelMap(map);
-                    ncdWorker.postMessage(input);
-                    cacheAccession(parsedSequences);
-                    setConfirmedSearchTerm(searchTerm);
-                }
-            } else {
-                setErrorMsg("no result");
-                setNcdMatrix([]);
-                setLabels([]);
-                labelMapRef.current = new Map();
-                setLabelMap(new Map());
-                setHasMatrix(false);
-                setQSearchTreeResult([]);
-            }
-        } else {
-            await handleCacheHit(searchTerm, searchTermCache, itemsNum);
-        }
-    };
-
     const getSearchResult = async (searchTerm) => {
         const emptyResult = {
             contents: [],
@@ -324,6 +303,7 @@ export const FastaSearch = () => {
         if (!searchTerm || searchTerm.trim() === '') {
             return emptyResult;
         }
+        searchTerm = searchTerm.toLowerCase().trim();
         const cachedAccessions = getCachedAccessionBySearchTerm(searchTerm);
         if (cacheHit(cachedAccessions)) {
             // labels, contents, accessions
@@ -342,20 +322,25 @@ export const FastaSearch = () => {
                 cacheHit: true
             }
         } else {
-            const ids = await getSequenceIdsBySearchTerm(searchTerm, MAX_IDS_FETCH);
+            const ids = await getSequenceIdsBySearchTerm(searchTerm, 1);
             if (ids && ids.length !== 0) {
                 const unfilteredAccessions = await getFastaAccessionNumbersFromIds(ids);
                 const accessions = filterValidAccessionAndParse(unfilteredAccessions);
                 const data = await getGenbankSequences(accessions, 1);
-                return {
-                    ...data,
-                    cacheHit: false
+                if (!data.contents[0] || data.contents[0].trim() === '') {
+                    // fall back to get the fasta sequence when sequence from genbank data is empty
+                    const fasta = await getFastaList(ids);
+                    let parsedFasta = parseFasta(fasta);
+                    data.contents[0] = parsedFasta.contents[0];
                 }
+                data.cacheHit = false;
+                return data;
             } else {
                 return emptyResult;
             }
         }
     }
+
 
 
     const cacheHit = (checkedResult) => {
@@ -365,87 +350,6 @@ export const FastaSearch = () => {
         return true;
     }
 
-    const handleCacheHit = async (searchTerm, searchTermCache, numItems) => {
-        console.log(
-            "Cache hit for term: " +
-            searchTerm +
-            ", existing accessions: " +
-            searchTermCache
-        );
-        // cache: searchTerm -> [{ accession: ...; label: }, .... ]
-        const cacheDataLen = searchTermCache.length;
-        const idsToFetch = [];
-        const input = {
-            labels: [],
-            contents: [],
-            accessions: [],
-        };
-
-        const needsSearchTermCache = {
-            accessions: [],
-            labels: [],
-        };
-
-        for (let i = 0; i < cacheDataLen; i++) {
-            const cur = searchTermCache[i];
-            if (!cur.label || cur.label === "") {
-                const remaining = searchTermCache.slice(
-                    i,
-                    Math.min(numItems, searchTermCache.length)
-                );
-                remaining.forEach((remain) => {
-                    idsToFetch.push(remain.accession);
-                });
-                break;
-            } else {
-                if (input.labels.length < numItems) {
-                    const sequence = getCachedSequenceByAccession(cur.accession);
-                    input.labels.push(cur.label);
-                    input.contents.push(sequence);
-                    input.accessions.push(cur.accession);
-                } else {
-                    break;
-                }
-            }
-        }
-        if (idsToFetch.length == 0) {
-            ncdWorker.postMessage({
-                contents: input.contents,
-                labels: input.accessions, // here we use accessions as labels
-            });
-        } else {
-            const fetchedSequences = await getGenbankSequences(Array.from(new Set([...idsToFetch])), numItems, {
-                skipDuplicates: true,
-                showAccession: true,
-            });
-            for (let i = 0; i < fetchedSequences.contents.length; i++) {
-                input.contents.push(fetchedSequences.contents[i]);
-                input.labels.push(fetchedSequences.labels[i]);
-                input.accessions.push(fetchedSequences.accessions[i]);
-
-                needsSearchTermCache.labels.push(fetchedSequences.labels[i]);
-                needsSearchTermCache.accessions.push(fetchedSequences.accessions[i]);
-            }
-            const needsAccessionCache = {
-                accessions: input.accessions,
-                contents: input.contents,
-            };
-            cacheSearchTermAccessions(
-                searchTerm,
-                needsSearchTermCache.accessions,
-                needsSearchTermCache.labels
-            );
-            cacheAccession(needsAccessionCache);
-            ncdWorker.postMessage({
-                contents: input.contents,
-                labels: input.accessions, // here we use accessions as labels
-            });
-        }
-        const map = getLabelMap(input);
-        labelMapRef.current = map;
-        setLabelMap(map);
-        setConfirmedSearchTerm(searchTerm);
-    };
 
     const resetDisplay = () => {
         setErrorMsg("");
@@ -456,11 +360,6 @@ export const FastaSearch = () => {
         setHasMatrix(false);
     };
 
-    const handleKeyDown = async (e) => {
-        if (e.key === "Enter") {
-            await performSearch();
-        }
-    };
 
     const handleQsearchMessage = (event) => {
         let newMessage = "";
@@ -474,7 +373,11 @@ export const FastaSearch = () => {
             console.error(event.data.message);
             newMessage = "Error: " + event.data.message;
         } else if (event.data.action === "treeJSON") {
-            setQSearchTreeResult(JSON.parse(event.data.result));
+            const result = JSON.parse(event.data.result);
+            for(let i = 0; i < result.nodes.length; i++) {
+                result.nodes[i].label = labelMapRef.current.get(result.nodes[i].label);
+            }
+            setQSearchTreeResult(result);
         }
     };
 
@@ -565,10 +468,7 @@ export const FastaSearch = () => {
                 >
                     {errorMsg && errorMsg.includes("no result") && (
                         <p style={{ fontSize: "18px" }}>
-                            There is no result for{" "}
-                            <b>
-                                <i>{searchTerm}</i>
-                            </b>
+                            There is no result for the input{" "}
                         </p>
                     )}
                 </div>

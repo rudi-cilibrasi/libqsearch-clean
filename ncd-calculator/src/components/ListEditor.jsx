@@ -158,8 +158,7 @@ const ListEditor = ({performSearch}) => {
                                 }}
                             >
                                 <div>
-                                    {projections.Accession &&
-                                        <div style={{color: '#718096', fontSize: '0.9rem'}}>{selectedItems[index]}</div>}
+                                    <div style={{color: '#718096', fontSize: '0.9rem'}}>{selectedItems[index]}</div>
                                 </div>
                                 <X size={20} color="#a0aec0" style={{cursor: 'pointer'}} onClick={() =>
                                     setSelectedItems(prev => prev.filter((_, i) => i !== index))

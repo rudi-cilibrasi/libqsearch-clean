@@ -1,4 +1,4 @@
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const CACHE_VERSION_KEY = "cache_version";
 const ACCESSION_CACHE_ID = "accession_cache";
 const SEARCH_TERM_CACHE_ID = "search_cache";
@@ -87,7 +87,7 @@ export const cacheSearchTermAccessions = (searchTerm, {accessions, labels, commo
         })
     }
     if (!searchTermCache || Object.keys(searchTermCache).length === 0) {
-        searchTermCache[searchTerm] = val;
+        searchTermCache[term] = val;
     } else {
         const c = searchTermCache[term];
         if (!c) {

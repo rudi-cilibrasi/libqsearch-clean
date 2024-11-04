@@ -65,9 +65,8 @@ export const FileDrop = ({ onFastaData }) => {
           .filter((file) => file.isValid)
           .map((file) => file.content)
           .join("\n");
-
         if (validFastaData) {
-          onFastaData(validFastaData);
+          onFastaData(validFastaData, files.map(file => file.name));
         }
 
         const invalidFiles = fileContents.filter((file) => !file.isValid);
