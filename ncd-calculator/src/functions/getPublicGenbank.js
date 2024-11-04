@@ -105,6 +105,8 @@ const generateDisplayNames = (sequences, options) => {
 const formatResponse = (sequences, labels) => {
   return {
     labels,
+    scientificNames: sequences.map(seq => seq.scientificName),
+    commonNames: sequences.map(seq => seq.commonName),
     contents: sequences.map(seq => seq.sequence),
     accessions: sequences.map(seq => parseAccessionNumber(seq.accessionNumber)),
     metadata: sequences.map(seq => ({
