@@ -1,4 +1,4 @@
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 3;
 const CACHE_VERSION_KEY = "cache_version";
 const ACCESSION_CACHE_ID = "accession_cache";
 const SEARCH_TERM_CACHE_ID = "search_cache";
@@ -16,7 +16,7 @@ const checkAndUpdateVersion = () => {
     }
 }
 
-export const getCachedDataByAccession = accessionNum => {
+export const getCachedSequenceByAccession = accessionNum => {
     let cache = JSON.parse(localStorage.getItem(ACCESSION_CACHE_ID));
     if (!cache) {
         cache = JSON.parse(initAccessionCacheAndGet());
@@ -46,7 +46,7 @@ const initAccessionCacheAndGet = () => {
     return localStorage.getItem(ACCESSION_CACHE_ID);
 }
 
-export const getCachedDataBySearchTerm = searchTerm => {
+export const getCachedAccessionBySearchTerm = searchTerm => {
     let cache = JSON.parse(localStorage.getItem(SEARCH_TERM_CACHE_ID));
     if (!cache || Object.keys(cache).length === 0) {
         cache = JSON.parse(initSearchTermCacheAndGet());
@@ -67,13 +67,13 @@ export const cacheAccessionSequence = (accession, sequence) => {
 
 export const cacheAccession = (parsedFastaList) => {
     let {contents, accessions} = parsedFastaList;
-    accessions = filterEmptyAccessions(accessions);
+    accessions = filterValidAccessionAndParse(accessions);
     for (let i = 0; i < accessions.length; i++) {
         cacheAccessionSequence(accessions[i], contents[i]);
     }
 }
 
-export const cacheSearchTermAccessions = (searchTerm, accessions, labels) => {
+export const cacheSearchTermAccessions = (searchTerm, {accessions, labels, commonNames, scientificNames}) => {
     const term = searchTerm.trim().toLowerCase();
     const cache = localStorage.getItem(SEARCH_TERM_CACHE_ID);
     const searchTermCache = JSON.parse(cache);
@@ -82,10 +82,12 @@ export const cacheSearchTermAccessions = (searchTerm, accessions, labels) => {
         val.push({
             "label": labels[i],
             "accession": accessions[i],
+            "scientificName": scientificNames[i],
+            "commonName": commonNames[i]
         })
     }
     if (!searchTermCache || Object.keys(searchTermCache).length === 0) {
-        searchTermCache[searchTerm] = val;
+        searchTermCache[term] = val;
     } else {
         const c = searchTermCache[term];
         if (!c) {
@@ -117,7 +119,7 @@ const merge = (existingArr, newArr) => {
     return res;
 }
 
-export const filterEmptyAccessions = (accessions) => {
+export const filterValidAccessionAndParse = (accessions) => {
     return accessions.filter(accession => accession != null && accession !== '').map(accession => parseAccessionNumber(accession));
 }
 
