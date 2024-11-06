@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { workerCode } from "../workers/ncdWorker.js";
-import { FileDrop } from "./FileDrop.jsx";
+import {useEffect, useRef, useState} from "react";
+import {workerCode} from "../workers/ncdWorker.js";
+import {FileDrop} from "./FileDrop.jsx";
 import MatrixTable from "./MatrixTable.jsx";
 import {
-    getFastaAccessionNumbersFromIds, getFastaList,
+    getFastaAccessionNumbersFromIds, getFastaList, getFastaListAndParse,
     getSequenceIdsBySearchTerm,
     parseFasta,
 } from "../functions/getPublicFasta.js";
@@ -17,8 +17,8 @@ import {
 } from "../functions/cache.js";
 
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
-import { QSearchTree3D } from "./QSearchTree3D.jsx";
-import { getGenbankSequences } from "../functions/getPublicGenbank.js";
+import {QSearchTree3D} from "./QSearchTree3D.jsx";
+import {getGenbankSequences} from "../functions/getPublicGenbank.js";
 import ListEditor from "./ListEditor.jsx";
 
 export const FastaSearch = () => {
@@ -43,14 +43,15 @@ export const FastaSearch = () => {
         qSearchWorkerRef.current.onmessage = handleQsearchMessage;
     }, []);
 
-    const handleFastaData = (data, fileNames) => {
-        const parsed = parseFasta(data);
+    const handleFastaData = (data, fileNames, sequences) => {
+        const parsed = parseFasta(data, fileNames);
+        const map = new Map();
         if (fileNames) {
             const map = {
                 displayLabels: [],
                 accessions: [],
             }
-            for(let i = 0; i < parsed.contents.length; i++) {
+            for (let i = 0; i < parsed.contents.length; i++) {
                 map.displayLabels.push(fileNames[i]);
                 map.accessions.push(parsed.labels[i]);
             }
@@ -65,7 +66,7 @@ export const FastaSearch = () => {
     };
 
     const displayNcdMatrix = (response) => {
-        const { labels, ncdMatrix } = response;
+        const {labels, ncdMatrix} = response;
         let displayNames = [];
         for (let i = 0; i < labels.length; i++) {
             displayNames.push(labelMapRef.current.get(labels[i]));
@@ -83,7 +84,7 @@ export const FastaSearch = () => {
     };
 
     const runNCDWorker = () => {
-        const blob = new Blob([workerCode], { type: "application/javascript" });
+        const blob = new Blob([workerCode], {type: "application/javascript"});
         const workerURL = URL.createObjectURL(blob);
         const worker = new Worker(workerURL);
         worker.onmessage = function (e) {
@@ -122,18 +123,22 @@ export const FastaSearch = () => {
     const emptySearchTerms = (searchTerms) => {
         return !searchTerms || searchTerms.length === 0;
     }
-    
-    
+
+
     const performSearch = async (searchTerms, projectionOptions) => {
         if (emptySearchTerms(searchTerms)) {
             return;
         }
         searchTerms = searchTerms.map(term => term.toLowerCase().trim());
+        const accessionToSearchTerm = new Map();
         const results = [];
-        for(let i = 0; i < searchTerms.length; i++) {
+        for (let i = 0; i < searchTerms.length; i++) {
             const rs = await getSearchResult(searchTerms[i]);
             if (rs.contents.length !== 0) {
                 results.push(rs);
+                for (let j = 0; j < rs.accessions.length; j++) {
+                    accessionToSearchTerm.set(rs.accessions[j], searchTerms[i]);
+                }
             }
         }
         if (results.length === 0) {
@@ -145,6 +150,63 @@ export const FastaSearch = () => {
             setHasMatrix(false);
             setQSearchTreeResult([]);
         } else {
+            const hitAccessions = new Set();
+            const missAccessions = new Set();
+            const accessionToSequence = new Map();
+            const accessions = [];
+            for (let i = 0; i < results.length; i++) {
+                if (results[i].cacheHit) {
+                    for (let j = 0; j < results[i].accessions.length; j++) {
+                        const rs = results[i];
+                        const accession = rs.accessions[j];
+                        if (!rs.contents[j] || rs.contents[j].trim() === '') {
+                            missAccessions.add(rs.accessions[j]);
+                        } else {
+                            hitAccessions.add(rs.accessions[j]);
+                            accessionToSequence.set(rs.accessions[j], {
+                                content: rs.contents[j],
+                                label: rs.labels[j],
+                                commonName: rs.commonNames[j],
+                                scientificName: rs.scientificNames[j],
+                                accession: rs.accessions[j]
+                            })
+                        }
+                        accessions.push(accession);
+                    }
+                } else {
+                    for (let j = 0; j < results[i].accessions.length; j++) {
+                        missAccessions.add(results[i].accessions[j]);
+                        accessions.push(results[i].accessions[j]);
+                    }
+                }
+            }
+            if (missAccessions.size !== 0) {
+                const missedSequences = await getFastaSequence(Array.from(missAccessions));
+                const accessionSeqToCache = {
+                    accessions: [],
+                    contents: []
+                }
+                for (let i = 0; i < missedSequences.accessions.length; i++) {
+                    accessionToSequence.set(missedSequences.accessions[i], {
+                        content: missedSequences.contents[i],
+                        label: missedSequences.labels[i],
+                        commonName: missedSequences.commonNames[i],
+                        scientificName: missedSequences.scientificNames[i],
+                        accession: missedSequences.accessions[i]
+                    });
+                    const searchTerm = accessionToSearchTerm.get(missedSequences.accessions[i]);
+                    cacheSearchTermAccessions(searchTerm, {
+                        accessions: [missedSequences.accessions[i]],
+                        labels: [missedSequences.labels[i]],
+                        commonNames: [missedSequences.commonNames[i]],
+                        scientificNames: [missedSequences.scientificNames[i]]
+                    });
+                    // {contents: [], accessions: []}
+                    accessionSeqToCache.accessions.push(missedSequences.accessions[i]);
+                    accessionSeqToCache.contents.push(missedSequences.contents[i]);
+                }
+                cacheAccession(accessionSeqToCache);
+            }
             const nonProjectedInput = {
                 contents: [],
                 labels: [],
@@ -152,28 +214,12 @@ export const FastaSearch = () => {
                 commonNames: [],
                 scientificNames: []
             }
-            for (let i = 0; i < results.length; i++) {
-                let rs = results[i];
-                if (rs.cacheHit) {
-                    const seq = rs.contents[0];
-                    const accession = rs.accessions[0];
-                    if (seq && seq.trim() !== '') {
-                        putNonProjectedItem(nonProjectedInput, rs);
-                    } else {
-                        const data = await getFastaSequence(accession);
-                        putNonProjectedItem(nonProjectedInput, data);
-                        rs = data;
-                    }
-                } else {
-                    const data = await getFastaSequence(rs.accessions[0]);
-                    putNonProjectedItem(nonProjectedInput, data);
-                    rs = data;
-                }
-                cacheSearchTermAccessions(searchTerms[i], rs);
-                cacheAccession(rs);
+            for (let i = 0; i < accessions.length; i++) {
+                const seqRes = accessionToSequence.get(accessions[i]);
+                putNonProjectedItem(nonProjectedInput, seqRes);
             }
             const map = new Map();
-            for(let i = 0; i < nonProjectedInput.accessions.length; i++) {
+            for (let i = 0; i < nonProjectedInput.accessions.length; i++) {
                 map.set(nonProjectedInput.accessions[i], {
                     label: nonProjectedInput.labels[i],
                     scientificName: nonProjectedInput.scientificNames[i],
@@ -198,7 +244,7 @@ export const FastaSearch = () => {
                 Object.assign(resultSet, intersect(resultSet, itemUniqueScientificNames));
             }
             const resultSetArr = Array.from(resultSet);
-            for(let i = 0; i < resultSetArr.length; i++) {
+            for (let i = 0; i < resultSetArr.length; i++) {
                 const data = map.get(resultSetArr[i]);
                 projectedInput.accessions.push(resultSetArr[i]);
                 projectedInput.labels.push(data.label);
@@ -218,37 +264,63 @@ export const FastaSearch = () => {
         }
     }
 
-
+    // the projected input is guaranteed to have unique values in some project option field
     const determineDisplayLabels = (projectedInput, projectionOptions) => {
         let displayLabels = [];
-        if (projectionOptions.CommonName && projectedInput.commonNames.length > 0) {
-            const uniqueCommonNames = [...new Set(projectedInput.commonNames)];
-            displayLabels = [...displayLabels, ...uniqueCommonNames];
+        if (allNonEmpty(projectedInput.accessions) && shouldUseOption(projectedInput.accessions)) {
+            displayLabels = projectedInput.accessions;
         }
-        if (projectionOptions.ScientificName && projectedInput.scientificNames.length > 0) {
-            const uniqueScientificNames = [...new Set(projectedInput.scientificNames)];
-            displayLabels = [...displayLabels, ...uniqueScientificNames];
+        if (allNonEmpty(projectedInput.labels) && shouldUseOption(projectedInput.labels)) {
+            displayLabels = projectedInput.labels;
         }
-        if (projectionOptions.Accession && projectedInput.accessions.length > 0) {
-            const uniqueAccessions = [...new Set(projectedInput.accessions)];
-            displayLabels = [...displayLabels, ...uniqueAccessions];
+        if (allNonEmpty(projectedInput.scientificNames) && shouldUseOption(projectedInput.scientificNames)) {
+            displayLabels = projectedInput.labels;
         }
-        if (projectionOptions.FileName && projectedInput.labels.length > 0) {
-            const uniqueLabels = [...new Set(projectedInput.labels)];
-            displayLabels = [...displayLabels, ...uniqueLabels];
+        if (allNonEmpty(projectedInput.commonNames) && shouldUseOption(projectedInput.commonNames)) {
+            displayLabels = projectedInput.labels;
         }
-        return [...new Set(displayLabels)];
+        return displayLabels;
     };
 
 
-    const getFastaSequence = async (id) => {
-        const data = await getGenbankSequences([id], 1);
-        if (!data.contents[0] || data.contents[0].trim().length === 0) {
-            const fasta = await getFastaList([id]);
-            let parsedFasta = parseFasta(fasta);
-            data.contents[0] = parsedFasta.contents[0];
+    const shouldUseOption = (optionValues) => {
+        const len = optionValues.length;
+        const set = new Set([...optionValues]);
+        return len === set.size;
+    }
+
+    const allNonEmpty = (arr) => {
+        const len = arr.length;
+        return arr.filter(e => e && e.trim() !== '').length === len;
+    }
+
+
+    const getFastaSequence = async (ids) => {
+        const data = await getGenbankSequences(ids, ids.length);
+        const emptySeqAccessions = [];
+        for (let i = 0; i < data.contents.length; i++) {
+            if (!data.contents[i] || data.contents[i].trim() === '') {
+                emptySeqAccessions.push(data.accessions[i]);
+            }
         }
-        return data;
+        const moreSeq = {};
+        if (emptySeqAccessions.length > 0) {
+            const fastaContent = await getFastaListAndParse(emptySeqAccessions);
+            for (let i = 0; i < fastaContent.contents.length; i++) {
+                const sequence = fastaContent.contents[i];
+                const accession = fastaContent.labels[i].toLowerCase().trim();
+                for (let j = 0; j < data.accessions.length; j++) {
+                    if (data.accessions[j] === accession) {
+                        data.contents[j] = sequence;
+                        break;
+                    }
+                }
+            }
+        }
+        return {
+            ...data,
+            ...moreSeq
+        }
     }
 
     const getUniqueAccessions = (projectedInput, uniqueField) => {
@@ -256,14 +328,14 @@ export const FastaSearch = () => {
         const uniqueAccessions = new Set();
         if ("commonName" === uniqueField) {
             projectedInput.commonNames.forEach(((name, index) => {
-                if (uniqueNames.has(name)) {
+                if (!uniqueNames.has(name)) {
                     uniqueNames.add(name);
                     uniqueAccessions.add(projectedInput.accessions[index]);
                 }
             }));
         } else if ("scientificName" === uniqueField) {
             projectedInput.scientificNames.forEach(((name, index) => {
-                if (uniqueNames.has(name)) {
+                if (!uniqueNames.has(name)) {
                     uniqueNames.add(name);
                     uniqueAccessions.add(projectedInput.accessions[index]);
                 }
@@ -283,11 +355,11 @@ export const FastaSearch = () => {
 
 
     const putNonProjectedItem = (obj, item) => {
-        obj.contents.push(item.contents[0]);
-        obj.labels.push(item.labels[0]);
-        obj.accessions.push(item.accessions[0]);
-        obj.commonNames.push(item.commonNames[0]);
-        obj.scientificNames.push(item.scientificNames[0]);
+        obj.contents.push(item.content);
+        obj.labels.push(item.label);
+        obj.accessions.push(item.accession);
+        obj.commonNames.push(item.commonName);
+        obj.scientificNames.push(item.scientificName);
     }
 
 
@@ -326,7 +398,7 @@ export const FastaSearch = () => {
             if (ids && ids.length !== 0) {
                 const unfilteredAccessions = await getFastaAccessionNumbersFromIds(ids);
                 const accessions = filterValidAccessionAndParse(unfilteredAccessions);
-                const data = await getGenbankSequences(accessions, 1);
+                const data = await getGenbankSequences(accessions, accessions.length);
                 if (!data.contents[0] || data.contents[0].trim() === '') {
                     // fall back to get the fasta sequence when sequence from genbank data is empty
                     const fasta = await getFastaList(ids);
@@ -340,7 +412,6 @@ export const FastaSearch = () => {
             }
         }
     }
-
 
 
     const cacheHit = (checkedResult) => {
@@ -374,7 +445,7 @@ export const FastaSearch = () => {
             newMessage = "Error: " + event.data.message;
         } else if (event.data.action === "treeJSON") {
             const result = JSON.parse(event.data.result);
-            for(let i = 0; i < result.nodes.length; i++) {
+            for (let i = 0; i < result.nodes.length; i++) {
                 result.nodes[i].label = labelMapRef.current.get(result.nodes[i].label);
             }
             setQSearchTreeResult(result);
@@ -382,74 +453,16 @@ export const FastaSearch = () => {
     };
 
     return (
-        <div style={{ margin: "20px", textAlign: "center" }}>
-            <h1 style={{ marginBottom: "20px" }}>NCD Calculator</h1>
+        <div style={{margin: "20px", textAlign: "center"}}>
+            <h1 style={{marginBottom: "20px"}}>NCD Calculator</h1>
             <ListEditor performSearch={performSearch}/>
             <div>
-                {/*<input*/}
-                {/*    type="text"*/}
-                {/*    placeholder="Enter search terms, e.g. buffalo"*/}
-                {/*    value={searchTerm}*/}
-                {/*    onChange={(e) => setSearchTermRemoveErr(e.target.value)}*/}
-                {/*    onKeyDown={handleKeyDown}*/}
-                {/*    style={{*/}
-                {/*        padding: "10px",*/}
-                {/*        width: "300px",*/}
-                {/*        fontSize: "18px",*/}
-                {/*        border: "2px solid #4CAF50",*/}
-                {/*        borderRadius: "5px",*/}
-                {/*        outline: "none",*/}
-                {/*        transition: "border-color 0.3s",*/}
-                {/*    }}*/}
-                {/*    onFocus={(e) => (e.target.style.borderColor = "#66bb6a")}*/}
-                {/*    onBlur={(e) => (e.target.style.borderColor = "#4CAF50")}*/}
-                {/*/>*/}
-                {/*<select*/}
-                {/*    value={numItems}*/}
-                {/*    onChange={(e) => setNumItems(parseInt(e.target.value))}*/}
-                {/*    style={{*/}
-                {/*        padding: "10px",*/}
-                {/*        marginLeft: "10px",*/}
-                {/*        fontSize: "18px",*/}
-                {/*        border: "2px solid #4CAF50",*/}
-                {/*        borderRadius: "5px",*/}
-                {/*    }}*/}
-                {/*>*/}
-                {/*    <option value="5">5</option>*/}
-                {/*    <option value="10">10</option>*/}
-                {/*    <option value="15">15</option>*/}
-                {/*    <option value="20">20</option>*/}
-                {/*    <option value="25">25</option>*/}
-                {/*    <option value="30">30</option>*/}
-                {/*    <option value="35">35</option>*/}
-                {/*    <option value="40">40</option>*/}
-                {/*</select>*/}
-                {/*<button*/}
-                {/*    onClick={() => performSearch()}*/}
-                {/*    style={{*/}
-                {/*        padding: "10px 20px",*/}
-                {/*        fontSize: "18px",*/}
-                {/*        marginLeft: "10px",*/}
-                {/*        backgroundColor: "#4CAF50",*/}
-                {/*        color: "white",*/}
-                {/*        border: "none",*/}
-                {/*        borderRadius: "5px",*/}
-                {/*        cursor: "pointer",*/}
-                {/*        transition: "background-color 0.3s",*/}
-                {/*    }}*/}
-                {/*    onMouseEnter={(e) => (e.target.style.backgroundColor = "#45a049")}*/}
-                {/*    onMouseLeave={(e) => (e.target.style.backgroundColor = "#4CAF50")}*/}
-                {/*>*/}
-                {/*    Search*/}
-                {/*</button>*/}
-            </div>
-            <div>
-                <FileDrop onFastaData={handleFastaData} />
+                <FileDrop onFastaData={handleFastaData}/>
             </div>
 
-            <div style={{ marginTop: "10px", textAlign: "left" }}>
+            <div style={{marginTop: "10px", textAlign: "left"}}>
                 {hasMatrix && labels.length !== 0 && (
-                    <div style={{ overflowX: "auto", maxWidth: "100%" }}>
+                    <div style={{overflowX: "auto", maxWidth: "100%"}}>
                         <MatrixTable
                             ncdMatrix={ncdMatrix}
                             labels={labels}
@@ -467,7 +480,7 @@ export const FastaSearch = () => {
                     }}
                 >
                     {errorMsg && errorMsg.includes("no result") && (
-                        <p style={{ fontSize: "18px" }}>
+                        <p style={{fontSize: "18px"}}>
                             There is no result for the input{" "}
                         </p>
                     )}
@@ -476,7 +489,7 @@ export const FastaSearch = () => {
                     {qSearchTreeResult &&
                         qSearchTreeResult.nodes &&
                         qSearchTreeResult.nodes.length !== 0 && (
-                            <QSearchTree3D data={qSearchTreeResult} />
+                            <QSearchTree3D data={qSearchTreeResult}/>
                         )}
                 </div>
             </div>

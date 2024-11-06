@@ -8,9 +8,9 @@ const ListEditor = ({performSearch}) => {
     const [selectedItems, setSelectedItems] = useState([]);
     const [projections, setProjections] = useState({
         Accession: true,
-        ScientificName: true,
+        ScientificName: false,
         CommonName: true,
-        FileName: true,
+        FileName: false,
     });
 
 
@@ -107,8 +107,7 @@ const ListEditor = ({performSearch}) => {
                                 }}
                             >
                                 <div>
-                                    {projections.CommonName &&
-                                        <div style={{color: '#2d3748'}}>{searchTerm}</div>}
+                                    {<div style={{color: '#2d3748'}}>{searchTerm}</div>}
                                 </div>
                                 <ChevronRight size={20} color="#a0aec0"/>
                             </div>
@@ -194,7 +193,7 @@ const ListEditor = ({performSearch}) => {
                                 checked={value}
                                 onChange={() => setProjections(prev => ({
                                     ...prev,
-                                    [key]: !prev[key]
+                                    [key]: key !== "Accession" ? !prev[key] : prev[key]
                                 }))}
                                 style={{cursor: 'pointer'}}
                             />

@@ -1,5 +1,6 @@
 import {parseAccessionNumber} from "./cache";
 import {getApiResponseText} from "./fetch";
+import {encodeURIWithApiKey} from "./api.js";
 
 const parseGenbankEntry = (entry) => {
     const sourceMatch = entry.match(/SOURCE\s+([^\n]+)/);
@@ -20,14 +21,14 @@ const parseGenbankEntry = (entry) => {
     }
 
     const accessionMatch = entry.match(/ACCESSION\s+(\w+)/);
-    const accessionNumber = accessionMatch ? accessionMatch[1] : "";
+    const accessionNumber = accessionMatch ? accessionMatch[1].trim().toLowerCase() : "";
 
     const originMatch = entry.match(/ORIGIN\s+([^/]+)/);
     let sequence = "";
     if (originMatch) {
         sequence = originMatch[1].replace(/\d+/g, "").replace(/\s+/g, "").trim();
     }
-    const rs = {
+    return {
         commonName,
         scientificName,
         accessionNumber,
@@ -35,8 +36,6 @@ const parseGenbankEntry = (entry) => {
         displayName: "",
         isUnique: true
     };
-    console.log('result now: ' + JSON.stringify(rs));
-    return rs;
 };
 
 const parseGenbankList = (text, maxResults, options = {
@@ -71,7 +70,6 @@ const parseGenbankList = (text, maxResults, options = {
 
     parsedSequences = parsedSequences.slice(0, maxResults);
     const labels = generateDisplayNames(parsedSequences, options);
-
     return formatResponse(parsedSequences, labels);
 };
 
@@ -125,7 +123,7 @@ const formatResponse = (sequences, labels) => {
 
 const getGenbankListUri = (ids) => {
     const IDS = ids.join(",");
-    return encodeURI(
+    return encodeURIWithApiKey(
         `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${IDS}&rettype=genbank&retmode=text`
     );
 };
