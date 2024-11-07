@@ -2,22 +2,31 @@ import {parseAccessionNumber} from "./cache.js";
 import {getApiResponseText} from "./fetch.js";
 import {encodeURIWithApiKey} from "./api.js";
 
+
+export const getApiResponse = async (uri) => {
+    const response = await fetch(uri);
+    if (!response.ok) {
+        throw new Error("Network response was not ok");
+    }
+    return await response.text();
+}
+
 export const getFastaList = async (idList) => {
-    const FETCH_URI = await getFastaListUri(idList) ;
+    const FETCH_URI = getFastaListUri(idList) ;
     return await getApiResponseText(FETCH_URI);
 }
 
 
 
 export const getFastaListAndParse = async (idList) => {
-    const FETCH_URI = await getFastaListUri(idList) ;
+    const FETCH_URI = getFastaListUri(idList) ;
     const data = await getApiResponseText(FETCH_URI);
     return parseFasta(data);
 }
 
 
 
-export const getFastaListUri = async (idList) => {
+export const getFastaListUri = (idList) => {
     const copy = [...idList];
     const ids = copy.join(",");
     return encodeURIWithApiKey(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${ids}&rettype=fasta&retmode=text`);
@@ -41,13 +50,13 @@ export const getFastaAccessionNumbersFromIds = async (idList) => {
 
 
 
-export const getSequenceIdsBySearchTermUri  = async (searchTerm, numItems) => {
+export const getSequenceIdsBySearchTermUri = (searchTerm, numItems) => {
     searchTerm = searchTerm.trim() + " AND mitochondrion[title] AND genome[title]";
     return encodeURIWithApiKey(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=${searchTerm}&retmode=text&rettype=fasta&retmax=${numItems}`);
 }
 
 export const getSequenceIdsBySearchTerm = async (searchTerm, numItems) => {
-    const ID_LIST_URI = await getSequenceIdsBySearchTermUri(searchTerm, numItems)
+    const ID_LIST_URI = getSequenceIdsBySearchTermUri(searchTerm, numItems)
     let idList = [];
     const searchResult = await getApiResponseText(ID_LIST_URI);
     const parser = new DOMParser();
