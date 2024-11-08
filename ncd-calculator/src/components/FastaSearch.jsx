@@ -125,7 +125,7 @@ export const FastaSearch = () => {
     }
 
 
-    const performSearch = async (searchTerms, projectionOptions) => {
+    const performSearch = async (searchTerms, projectionOptions, apiKey) => {
         if (emptySearchTerms(searchTerms)) {
             return;
         }
@@ -133,7 +133,7 @@ export const FastaSearch = () => {
         const accessionToSearchTerm = new Map();
         const results = [];
         for (let i = 0; i < searchTerms.length; i++) {
-            const rs = await getSearchResult(searchTerms[i]);
+            const rs = await getSearchResult(searchTerms[i], apiKey);
             if (rs.contents.length !== 0) {
                 results.push(rs);
                 for (let j = 0; j < rs.accessions.length; j++) {
@@ -181,7 +181,7 @@ export const FastaSearch = () => {
                 }
             }
             if (missAccessions.size !== 0) {
-                const missedSequences = await getFastaSequence(Array.from(missAccessions));
+                const missedSequences = await getFastaSequence(Array.from(missAccessions), apiKey);
                 const accessionSeqToCache = {
                     accessions: [],
                     contents: []
@@ -363,7 +363,7 @@ export const FastaSearch = () => {
     }
 
 
-    const getSearchResult = async (searchTerm) => {
+    const getSearchResult = async (searchTerm, apiKey) => {
         const emptyResult = {
             contents: [],
             labels: [],
@@ -394,7 +394,7 @@ export const FastaSearch = () => {
                 cacheHit: true
             }
         } else {
-            const ids = await getSequenceIdsBySearchTerm(searchTerm, 1);
+            const ids = await getSequenceIdsBySearchTerm(searchTerm, 1, apiKey);
             if (ids && ids.length !== 0) {
                 const unfilteredAccessions = await getFastaAccessionNumbersFromIds(ids);
                 const accessions = filterValidAccessionAndParse(unfilteredAccessions);

@@ -121,10 +121,10 @@ const formatResponse = (sequences, labels) => {
     };
 };
 
-const getGenbankListUri = (ids) => {
+const getGenbankListUri = (ids, apiKey) => {
     const IDS = ids.join(",");
     return encodeURIWithApiKey(
-        `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${IDS}&rettype=genbank&retmode=text`
+        `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${IDS}&rettype=genbank&retmode=text`, apiKey
     );
 };
 

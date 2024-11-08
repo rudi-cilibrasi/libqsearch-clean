@@ -18,6 +18,7 @@ import * as path from "node:path";
 const parser = new Parser([]);
 const searchTerm = "buffalo";
 const listSize = 20;
+const apiKey = "secretApiKey"
 
 const getSampleFasta = () => {
     return readFileSync(join(__dirname, "buffaloes_fasta.json"), 'utf-8');
@@ -29,7 +30,7 @@ const ACCESSIONS = SAMPLE_FASTA.map(json => json.acessionNumbers);
 const SEQUENCES = SAMPLE_FASTA.map(json => json.sequence);
 
 test('test fetch fasta IDs for buffalo', async () => {
-    const idsUri = getSequenceIdsBySearchTermUri(searchTerm, listSize);
+    const idsUri = getSequenceIdsBySearchTermUri(searchTerm, listSize, apiKey);
     const response = await fetchWithRetry(getApiResponse, idsUri);
     const json = await parser.parseStringPromise(response);
     const ids = json["eSearchResult"]["IdList"][0]["Id"];
@@ -38,7 +39,7 @@ test('test fetch fasta IDs for buffalo', async () => {
 })
 
 test('test fetch accessions numbers from fasta IDs', async () => {
-    let fastaAccessionNumbersFromIdsUri = getFastaAccessionNumbersFromIdsUri(IDS);
+    let fastaAccessionNumbersFromIdsUri = getFastaAccessionNumbersFromIdsUri(IDS, apiKey);
     let textResponse = await fetchWithRetry(getApiResponse, fastaAccessionNumbersFromIdsUri)
     const accessionNumbers = textResponse.trim().split("\n").map(parseAccessionNumber);
     expect(arraysEqual(accessionNumbers, ACCESSIONS));
@@ -46,14 +47,14 @@ test('test fetch accessions numbers from fasta IDs', async () => {
 
 
 test('test fetch sequence responses from fasta IDs', async () => {
-    const fastaListUri = getFastaListUri(IDS);
+    const fastaListUri = getFastaListUri(IDS, apiKey);
     const sequenceResponse = await fetchWithRetry(getApiResponse, fastaListUri);
     let parsed = parseFasta(sequenceResponse);
     expect(arraysEqual(parsed.contents, SEQUENCES));
 });
 
 test('test fetch fasta list from search term', async () => {
-    let uri = getSequenceIdsBySearchTermUri(searchTerm, listSize);
+    let uri = getSequenceIdsBySearchTermUri(searchTerm, listSize, apiKey);
     let ids = (await fetchWithRetry(getApiResponse, uri)).split(",");
     expect(arraysEqual(ids, IDS));
     let accessionUris = await fetchWithRetry(getFastaAccessionNumbersFromIds, ids);
