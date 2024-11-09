@@ -1,7 +1,7 @@
-import React, { useCallback } from "react";
-import { isCleanFastaSequence } from "../functions/getPublicFasta.js";
+import React, {useCallback} from "react";
+import {isCleanFastaSequence} from "../functions/getPublicFasta.js";
 
-export const FileDrop = ({ onFastaData }) => {
+export const FileDrop = ({onFastaData}) => {
     const isFastaFormat = (content) => {
         const lines = content.split("\n").filter((line) => line.trim());
         if (lines.length === 0) return false;
@@ -90,12 +90,21 @@ export const FileDrop = ({ onFastaData }) => {
     };
 
     return (
-        <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            className="border-2 border-dashed p-4 text-center cursor-pointer"
-        >
-            Drag and drop FASTA files here or click to upload.
-        </div>
-    );
+        <div style={{padding: '20px', width: '100%'}}>
+
+            <div
+                style={{
+                    display: 'flex',
+                    gap: '24px',
+                    flex: 1,
+                    width: '60vw',
+                    justifyContent: 'center'
+                }}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                className="border-2 border-dashed p-4 text-center cursor-pointer"
+            >
+                Drag and drop FASTA files here or click to upload.
+            </div>
+        </div>)
 };

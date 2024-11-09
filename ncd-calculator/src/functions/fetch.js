@@ -5,3 +5,4 @@ export const getApiResponseText = async (uri) => {
     }
     return await response.text();
 }
+

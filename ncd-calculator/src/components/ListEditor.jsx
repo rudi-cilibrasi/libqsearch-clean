@@ -12,7 +12,7 @@ const ListEditor = ({performSearch}) => {
         CommonName: true,
         FileName: false,
     });
-
+    const [apiKey, setApiKey] = useState('');
 
     const onInputChange = (term) => {
         setSearchTerm(term);
@@ -20,8 +20,8 @@ const ListEditor = ({performSearch}) => {
     }
 
     const onPerformSearch = () => {
-        if (selectedItems.length !== 0) {
-            performSearch(selectedItems, projections);
+        if (!isDisabledByApiKey && selectedItems.length !== 0) {
+            performSearch(selectedItems, projections, apiKey);
         }
     }
 
@@ -33,11 +33,13 @@ const ListEditor = ({performSearch}) => {
         }
     };
 
+    const isDisabledByApiKey = apiKey === null || apiKey.trim() === '';
 
     return (
         <div style={{padding: '20px', width: '100%'}}>
             {/* Main Content - Side by Side Layout */}
-            <div style={{display: 'flex', gap: '24px', flex: 1, width: '60vw'}}>
+            <div
+                style={{display: 'flex', gap: '24px', flex: 1, width: '60vw', pointerEvents: isDisabledByApiKey ? 'none' : 'auto'}}>
                 <div style={{
                     width: '50%',
                     height: '500px',
@@ -55,7 +57,8 @@ const ListEditor = ({performSearch}) => {
                         color: '#1a365d'
                     }}>Search
                         Results</h3>
-                    <div style={{position: 'relative', marginBottom: '20px'}}>
+                    <div
+                        style={{position: 'relative', marginBottom: '20px'}}>
                         <div
                             style={{position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)'}}>
                             <Search size={20} color="#4a5568"/>
@@ -66,14 +69,13 @@ const ListEditor = ({performSearch}) => {
                             onKeyDown={handleKeyDown}
                             onChange={(e) => onInputChange(e.target.value)}
                             placeholder="Search animals..."
+                            className={`${isDisabledByApiKey ? 'bg-gray-300 text-gray-800' : '#3182ce'}`}
                             style={{
                                 width: '100%',
                                 padding: '12px 12px 12px 48px',
                                 border: '2px solid #e2e8f0',
                                 borderRadius: '8px',
                                 fontSize: '1rem',
-                                color: 'black', // Set text color to black
-                                backgroundColor: '#f8fafc',
                                 outline: 'none',
                                 transition: 'border-color 0.2s',
                             }}
@@ -168,22 +170,32 @@ const ListEditor = ({performSearch}) => {
                 </div>
             </div>
 
+            <div className="mb-6 mt-6">
+                <label htmlFor="large-input" className="block mb-2 text-lg font-medium text-gray-900 dark:text-white">Enter API Key</label>
+                <input type="text" id="large-input"
+                       className="block w-full p-4 text-black bg-white border border-gray-300 rounded-lg text-base"
+                       value={apiKey}
+                       onChange={(event) => setApiKey(event.target.value)}
+                />
+            </div>
 
             <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 marginBottom: '24px',
-                marginTop: '24px'
+                marginTop: '24px',
+                pointerEvents: isDisabledByApiKey ? 'none' : 'auto'
             }}>
                 <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
                     {Object.entries(projections).map(([key, value]) => (
-                        <label key={key} style={{
+                        <label
+                            className={`${isDisabledByApiKey ? 'bg-gray-300' : (value ? 'bg-blue-200' : 'bg-white')}`}
+                            key={key} style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
                             padding: '8px 16px',
-                            backgroundColor: value ? '#e3f2fd' : 'white',
                             borderRadius: '6px',
                             cursor: 'pointer',
                             border: '1px solid #e2e8f0'
@@ -205,10 +217,9 @@ const ListEditor = ({performSearch}) => {
 
                 <button
                     onClick={onPerformSearch}
+                    className={`${isDisabledByApiKey ? 'bg-gray-300 text-gray-800' : 'bg-blue-600 text-white hover:bg-blue-900'}`}
                     style={{
                         padding: '12px 24px',
-                        backgroundColor: '#3182ce',
-                        color: 'white',
                         fontSize: '1rem',
                         borderRadius: '8px',
                         cursor: 'pointer',
@@ -216,8 +227,6 @@ const ListEditor = ({performSearch}) => {
                         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
                         transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#2b6cb0'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#3182ce'}
                 >
                     Search
                 </button>
