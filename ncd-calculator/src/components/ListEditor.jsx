@@ -69,7 +69,7 @@ const ListEditor = ({performSearch}) => {
                             onKeyDown={handleKeyDown}
                             onChange={(e) => onInputChange(e.target.value)}
                             placeholder="Search animals..."
-                            className={`${isDisabledByApiKey ? 'bg-gray-300 text-gray-800' : 'bg-white text-black'}`}
+                            className={`${isDisabledByApiKey ? 'bg-gray-300 text-gray-800' : '#3182ce'}`}
                             style={{
                                 width: '100%',
                                 padding: '12px 12px 12px 48px',

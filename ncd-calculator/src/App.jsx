@@ -1,11 +1,11 @@
 import './App.css'
-import {FastaSearch} from "./components/FastaSearch.jsx";
+import {QSearch} from "./components/QSearch.jsx";
 
 function App() {
   return (
     <>
       <div className="card">
-        <FastaSearch/>
+        <QSearch/>
       </div>
     </>
   )
