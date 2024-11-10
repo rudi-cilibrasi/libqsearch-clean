@@ -1,5 +1,7 @@
-import React, {useCallback} from "react";
+import React, {useCallback, useState} from "react";
 import {isCleanFastaSequence} from "../functions/getPublicFasta.js";
+import {useDropzone} from 'react-dropzone'
+import {X} from "lucide-react";
 
 export const FileDrop = ({onFastaData}) => {
     const isFastaFormat = (content) => {
@@ -53,10 +55,8 @@ export const FileDrop = ({onFastaData}) => {
         });
     };
 
-    const handleDrop = useCallback(
-        async (event) => {
-            event.preventDefault();
-            const files = Array.from(event.dataTransfer.files);
+    const searchByUploadedFiles = useCallback(
+        async (files) => {
             const fileContents = [];
 
             // Read files sequentially to maintain order
@@ -85,26 +85,57 @@ export const FileDrop = ({onFastaData}) => {
         [onFastaData]
     );
 
-    const handleDragOver = (event) => {
-        event.preventDefault();
+    const [fileList, setFileList] = useState([]);
+
+    const handleIncrementalDrop = (acceptedFiles) => {
+        setFileList((prevFiles) => {
+            const newFiles = acceptedFiles.filter(
+                (newFile) => !prevFiles.some((prevFile) => prevFile.name === newFile.name)
+            );
+            return [...prevFiles, ...newFiles];
+        });
     };
+
+    const {getRootProps, getInputProps} = useDropzone({
+        onDrop: handleIncrementalDrop,
+        multiple: true, // multiple files upload
+    });
 
     return (
         <div style={{padding: '20px', width: '100%'}}>
+            <div className="flex items-center justify-between gap-x-4">
+                <div
+                    {...getRootProps({
+                        className: 'text-lg border-2 border-dashed p-4 text-center cursor-pointer flex-1',
+                    })}>
+                    <input {...getInputProps()} />
+                    <p>Drag and drop FASTA files here or click to upload.</p>
+                </div>
 
-            <div
-                style={{
-                    display: 'flex',
-                    gap: '24px',
-                    flex: 1,
-                    width: '60vw',
-                    justifyContent: 'center'
-                }}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                className="border-2 border-dashed p-4 text-center cursor-pointer"
-            >
-                Drag and drop FASTA files here or click to upload.
+                <button
+                    type="button"
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                    onClick={() => searchByUploadedFiles(fileList)}>
+                    Show
+                </button>
             </div>
-        </div>)
+
+            <div className="mt-4">
+                {fileList.map((file, index) => (
+                    <div key={index} className="text-lg flex justify-between">
+                        <span>
+                          {file.name} - {file.size} bytes
+                        </span>
+                        <X size={20}
+                            color="#a0aec0"
+                            style={{cursor: 'pointer'}}
+                            onClick={() =>
+                                setFileList((prev) => prev.filter((_, i) => i !== index))
+                            }
+                        />
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
 };
