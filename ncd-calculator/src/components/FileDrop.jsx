@@ -102,8 +102,11 @@ export const FileDrop = ({onFastaData}) => {
     });
 
     return (
-        <div style={{padding: '20px', width: '100%'}}>
-            <div className="flex items-center justify-between gap-x-4">
+        <>
+            <label htmlFor="large-input" className="block mb-2 mt-6 text-lg font-medium text-gray-900 dark:text-white">
+                Search By FASTA Files
+            </label>
+            <div className="flex justify-between gap-x-4">
                 <div
                     {...getRootProps({
                         className: 'text-lg border-2 border-dashed p-4 text-center cursor-pointer flex-1',
@@ -114,7 +117,9 @@ export const FileDrop = ({onFastaData}) => {
 
                 <button
                     type="button"
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                    className={`${fileList.length < 4 ? 'bg-gray-300 text-gray-800' : 'bg-blue-600 text-white hover:bg-blue-900'} 
+                        "py-3 px-6 text-base rounded-lg cursor-pointer border-none shadow-md transition-colors duration-200"`}
+                    disabled={fileList.length < 4}
                     onClick={() => searchByUploadedFiles(fileList)}>
                     Show
                 </button>
@@ -127,15 +132,11 @@ export const FileDrop = ({onFastaData}) => {
                           {file.name} - {file.size} bytes
                         </span>
                         <X size={20}
-                            color="#a0aec0"
-                            style={{cursor: 'pointer'}}
-                            onClick={() =>
-                                setFileList((prev) => prev.filter((_, i) => i !== index))
-                            }
-                        />
+                           style={{cursor: 'pointer', color: '#a0aec0'}}
+                           onClick={() => setFileList((prev) => prev.filter((_, i) => i !== index))}/>
                     </div>
                 ))}
             </div>
-        </div>
+        </>
     )
 };

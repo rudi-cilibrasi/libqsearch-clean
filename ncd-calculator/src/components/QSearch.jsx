@@ -48,6 +48,8 @@ export const QSearch = () => {
     }, []);
 
     const handleFastaData = (data, fileNames) => {
+        setIsLoading(true);
+        resetDisplay();
         const parsed = parseFasta(data, fileNames);
         if (fileNames) {
             const map = {
@@ -147,130 +149,125 @@ export const QSearch = () => {
             }
         }
         if (results.length === 0) {
-            setErrorMsg("no result");
-            setNcdMatrix([]);
-            setLabels([]);
-            labelMapRef.current = new Map();
-            setLabelMap(new Map());
-            setHasMatrix(false);
-            setQSearchTreeResult([]);
-        } else {
-            try {
-                const hitAccessions = new Set();
-                const missAccessions = new Set();
-                const accessionToSequence = new Map();
-                const accessions = [];
-                for (let i = 0; i < results.length; i++) {
-                    if (results[i].cacheHit) {
-                        for (let j = 0; j < results[i].accessions.length; j++) {
-                            const rs = results[i];
-                            const accession = rs.accessions[j];
-                            if (!rs.contents[j] || rs.contents[j].trim() === '') {
-                                missAccessions.add(rs.accessions[j]);
-                            } else {
-                                hitAccessions.add(rs.accessions[j]);
-                                accessionToSequence.set(rs.accessions[j], {
-                                    content: rs.contents[j],
-                                    label: rs.labels[j],
-                                    commonName: rs.commonNames[j],
-                                    scientificName: rs.scientificNames[j],
-                                    accession: rs.accessions[j]
-                                })
-                            }
-                            accessions.push(accession);
+            resetDisplay();
+            return;
+        }
+
+        try {
+            const hitAccessions = new Set();
+            const missAccessions = new Set();
+            const accessionToSequence = new Map();
+            const accessions = [];
+            for (let i = 0; i < results.length; i++) {
+                if (results[i].cacheHit) {
+                    for (let j = 0; j < results[i].accessions.length; j++) {
+                        const rs = results[i];
+                        const accession = rs.accessions[j];
+                        if (!rs.contents[j] || rs.contents[j].trim() === '') {
+                            missAccessions.add(rs.accessions[j]);
+                        } else {
+                            hitAccessions.add(rs.accessions[j]);
+                            accessionToSequence.set(rs.accessions[j], {
+                                content: rs.contents[j],
+                                label: rs.labels[j],
+                                commonName: rs.commonNames[j],
+                                scientificName: rs.scientificNames[j],
+                                accession: rs.accessions[j]
+                            })
                         }
-                    } else {
-                        for (let j = 0; j < results[i].accessions.length; j++) {
-                            missAccessions.add(results[i].accessions[j]);
-                            accessions.push(results[i].accessions[j]);
-                        }
+                        accessions.push(accession);
+                    }
+                } else {
+                    for (let j = 0; j < results[i].accessions.length; j++) {
+                        missAccessions.add(results[i].accessions[j]);
+                        accessions.push(results[i].accessions[j]);
                     }
                 }
-                if (missAccessions.size !== 0) {
-                    const missedSequences = await getFastaSequence(Array.from(missAccessions), apiKey);
-                    const accessionSeqToCache = {
-                        accessions: [],
-                        contents: []
-                    }
-                    for (let i = 0; i < missedSequences.accessions.length; i++) {
-                        accessionToSequence.set(missedSequences.accessions[i], {
-                            content: missedSequences.contents[i],
-                            label: missedSequences.labels[i],
-                            commonName: missedSequences.commonNames[i],
-                            scientificName: missedSequences.scientificNames[i],
-                            accession: missedSequences.accessions[i]
-                        });
-                        const searchTerm = accessionToSearchTerm.get(missedSequences.accessions[i]);
-                        cacheSearchTermAccessions(searchTerm, {
-                            accessions: [missedSequences.accessions[i]],
-                            labels: [missedSequences.labels[i]],
-                            commonNames: [missedSequences.commonNames[i]],
-                            scientificNames: [missedSequences.scientificNames[i]]
-                        });
-                        // {contents: [], accessions: []}
-                        accessionSeqToCache.accessions.push(missedSequences.accessions[i]);
-                        accessionSeqToCache.contents.push(missedSequences.contents[i]);
-                    }
-                    cacheAccession(accessionSeqToCache);
-                }
-                const nonProjectedInput = {
-                    contents: [],
-                    labels: [],
-                    accessions: [],
-                    commonNames: [],
-                    scientificNames: []
-                }
-                for (let i = 0; i < accessions.length; i++) {
-                    const seqRes = accessionToSequence.get(accessions[i]);
-                    putNonProjectedItem(nonProjectedInput, seqRes);
-                }
-                const map = new Map();
-                for (let i = 0; i < nonProjectedInput.accessions.length; i++) {
-                    map.set(nonProjectedInput.accessions[i], {
-                        label: nonProjectedInput.labels[i],
-                        scientificName: nonProjectedInput.scientificNames[i],
-                        commonName: nonProjectedInput.commonNames[i],
-                        content: nonProjectedInput.contents[i]
-                    });
-                }
-                const projectedInput = {
-                    contents: [],
-                    labels: [],
-                    scientificNames: [],
-                    commonNames: [],
-                    accessions: []
-                }
-                const resultSet = new Set([...nonProjectedInput.accessions]);
-                if (projectionOptions.commonName) {
-                    const itemsUniqueNames = getUniqueAccessions(nonProjectedInput, "commonName");
-                    Object.assign(resultSet, intersect(resultSet, itemsUniqueNames));
-                }
-                if (projectionOptions.scientificName) {
-                    const itemUniqueScientificNames = getUniqueAccessions(nonProjectedInput, "scientificName");
-                    Object.assign(resultSet, intersect(resultSet, itemUniqueScientificNames));
-                }
-                const resultSetArr = Array.from(resultSet);
-                for (let i = 0; i < resultSetArr.length; i++) {
-                    const data = map.get(resultSetArr[i]);
-                    projectedInput.accessions.push(resultSetArr[i]);
-                    projectedInput.labels.push(data.label);
-                    projectedInput.contents.push(data.content);
-                    projectedInput.scientificNames.push(data.scientificName);
-                    projectedInput.commonNames.push(data.commonName);
-                }
-                const ncdInput = {
-                    contents: projectedInput.contents,
-                    labels: projectedInput.accessions
-                }
-                projectedInput.displayLabels = determineDisplayLabels(projectedInput, projectionOptions);
-                let labelMap = getLabelMap(projectedInput);
-                labelMapRef.current = labelMap;
-                setLabelMap(labelMap);
-                ncdWorker.postMessage(ncdInput);
-            } finally {
-                setIsLoading(false);
-                isSearchDisabled(false);
             }
+            if (missAccessions.size !== 0) {
+                const missedSequences = await getFastaSequence(Array.from(missAccessions), apiKey);
+                const accessionSeqToCache = {
+                    accessions: [],
+                    contents: []
+                }
+                for (let i = 0; i < missedSequences.accessions.length; i++) {
+                    accessionToSequence.set(missedSequences.accessions[i], {
+                        content: missedSequences.contents[i],
+                        label: missedSequences.labels[i],
+                        commonName: missedSequences.commonNames[i],
+                        scientificName: missedSequences.scientificNames[i],
+                        accession: missedSequences.accessions[i]
+                    });
+                    const searchTerm = accessionToSearchTerm.get(missedSequences.accessions[i]);
+                    cacheSearchTermAccessions(searchTerm, {
+                        accessions: [missedSequences.accessions[i]],
+                        labels: [missedSequences.labels[i]],
+                        commonNames: [missedSequences.commonNames[i]],
+                        scientificNames: [missedSequences.scientificNames[i]]
+                    });
+                    // {contents: [], accessions: []}
+                    accessionSeqToCache.accessions.push(missedSequences.accessions[i]);
+                    accessionSeqToCache.contents.push(missedSequences.contents[i]);
+                }
+                cacheAccession(accessionSeqToCache);
+            }
+            const nonProjectedInput = {
+                contents: [],
+                labels: [],
+                accessions: [],
+                commonNames: [],
+                scientificNames: []
+            }
+            for (let i = 0; i < accessions.length; i++) {
+                const seqRes = accessionToSequence.get(accessions[i]);
+                putNonProjectedItem(nonProjectedInput, seqRes);
+            }
+            const map = new Map();
+            for (let i = 0; i < nonProjectedInput.accessions.length; i++) {
+                map.set(nonProjectedInput.accessions[i], {
+                    label: nonProjectedInput.labels[i],
+                    scientificName: nonProjectedInput.scientificNames[i],
+                    commonName: nonProjectedInput.commonNames[i],
+                    content: nonProjectedInput.contents[i]
+                });
+            }
+            const projectedInput = {
+                contents: [],
+                labels: [],
+                scientificNames: [],
+                commonNames: [],
+                accessions: []
+            }
+            const resultSet = new Set([...nonProjectedInput.accessions]);
+            if (projectionOptions.commonName) {
+                const itemsUniqueNames = getUniqueAccessions(nonProjectedInput, "commonName");
+                Object.assign(resultSet, intersect(resultSet, itemsUniqueNames));
+            }
+            if (projectionOptions.scientificName) {
+                const itemUniqueScientificNames = getUniqueAccessions(nonProjectedInput, "scientificName");
+                Object.assign(resultSet, intersect(resultSet, itemUniqueScientificNames));
+            }
+            const resultSetArr = Array.from(resultSet);
+            for (let i = 0; i < resultSetArr.length; i++) {
+                const data = map.get(resultSetArr[i]);
+                projectedInput.accessions.push(resultSetArr[i]);
+                projectedInput.labels.push(data.label);
+                projectedInput.contents.push(data.content);
+                projectedInput.scientificNames.push(data.scientificName);
+                projectedInput.commonNames.push(data.commonName);
+            }
+            const ncdInput = {
+                contents: projectedInput.contents,
+                labels: projectedInput.accessions
+            }
+            projectedInput.displayLabels = determineDisplayLabels(projectedInput, projectionOptions);
+            let labelMap = getLabelMap(projectedInput);
+            labelMapRef.current = labelMap;
+            setLabelMap(labelMap);
+            ncdWorker.postMessage(ncdInput);
+        } finally {
+            setIsLoading(false);
+            setIsSearchDisabled(false);
         }
     }
 
@@ -461,6 +458,7 @@ export const QSearch = () => {
             }
             setQSearchTreeResult(result);
         }
+        setIsLoading(false);
     };
 
     const resetAndSetActiveTab = (tab) => {
