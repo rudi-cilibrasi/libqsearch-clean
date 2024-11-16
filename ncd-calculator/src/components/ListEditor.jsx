@@ -1,5 +1,5 @@
-import React, {useState, useEffect} from 'react';
-import {Search, ChevronRight, X} from 'lucide-react';
+import React, {useState} from 'react';
+import {ChevronRight, Search, X} from 'lucide-react';
 
 const ListEditor = ({performSearch}) => {
 
@@ -20,9 +20,7 @@ const ListEditor = ({performSearch}) => {
     }
 
     const onPerformSearch = () => {
-        if (!isDisabledByApiKey && selectedItems.length !== 0) {
-            performSearch(selectedItems, projections, apiKey);
-        }
+        performSearch(selectedItems, projections, apiKey);
     }
 
 
@@ -36,31 +34,15 @@ const ListEditor = ({performSearch}) => {
     const isDisabledByApiKey = apiKey === null || apiKey.trim() === '';
 
     return (
-        <div style={{padding: '20px', width: '100%'}}>
+        <>
             {/* Main Content - Side by Side Layout */}
-            <div
-                style={{display: 'flex', gap: '24px', flex: 1, width: '60vw', pointerEvents: isDisabledByApiKey ? 'none' : 'auto'}}>
-                <div style={{
-                    width: '50%',
-                    height: '500px',
-                    overflowY: 'auto',
-                    border: '1px solid #ccc',
-                    padding: '24px',
-                    boxSizing: 'border-box',
-                    borderRadius: '12px',
-                    backgroundColor: 'white'
-                }}>
-                    <h3 style={{
-                        fontSize: '1.2rem',
-                        fontWeight: 'bold',
-                        marginBottom: '20px',
-                        color: '#1a365d'
-                    }}>Search
+            <div style={{display: 'flex', gap: '24px', flex: 1, pointerEvents: isDisabledByApiKey ? 'none' : 'auto'}}>
+                <div
+                    className="w-1/2 h-[500px] overflow-y-auto border border-gray-300 p-6 box-border rounded-lg bg-white">
+                    <h3 className="text-xl font-bold mb-5 text-[#1a365d]">Search
                         Results</h3>
-                    <div
-                        style={{position: 'relative', marginBottom: '20px'}}>
-                        <div
-                            style={{position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)'}}>
+                    <div className="relative mb-5">
+                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
                             <Search size={20} color="#4a5568"/>
                         </div>
                         <input
@@ -69,45 +51,19 @@ const ListEditor = ({performSearch}) => {
                             onKeyDown={handleKeyDown}
                             onChange={(e) => onInputChange(e.target.value)}
                             placeholder="Search animals..."
-                            className={`${isDisabledByApiKey ? 'bg-gray-300 text-gray-800' : '#3182ce'}`}
-                            style={{
-                                width: '100%',
-                                padding: '12px 12px 12px 48px',
-                                border: '2px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '1rem',
-                                outline: 'none',
-                                transition: 'border-color 0.2s',
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = '#3182ce'}
-                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                            className={`${isDisabledByApiKey ? 'bg-gray-300 text-gray-800' : '#3182ce'} w-full py-3 px-3 pl-12 border-2 border-gray-200 rounded-lg text-base outline-none transition-colors duration-200`}
+                            onFocus={(e) => e.target.classList.add('border-[#3182ce]')}
+                            onBlur={(e) => e.target.classList.remove('border-[#3182ce]')}
                         />
                     </div>
 
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
-                        maxHeight: '500px',
-                        overflowY: 'auto',
-                        padding: '4px'
-                    }}>
+                    <div className="flex flex-col gap-2.5 max-h-[500px] overflow-y-auto p-1">
                         {searchResults.map((item, index) => (
                             <div
                                 key={index}
                                 onClick={() => setSelectedItems(prev => [...prev, item])}
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    padding: '16px',
-                                    backgroundColor: '#f8fafc',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
+                                className="flex justify-between items-center p-4 bg-gray-50 border border-gray-200
+                                    rounded-lg cursor-pointer transition-all duration-200">
                                 <div>
                                     {<div style={{color: '#2d3748'}}>{searchTerm}</div>}
                                 </div>
@@ -120,44 +76,13 @@ const ListEditor = ({performSearch}) => {
                 {/* Selected Items Box */}
 
 
-                <div style={{
-                    width: '50%',
-                    height: '500px',
-                    overflowY: 'auto',
-                    border: '1px solid #ccc',
-                    padding: '24px',
-                    boxSizing: 'border-box',
-                    borderRadius: '12px',
-                    backgroundColor: 'white'
-                }}>
-
-                    <h3 style={{
-                        fontSize: '1.2rem',
-                        fontWeight: 'bold',
-                        marginBottom: '20px',
-                        color: '#1a365d'
-                    }}>Selected Items</h3>
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
-                        maxHeight: '500px',
-                        overflowY: 'auto',
-                        padding: '4px'
-                    }}>
+                <div
+                    className="w-1/2 h-[500px] overflow-y-auto border border-gray-300 p-6 box-border rounded-lg bg-white">
+                    <h3 className="text-xl font-bold mb-5 text-[#1a365d]">Selected Items</h3>
+                    <div className="flex flex-col gap-2.5 max-h-[500px] overflow-y-auto p-1">
                         {selectedItems.map((item, index) => (
-                            <div
-                                key={index}
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    padding: '16px',
-                                    backgroundColor: '#f8fafc',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '8px',
-                                }}
-                            >
+                            <div key={index}
+                                 className="flex justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-lg">
                                 <div>
                                     <div style={{color: '#718096', fontSize: '0.9rem'}}>{selectedItems[index]}</div>
                                 </div>
@@ -170,36 +95,23 @@ const ListEditor = ({performSearch}) => {
                 </div>
             </div>
 
-            <div className="mb-6 mt-6">
-                <label htmlFor="large-input" className="block mb-2 text-lg font-medium text-gray-900 dark:text-white">Enter API Key</label>
-                <input type="text" id="large-input"
-                       className="block w-full p-4 text-black bg-white border border-gray-300 rounded-lg text-base"
-                       value={apiKey}
-                       onChange={(event) => setApiKey(event.target.value)}
-                />
-            </div>
+            <label htmlFor="large-input" className="block mb-2 mt-6 text-lg font-medium text-gray-900 dark:text-white">
+                Enter API Key
+            </label>
 
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '24px',
-                marginTop: '24px',
-                pointerEvents: isDisabledByApiKey ? 'none' : 'auto'
-            }}>
+            <input type="text" id="large-input"
+                   className="block w-full p-4 text-black bg-white border border-gray-300 rounded-lg text-base"
+                   value={apiKey}
+                   onChange={(event) => setApiKey(event.target.value)}/>
+
+            <div
+                className={`flex items-center justify-between mt-6 mb-6 ${isDisabledByApiKey ? 'pointer-events-none' : 'pointer-events-auto'}`}>
                 <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
                     {Object.entries(projections).map(([key, value]) => (
                         <label
-                            className={`${isDisabledByApiKey ? 'bg-gray-300' : (value ? 'bg-blue-200' : 'bg-white')}`}
-                            key={key} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 16px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            border: '1px solid #e2e8f0'
-                        }}>
+                            className={`${isDisabledByApiKey ? 'bg-gray-300' : (value ? 'bg-blue-200' : 'bg-white')}
+                                flex items-center gap-2 py-2 px-4 rounded cursor-pointer border border-gray-200`}
+                            key={key}>
                             <input
                                 type="checkbox"
                                 checked={value}
@@ -207,31 +119,20 @@ const ListEditor = ({performSearch}) => {
                                     ...prev,
                                     [key]: key !== "Accession" ? !prev[key] : prev[key]
                                 }))}
-                                style={{cursor: 'pointer'}}
                             />
                             <span style={{color: '#2d3748'}}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
                         </label>
                     ))}
                 </div>
 
-
                 <button
                     onClick={onPerformSearch}
-                    className={`${isDisabledByApiKey ? 'bg-gray-300 text-gray-800' : 'bg-blue-600 text-white hover:bg-blue-900'}`}
-                    style={{
-                        padding: '12px 24px',
-                        fontSize: '1rem',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        border: 'none',
-                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                        transition: 'background-color 0.2s'
-                    }}
-                >
+                    className={`${isDisabledByApiKey || selectedItems.length < 4 ? 'bg-gray-300 text-gray-800' : 'bg-blue-600 text-white hover:bg-blue-900'}
+                        "py-3 px-6 text-base rounded-lg cursor-pointer border-none shadow-md transition-colors duration-200"`}>
                     Search
                 </button>
             </div>
-        </div>
+        </>
     );
 };
 
