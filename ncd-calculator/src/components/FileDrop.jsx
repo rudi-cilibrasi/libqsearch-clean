@@ -2,23 +2,29 @@ import React, { useCallback, useState } from "react";
 import { useDropzone } from 'react-dropzone';
 import { X } from "lucide-react";
 import { getAllValidFilesOrError, getFile } from "../functions/file.js";
-import { parseFastaAndClean } from "../functions/fasta.js";
+import {parseFasta, parseFastaAndClean} from "../functions/fasta.js";
 
 export const FileDrop = ({ onParsedFileContent }) => {
     const [error, setError] = useState("");
     const [fileList, setFileList] = useState([]);
 
     const handleIncrementalDrop = (acceptedFiles) => {
-        setFileList((prevFiles) => {
-            const newFiles = acceptedFiles.filter((newFile) => !prevFiles.some((prevFile) => prevFile.name === newFile.name));
-            return [...prevFiles, ...newFiles];
-        });
+        const list = updateFileListAndGet(fileList, acceptedFiles);
+        setFileList(list);
     };
 
 
-    const show = async (fileList) => {
+    const updateFileListAndGet = (prevFiles, newFiles) => {
+        const filtered = newFiles.filter((newFile) => !prevFiles.some((prevFile) => prevFile.name === newFile.name));
+        return [...prevFiles, ...filtered];
+    }
+
+
+
+    const show = async (newFiles) => {
         setError("");
-        await searchByUploadedFiles(fileList);
+        const list = updateFileListAndGet(fileList, newFiles);
+        await searchByUploadedFiles(list);
     }
 
     const searchByUploadedFiles = useCallback(
@@ -31,23 +37,31 @@ export const FileDrop = ({ onParsedFileContent }) => {
                         return { valid: false };
                     },
                     (fileInfos) => {
-                        if (fileInfos[0].ext === "fasta") {
-                            const fastaList = fileInfos.reduce((acc, info) => {
-                                const parsedFasta = parseFastaAndClean(info.content);
-                                parsedFasta.forEach((entry) => {
-                                    if (!entry.accession || entry.accession.trim() === "") {
-                                        entry.accession = info.name;
+                        let result = [];
+                        for(let i = 0; i < fileInfos.length; i++) {
+                            const fileInfo = fileInfos[i];
+                            const ext = fileInfo.ext;
+                            if (ext === "fasta") {
+                                const parsedFasta = parseFastaAndClean(fileInfo.content);
+                                for(let i = 0; i < parsedFasta.length; i++) {
+                                    if (!parsedFasta[i].accession ||  parsedFasta[i].accession.trim() === '') {
+                                        parsedFasta[i].accession = fileInfo.name;
                                     }
-                                });
-                                return [...acc, ...parsedFasta];
-                            }, []);
-                            return { valid: true, clean: true, isFasta: true, data: fastaList };
-                        } else {
-                            const data = fileInfos.map((file) => ({
-                                accession: file.name,
-                                sequence: file.content,
-                            }));
-                            return { valid: true, clean: true, isFasta: false, data: data };
+                                }
+                                result = [...result, ...parsedFasta];
+                            } else {
+                                const content = fileInfo.content;
+                                const accession = fileInfo.name;
+                                result.push({
+                                    accession: accession,
+                                    sequence: content
+                                })
+                            }
+                        }
+                        return {
+                            valid: true,
+                            clean: true,
+                            data: result
                         }
                     }
                 );

@@ -122,13 +122,8 @@ export const allFilesWithSupportedFormat = async (files) => {
     for(let i = 0; i < SUPPORTED_FILE_FORMATS.length; i++) {
         const format = SUPPORTED_FILE_FORMATS[i];
         const ext = format.ext;
-        const hasFasta = hasAnyFasta(files);
         const supported = await allFilesWithFormat(files, ext);
-        if (hasFasta && !supported) {
-            return false;
-        } else if (hasFasta && supported) {
-            return true;
-        } else if (!hasFasta && supported) {
+        if (supported) {
             return true;
         }
     }
