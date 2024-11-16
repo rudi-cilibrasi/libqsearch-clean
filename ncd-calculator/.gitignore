@@ -31,3 +31,4 @@ dist-ssr
 .env.development
 .env.production
 .env*.local
+.vite

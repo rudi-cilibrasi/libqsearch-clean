@@ -1,6 +1,6 @@
-import {parseAccessionNumber} from "./cache.js";
 import {getApiResponseText} from "./fetch.js";
 import {encodeURIWithApiKey} from "./api.js";
+import {parseFastaAndClean} from "./fasta.js";
 
 
 export const getApiResponse = async (uri) => {
@@ -19,9 +19,8 @@ export const getFastaList = async (idList, apiKey) => {
 
 
 export const getFastaListAndParse = async (idList, apiKey) => {
-    const FETCH_URI = getFastaListUri(idList, apiKey) ;
-    const data = await getApiResponseText(FETCH_URI);
-    return parseFasta(data);
+    const data = await getFastaList(idList, apiKey) ;
+    return parseFastaAndClean(data);
 }
 
 
@@ -70,56 +69,3 @@ export const getSequenceIdsBySearchTerm = async (searchTerm, numItems, apiKey) =
     }
     return idList;
 }
-
-
-export const parseFasta = (fastaData, fileNames) => {
-    if (fastaData && isCleanFastaSequence(fastaData[0]) && fileNames) {
-        const sequences = {
-            contents: [],
-            labels: []
-        }
-        for(let i = 0; i < fastaData.length; i++) {
-            sequences.contents[i] = fastaData[i];
-            sequences.labels[i] = fileNames[i];
-        }
-        return sequences;
-    } else {
-        const labels = [];
-        const contents = [];
-        const lines = fastaData.split("\n").map(line => line.toLowerCase());
-        let currentLabel = null;
-        let currentSequence = "";
-
-        lines.forEach((line) => {
-            if (line.startsWith(">")) {
-                if (currentLabel && currentSequence) {
-                    labels.push(currentLabel);
-                    contents.push(currentSequence);
-                }
-                currentSequence = "";
-                const header = line.substring(1);
-                const labelMatch = header.match(/^(\S+)/);
-                currentLabel = labelMatch ? parseAccessionNumber(labelMatch[1]) : "unknown";
-            } else {
-                currentSequence += line.trim();
-            }
-        });
-        if (currentLabel && currentSequence) {
-            labels.push(currentLabel);
-            contents.push(currentSequence);
-        }
-        return {labels, contents};
-    }
-};
-
-
-export const isCleanFastaSequence = (content) => {
-    const cleanContent = content.replace(/\s/g, '');
-    const isDna = /^[ATCGNatcgn\s]*$/.test(cleanContent);  // DNA
-    if (isDna) return true;
-    const isRna = /^[AUCGNaucgn\s]*$/.test(cleanContent);  // RNA
-    if (isRna) {
-        return true;
-    }
-    return /^[ACDEFGHIKLMNPQRSTVWY\s]*$/.test(cleanContent); // protein
-};
