@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { useDropzone } from 'react-dropzone';
 import { X } from "lucide-react";
 import { getAllValidFilesOrError, getFile } from "../functions/file.js";
-import {parseFasta, parseFastaAndClean} from "../functions/fasta.js";
+import {parseFastaAndClean} from "../functions/fasta.js";
 
 export const FileDrop = ({ onParsedFileContent }) => {
     const [error, setError] = useState("");
