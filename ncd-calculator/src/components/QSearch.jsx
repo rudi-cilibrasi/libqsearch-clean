@@ -193,7 +193,6 @@ export const QSearch = () => {
 
     return (
         <div style={{margin: "20px", textAlign: "center"}}>
-            <h1 style={{marginBottom: "20px"}}>NCD Calculator</h1>
             <ListEditor onComputedNcdInput={onNcdInput} labelMapRef={labelMapRef} setLabelMap={setLabelMap}
                         setIsLoading={setIsLoading} resetDisplay={resetDisplay}/>
             {
