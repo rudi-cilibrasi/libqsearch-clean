@@ -186,6 +186,14 @@ export const validSequence = (content) => {
     return /^[ACDEFGHIKLMNPQRSTVWY\s]*$/.test(cleanContent); // protein
 }
 
+export const isFasta = (fileInfo) => {
+    if (!fileInfo) return false;
+    const ext = fileInfo.ext;
+    if ("fasta" === ext) return true;
+    const content = fileInfo.content;
+    return isValidFasta(content);
+}
+
 
 export const parseFastaAndClean = (fastaData) => {
     const fastaList = parseFasta(fastaData);
