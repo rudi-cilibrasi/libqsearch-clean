@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE eSearchResult PUBLIC "-//NLM//DTD esearch 20060628//EN"
+        "https://eutils.ncbi.nlm.nih.gov/eutils/dtd/20060628/esearch.dtd">
+<eSearchResult>
+    <Count>601</Count>
+    <RetMax>20</RetMax>
+    <RetStart>0</RetStart>
+    <IdList>
+        <Id>2626744391</Id>
+        <Id>2626744377</Id>
+        <Id>2626744363</Id>
+        <Id>2626744349</Id>
+        <Id>2626744335</Id>
+        <Id>2626744321</Id>
+        <Id>2626744307</Id>
+        <Id>2626744293</Id>
+        <Id>2626744279</Id>
+        <Id>2626744265</Id>
+        <Id>2626744251</Id>
+        <Id>2626744237</Id>
+        <Id>2626744223</Id>
+        <Id>2626744209</Id>
+        <Id>2626744195</Id>
+        <Id>2626744181</Id>
+        <Id>2626744167</Id>
+        <Id>2626744153</Id>
+        <Id>2626744139</Id>
+        <Id>2626744125</Id>
+    </IdList>
+    <TranslationSet/>
+    <TranslationStack>
+        <TermSet>
+            <Term>buffalo[All Fields]</Term>
+            <Field>All Fields</Field>
+            <Count>2037356</Count>
+            <Explode>N</Explode>
+        </TermSet>
+        <TermSet>
+            <Term>mitochondrion[title]</Term>
+            <Field>title</Field>
+            <Count>212805</Count>
+            <Explode>N</Explode>
+        </TermSet>
+        <OP>AND</OP>
+        <TermSet>
+            <Term>genome[title]</Term>
+            <Field>title</Field>
+            <Count>157393051</Count>
+            <Explode>N</Explode>
+        </TermSet>
+        <OP>AND</OP>
+    </TranslationStack>
+    <QueryTranslation>buffalo[All Fields] AND mitochondrion[title] AND genome[title]</QueryTranslation>
+</eSearchResult>

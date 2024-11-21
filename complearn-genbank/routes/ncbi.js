@@ -1,15 +1,14 @@
-require('dotenv').config();
-
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+const envLoader = require('../configurations/envLoader');
 
 let apiKeyIndex = 0;
 
 const apiKeys = [
-    process.env.GENBANK_API_KEY_1,
-    process.env.GENBANK_API_KEY_2,
-    process.env.GENBANK_API_KEY_3
+    envLoader.get('GENBANK_API_KEY_1'),
+    envLoader.get('GENBANK_API_KEY_2'),
+    envLoader.get('GENBANK_API_KEY_3'),
 ];
 
 function getNextApiKey() {
@@ -27,15 +26,20 @@ const commonHandler = async (urlBase, req, res) => {
     }
 
     let queryString = '';
+    let userApiKey = null;
     for (const [key, value] of Object.entries(queryParams)) {
+        if (key.startsWith('api_key')) {
+            userApiKey = key;
+            continue;
+        }
         if (queryString) {
             queryString += '&';
         }
         queryString += `${key}=${encodeURIComponent(value)}`;
     }
 
-    let nextApiKey = getNextApiKey();
-    const finalUrl = `${urlBase}?${queryString}&api_key${encodeURIComponent(nextApiKey)}`
+    let nextApiKey = userApiKey ? userApiKey : `api_key${encodeURIComponent(getNextApiKey())}`;
+    const finalUrl = `${urlBase}?${queryString}&${nextApiKey}`
 
     try {
         const response = await axios.get(finalUrl);

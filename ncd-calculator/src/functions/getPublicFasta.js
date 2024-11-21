@@ -1,6 +1,7 @@
 import {getApiResponseText} from "./fetch.js";
 import {encodeURIWithApiKey} from "./api.js";
 import {parseFastaAndClean} from "./fasta.js";
+import {BACKEND_BASE_URL} from "../config/api.js";
 
 
 export const getApiResponse = async (uri) => {
@@ -28,14 +29,14 @@ export const getFastaListAndParse = async (idList, apiKey) => {
 export const getFastaListUri = (idList, apiKey) => {
     const copy = [...idList];
     const ids = copy.join(",");
-    return encodeURIWithApiKey(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${ids}&rettype=fasta&retmode=text`, apiKey);
+    return encodeURIWithApiKey(`${BACKEND_BASE_URL}/ncbi/fetch?db=nuccore&id=${ids}&rettype=fasta&retmode=text`, apiKey);
 }
 
 export const getFastaAccessionNumbersFromIdsUri = (idList, apiKey) => {
     if (typeof idList !== 'string') {
         idList = idList.join(",");
     }
-    return encodeURIWithApiKey(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id=${idList}&rettype=acc`, apiKey);
+    return encodeURIWithApiKey(`${BACKEND_BASE_URL}/ncbi/fetch?db=nucleotide&id=${idList}&rettype=acc`, apiKey);
 }
 
 export const getFastaAccessionNumbersFromIds = async (idList, apiKey) => {
@@ -51,7 +52,7 @@ export const getFastaAccessionNumbersFromIds = async (idList, apiKey) => {
 
 export const getSequenceIdsBySearchTermUri = (searchTerm, numItems, apiKey) => {
     searchTerm = searchTerm.trim() + " AND mitochondrion[title] AND genome[title]";
-    return encodeURIWithApiKey(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=${searchTerm}&retmode=text&rettype=fasta&retmax=${numItems}`, apiKey);
+    return encodeURIWithApiKey(`${BACKEND_BASE_URL}/ncbi/search?db=nuccore&term=${searchTerm}&retmode=text&rettype=fasta&retmax=${numItems}`, apiKey);
 }
 
 export const getSequenceIdsBySearchTerm = async (searchTerm, numItems, apiKey) => {
