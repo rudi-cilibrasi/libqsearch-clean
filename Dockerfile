@@ -1,4 +1,4 @@
-# Stage 1: C++ Build and Test Environment
+# Stage 1: C++ Build Environment
 FROM ubuntu:22.04 as cpp-builder
 WORKDIR /app
 
@@ -17,7 +17,6 @@ COPY . .
 # Make runtests executable
 RUN chmod +x runtests
 
-# Modify runtests script to handle existing build directory
 RUN sed -i 's/mkdir build/mkdir -p build/' runtests || true
 
 # Build C++ project
@@ -55,22 +54,11 @@ COPY --from=node-builder /app/ncd-calculator/dist /usr/share/nginx/html
 # Copy C++ files for testing
 COPY --from=cpp-builder /app .
 
-# Make sure build directory is removable
-RUN chmod -R 777 build || true
-
 # Install runtime dependencies
 RUN apk add --no-cache \
     libstdc++ \
     libgcc
 
-# Copy a startup script
-RUN echo '#!/bin/sh\n\
-nginx -g "daemon off;"' > /start.sh
-
-RUN chmod +x /start.sh
-
-# Expose port 80
+# Use nginx directly instead of a startup script
 EXPOSE 80
-
-# Use the startup script as the entry point
-CMD ["/start.sh"]
+CMD ["nginx", "-g", "daemon off;"]
