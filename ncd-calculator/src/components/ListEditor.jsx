@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Globe2, X} from 'lucide-react';
+import {Dna, Globe2, FileType2} from 'lucide-react';
 import {getTranslationResponse} from '../functions/udhr.js';
 import {InputAccumulator} from "./InputAccumulator.jsx";
 import {parseFastaAndClean} from "../functions/fasta.js";
@@ -21,6 +21,8 @@ import {
 } from "../functions/getPublicFasta.js";
 import {getGenbankSequences} from "../functions/getPublicGenbank.js";
 import {FastaSearch} from "./FastaSearch.jsx";
+import {FASTA, FILE_UPLOAD, LANGUAGE} from "./constants/modalConstants.js";
+import {FileUpload} from "./FileUpload.jsx";
 
 const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay}) => {
     const [searchMode, setSearchMode] = useState('language');
@@ -253,8 +255,8 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
 
 
     const computeNcdInput = async () => {
-        const langItems = selectedItems.filter(item => item.type === 'language');
-        const fastaItems = selectedItems.filter(item => item.type === 'fasta');
+        const langItems = selectedItems.filter(item => item.type === LANGUAGE);
+        const fastaItems = selectedItems.filter(item => item.type === FASTA || item.type === FILE_UPLOAD);
         const orderMap = getOrderMap(selectedItems);
         /** the computed NCD input will have the format, the labels here will act as ids:
          * {
@@ -538,19 +540,26 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
         setSelectedItems(selectedItems.filter(item => item.id !== itemId));
     };
 
-    const handleKeyDown = (e) => {
-        if (e.key === "Enter" && searchTerm.trim() !== '' && searchMode === 'fasta') {
-            addItem({
-                id: `fasta-${Date.now()}`,
-                type: 'fasta',
-                display: searchTerm
-            });
-            setSearchTerm('');
-        }
-    };
     const clearAllSelectedItems = () => {
         setSelectedItems([]);
         resetDisplay();
+    }
+
+    const renderModal = (mode) => {
+        switch (mode) {
+            case FASTA:
+                return (<FastaSearch addItem={addItem} searchTerm={searchTerm} MIN_ITEMS={MIN_ITEMS}
+                                     selectedItems={selectedItems}
+                                     onSetApiKey={setApiKey} setSelectedItems={setSelectedItems}/>)
+            case LANGUAGE:
+                return (<Language selectedItems={selectedItems} searchTerm={searchTerm} addItem={addItem}
+                                  MIN_ITEMS={MIN_ITEMS}/>)
+            default:
+                return (
+                    <FileUpload selectedItems={selectedItems} searchTerm={searchTerm} addItem={addItem} setSelectedItems={setSelectedItems}
+                                MIN_ITEMS={MIN_ITEMS}/>
+                )
+        }
     }
 
     return (
@@ -558,9 +567,9 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
             {/* Mode Selector */}
             <div className="flex gap-4 mb-6">
                 <button
-                    onClick={() => setSearchMode('language')}
+                    onClick={() => setSearchMode(LANGUAGE)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-            ${searchMode === 'language'
+            ${searchMode === LANGUAGE
                         ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
                         : 'bg-gray-100 text-gray-600 border-2 border-transparent'}`}
                 >
@@ -568,14 +577,24 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
                     <span>Language Analysis</span>
                 </button>
                 <button
-                    onClick={() => setSearchMode('fasta')}
+                    onClick={() => setSearchMode(FASTA)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-            ${searchMode === 'fasta'
+            ${searchMode === FASTA
                         ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
                         : 'bg-gray-100 text-gray-600 border-2 border-transparent'}`}
                 >
-                    {/*<DNA size={20} />*/}
+                    <Dna size={20}/>
                     <span>FASTA Search</span>
+                </button>
+                <button
+                    onClick={() => setSearchMode(FILE_UPLOAD)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+            ${searchMode === FILE_UPLOAD
+                        ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                        : 'bg-gray-100 text-gray-600 border-2 border-transparent'}`}
+                >
+                    <FileType2 size={20}/>
+                    <span>File Upload</span>
                 </button>
             </div>
 
@@ -584,15 +603,8 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
                 <div
                     className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
                     <div className="flex-1 overflow-y-auto p-3">
-                        {searchMode === 'language' ? (
-                            <Language selectedItems={selectedItems} searchTerm={searchTerm} addItem={addItem}
-                                      MIN_ITEMS={MIN_ITEMS}/>
-                        ) : (
-                            <FastaSearch addItem={addItem} searchTerm={searchTerm} MIN_ITEMS={MIN_ITEMS}
-                                         selectedItems={selectedItems}
-                                         onSetApiKey={setApiKey} setSelectedItems={setSelectedItems}
-
-                            />)
+                        {
+                            renderModal(searchMode)
                         }
                     </div>
                 </div>

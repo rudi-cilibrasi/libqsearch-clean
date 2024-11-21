@@ -19,11 +19,10 @@ export const Language = ({MIN_ITEMS, addItem, selectedItems}) => {
 
 
     return (
-        <div className="p-4">
+        <div className="p-4 h-[700px] flex flex-col">
             <SearchInput addItem={addItem} label="Available Languages" type="language"
                          handleSearchTerm={handleSearchTerm} searchTerm={searchTerm}/>
-            <div
-                className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
                 <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={20}/>
                 <p className="m-0 text-blue-800 text-sm leading-relaxed">
                     Explore language relationships through the <strong>Universal Declaration of
