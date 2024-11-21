@@ -17,6 +17,9 @@ COPY . .
 # Make runtests executable
 RUN chmod +x runtests
 
+# Modify runtests script to handle existing build directory
+RUN sed -i 's/mkdir build/mkdir -p build/' runtests || true
+
 # Build C++ project
 RUN mkdir -p build && \
     cd build && \
@@ -51,6 +54,9 @@ COPY --from=node-builder /app/ncd-calculator/dist /usr/share/nginx/html
 
 # Copy C++ files for testing
 COPY --from=cpp-builder /app .
+
+# Make sure build directory is removable
+RUN chmod -R 777 build || true
 
 # Install runtime dependencies
 RUN apk add --no-cache \
