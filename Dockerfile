@@ -1,4 +1,4 @@
-# Stage 1: C++ Build Environment
+# Stage 1: C++ Build and Test Environment
 FROM ubuntu:22.04 as cpp-builder
 WORKDIR /app
 
@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y \
 
 # Copy C++ project files
 COPY . .
+
+# Make runtests executable
+RUN chmod +x runtests
 
 # Build C++ project
 RUN mkdir -p build && \
@@ -41,29 +44,26 @@ RUN npm run build
 
 # Stage 3: Final Production Environment
 FROM nginx:alpine
+WORKDIR /app
 
 # Copy built assets from node builder
 COPY --from=node-builder /app/ncd-calculator/dist /usr/share/nginx/html
 
-# Create directory for C++ application
-WORKDIR /app
+# Copy C++ files for testing
+COPY --from=cpp-builder /app .
 
-# Copy compiled C++ binaries from cpp-builder
-COPY --from=cpp-builder /app/build /app/build
-
-# Install runtime dependencies for C++ application
+# Install runtime dependencies
 RUN apk add --no-cache \
     libstdc++ \
     libgcc
 
 # Copy a startup script
 RUN echo '#!/bin/sh\n\
-# Start nginx\n\
 nginx -g "daemon off;"' > /start.sh
 
 RUN chmod +x /start.sh
 
-# Expose port 80 for nginx
+# Expose port 80
 EXPOSE 80
 
 # Use the startup script as the entry point
