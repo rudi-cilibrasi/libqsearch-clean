@@ -1,5 +1,5 @@
 /* eslint-disable */
-import {expect, test} from "vitest";
+import {expect, test, vi} from "vitest";
 import {
     getApiResponse,
     getFastaAccessionNumbersFromIds,
@@ -10,11 +10,12 @@ import {
     parseFastaAndClean
 } from "../functions/getPublicFasta.js";
 import {Parser} from "xml2js"
-import {readFileSync} from "fs";
+import fs, {readFileSync} from "fs";
 
 import {parseAccessionNumber} from "../functions/cache.js";
 import {join} from "node:path";
 import {parseFastaAndClean} from "../functions/fasta.js";
+import path from "path";
 
 const parser = new Parser([]);
 const searchTerm = "buffalo";
@@ -31,6 +32,13 @@ const ACCESSIONS = SAMPLE_FASTA.map(json => json.accessionNumber);
 const SEQUENCES = SAMPLE_FASTA.map(json => json.sequence);
 
 test('test fetch fasta IDs for buffalo', async () => {
+    const mockXmlResponse = fs.readFileSync(path.resolve(__dirname, './mock_response/fetch_fastaID_term_response.xml'), 'utf-8');
+    global.fetch = vi.fn().mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        text: vi.fn().mockResolvedValue(mockXmlResponse),
+        headers: {get: vi.fn().mockReturnValue('application/xml')}
+    });
     const idsUri = getSequenceIdsBySearchTermUri(searchTerm, listSize, apiKey);
     const response = await fetchWithRetry(getApiResponse, idsUri);
     const json = await parser.parseStringPromise(response);
@@ -40,14 +48,26 @@ test('test fetch fasta IDs for buffalo', async () => {
 })
 
 test('test fetch accessions numbers from fasta IDs', async () => {
+    const mockResponse = fs.readFileSync(path.resolve(__dirname, './mock_response/fetch_accession_numbers_fasta_ids'), 'utf-8');
+    global.fetch = vi.fn().mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        text: vi.fn().mockResolvedValue(mockResponse),
+    });
     let fastaAccessionNumbersFromIdsUri = getFastaAccessionNumbersFromIdsUri(IDS, apiKey);
     let textResponse = await fetchWithRetry(getApiResponse, fastaAccessionNumbersFromIdsUri)
     const accessionNumbers = textResponse.trim().split("\n").map(parseAccessionNumber);
     expect(arraysEqual(accessionNumbers, ACCESSIONS));
-});
+}, 30000);
 
 
 test('test fetch sequence responses from fasta IDs', async () => {
+    const mockResponse = fs.readFileSync(path.resolve(__dirname, "./mock_response/fetch_sequence_fasta_ids"), 'utf-8');
+    global.fetch = vi.fn().mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        text: vi.fn().mockResolvedValue(mockResponse),
+    });
     const fastaListUri = getFastaListUri(IDS, apiKey);
     const sequenceResponse = await fetchWithRetry(getApiResponse, fastaListUri);
     let parsed = parseFastaAndClean(sequenceResponse);
@@ -55,15 +75,32 @@ test('test fetch sequence responses from fasta IDs', async () => {
 });
 
 test('test fetch fasta list from search term', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        text: vi.fn().mockResolvedValue(fs.readFileSync(path.resolve(__dirname, "./mock_response/fetch_sequence_id_search_term.xml"), 'utf-8')),
+    });
     let uri = getSequenceIdsBySearchTermUri(searchTerm, listSize, apiKey);
     let ids = (await fetchWithRetry(getApiResponse, uri)).split(",");
     expect(arraysEqual(ids, IDS));
-    let accessionUris = await fetchWithRetry(getFastaAccessionNumbersFromIds, ids);
+
+    global.fetch = vi.fn().mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        text: vi.fn().mockResolvedValue(fs.readFileSync(path.resolve(__dirname, './mock_response/fetch_accession_numbers_fasta_ids'), 'utf-8')),
+    });
+    let accessionUris = await fetchWithRetry(getFastaAccessionNumbersFromIds, IDS);
     expect(arraysEqual(accessionUris, ACCESSIONS));
-    let fastaList = await fetchWithRetry(getFastaList, ids);
+
+    global.fetch = vi.fn().mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        text: vi.fn().mockResolvedValue(fs.readFileSync(path.resolve(__dirname, "./mock_response/fetch_sequence_fasta_ids"), 'utf-8')),
+    });
+    let fastaList = await fetchWithRetry(getFastaList, IDS);
     let parsed = parseFastaAndClean(fastaList);
     expect(arraysEqual(parsed.contents, SEQUENCES));
-})
+}, 30000)
 
 
 const arraysEqual = (a, b) => {
@@ -88,7 +125,7 @@ const delay = (ms) => {
 const retries = 5;
 const delayMs = 1000;
 
-async function fetchWithRetry(func,...params) {
+async function fetchWithRetry(func, ...params) {
     for (let i = 0; i < retries; i++) {
         let response;
         try {

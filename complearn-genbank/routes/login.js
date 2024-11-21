@@ -1,4 +1,5 @@
 require("dotenv").config();
+const envLoader = require('../configurations/envLoader');
 
 module.exports = (passport) => {
     const router = require("express").Router();
@@ -10,13 +11,11 @@ module.exports = (passport) => {
 
     // handle the callback after authentication complete
     router.get("/google/callback", passport.authenticate("google", {failureRedirect: "/"}), (req, res) => {
-        let url = `${req.protocol}://${req.hostname}`;
-        res.redirect(url);
+        res.redirect(`${envLoader.get('FRONTEND_BASE_URL')}`);
     });
 
     router.get("/github/callback", passport.authenticate("github", {failureRedirect: "/"}), (req, res) => {
-        let url = `${req.protocol}://${req.hostname}`;
-        res.redirect(url);
+        res.redirect(`${envLoader.get('FRONTEND_BASE_URL')}`);
     });
 
     router.get("/profile", (req, res) => {

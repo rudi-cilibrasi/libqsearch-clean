@@ -1,83 +1,84 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
 import * as pdfjs from "pdfjs-dist";
+import {BACKEND_BASE_URL} from "../config/api.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.mjs';
 
 
 const LANGUAGE_URLS = {
     // Major UN Languages
-    'eng': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/eng.pdf', // English
-    'fra': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/frn.pdf', // French
-    'rus': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/rus.pdf', // Russian
-    'spa': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/spn.pdf', // Spanish
-    'cmn': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/chn.pdf', // Chinese (Mandarin)
+    'eng': 'eng.pdf', // English
+    'fra': 'frn.pdf', // French
+    'rus': 'rus.pdf', // Russian
+    'spa': 'spn.pdf', // Spanish
+    'cmn': 'chn.pdf', // Chinese (Mandarin)
 
     // Other Major Languages
-    'hin': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/hnd.pdf', // Hindi
-    'ben': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/bng.pdf', // Bengali
-    'por': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/por.pdf', // Portuguese
-    'jpn': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/jpn.pdf', // Japanese
-    'deu': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/ger.pdf', // German
-    'jav': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/jan.pdf', // Javanese
-    'kor': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/kkn.pdf', // Korean
-    'vie': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/vie.pdf', // Vietnamese
-    'mar': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/mrt.pdf', // Marathi
-    'tam': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/tam.pdf', // Tamil
-    'tur': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/trk.pdf', // Turkish
-    'ita': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/itn.pdf', // Italian
-    'tha': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/thj.pdf', // Thai
+    'hin': 'hnd.pdf', // Hindi
+    'ben': 'bng.pdf', // Bengali
+    'por': 'por.pdf', // Portuguese
+    'jpn': 'jpn.pdf', // Japanese
+    'deu': 'ger.pdf', // German
+    'jav': 'jan.pdf', // Javanese
+    'kor': 'kkn.pdf', // Korean
+    'vie': 'vie.pdf', // Vietnamese
+    'mar': 'mrt.pdf', // Marathi
+    'tam': 'tam.pdf', // Tamil
+    'tur': 'trk.pdf', // Turkish
+    'ita': 'itn.pdf', // Italian
+    'tha': 'thj.pdf', // Thai
 
     // European Languages
-    'bul': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/blg.pdf', // Bulgarian
-    'ces': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/czc.pdf', // Czech
-    'dan': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/dns.pdf', // Danish
-    'nld': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/dut.pdf', // Dutch
-    'est': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/est.pdf', // Estonian
-    'ell': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/grk.pdf', // Greek
-    'hun': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/hng.pdf', // Hungarian
-    'isl': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/ice.pdf', // Icelandic
-    'gle': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/gli1.pdf', // Irish
-    'lav': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/lat.pdf', // Latvian
-    'lit': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/lit.pdf', // Lithuanian
-    'nor': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/nrr.pdf', // Norwegian
-    'pol': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/pql.pdf', // Polish
-    'ron': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/rum.pdf', // Romanian
-    'slk': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/slo.pdf', // Slovak
-    'slv': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/slv.pdf', // Slovenian
-    'swe': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/swd.pdf', // Swedish
+    'bul': 'blg.pdf', // Bulgarian
+    'ces': 'czc.pdf', // Czech
+    'dan': 'dns.pdf', // Danish
+    'nld': 'dut.pdf', // Dutch
+    'est': 'est.pdf', // Estonian
+    'ell': 'grk.pdf', // Greek
+    'hun': 'hng.pdf', // Hungarian
+    'isl': 'ice.pdf', // Icelandic
+    'gle': 'gli1.pdf', // Irish
+    'lav': 'lat.pdf', // Latvian
+    'lit': 'lit.pdf', // Lithuanian
+    'nor': 'nrr.pdf', // Norwegian
+    'pol': 'pql.pdf', // Polish
+    'ron': 'rum.pdf', // Romanian
+    'slk': 'slo.pdf', // Slovak
+    'slv': 'slv.pdf', // Slovenian
+    'swe': 'swd.pdf', // Swedish
 
     // Asian Languages
-    'hye': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/arm.pdf', // Armenian
-    'kat': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/geo.pdf', // Georgian
-    'kaz': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/kaz.pdf', // Kazakh
-    'kir': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/kdo.pdf', // Kyrgyz
-    'mon': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/khk.pdf', // Mongolian
-    'tgk': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/pet.pdf', // Tajik
-    'tuk': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/tck.pdf', // Turkmen
-    'uzb': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/uzb.pdf', // Uzbek
+    'hye': 'arm.pdf', // Armenian
+    'kat': 'geo.pdf', // Georgian
+    'kaz': 'kaz.pdf', // Kazakh
+    'kir': 'kdo.pdf', // Kyrgyz
+    'mon': 'khk.pdf', // Mongolian
+    'tgk': 'pet.pdf', // Tajik
+    'tuk': 'tck.pdf', // Turkmen
+    'uzb': 'uzb.pdf', // Uzbek
 
     // African Languages
-    'amh': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/amh.pdf', // Amharic
-    'hau': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/hau.pdf', // Hausa
-    'ibo': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/igr.pdf', // Igbo
-    'yor': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/yor.pdf', // Yoruba
-    'zul': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/zuu.pdf', // Zulu
-    'swa': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/swa.pdf', // Swahili
+    'amh': 'amh.pdf', // Amharic
+    'hau': 'hau.pdf', // Hausa
+    'ibo': 'igr.pdf', // Igbo
+    'yor': 'yor.pdf', // Yoruba
+    'zul': 'zuu.pdf', // Zulu
+    'swa': 'swa.pdf', // Swahili
 
     // Middle Eastern Languages
-    'fas': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/prs.pdf', // Persian
-    'heb': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/hbr.pdf', // Hebrew
-    'kur': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/kdb1.pdf', // Kurdish
-    'urd': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/urd.pdf', // Urdu
+    'fas': 'prs.pdf', // Persian
+    'heb': 'hbr.pdf', // Hebrew
+    'kur': 'kdb1.pdf', // Kurdish
+    'urd': 'urd.pdf', // Urdu
 
     // Southeast Asian Languages
-    'khm': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/khm.pdf', // Khmer
-    'lao': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/nol.pdf', // Lao
-    'mya': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/bms.pdf', // Burmese
-    'ind': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/inz.pdf', // Indonesian
-    'msa': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/mli.pdf', // Malay
-    'fil': 'https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/tgl.pdf', // Filipino
+    'khm': 'khm.pdf', // Khmer
+    'lao': 'nol.pdf', // Lao
+    'mya': 'bms.pdf', // Burmese
+    'ind': 'inz.pdf', // Indonesian
+    'msa': 'mli.pdf', // Malay
+    'fil': 'tgl.pdf', // Filipino
 };
 
 const LANGUAGE_NAMES = {
@@ -259,7 +260,7 @@ export const getTranslationResponse = async (language) => {
     if (!LANGUAGE_URLS[language]) {
         throw new Error(`No URL found for ${language}`);
     }
-    const uri = PROXY_URL + "?url=" + LANGUAGE_URLS[language] + "&contentType=application/pdf";
+    const uri = `${BACKEND_BASE_URL}/language/fetch?file=` + LANGUAGE_URLS[language];
     const response = await fetch(uri);
     if (!response.ok) {
         throw new Error(`HTTP error: ${response.status}`);

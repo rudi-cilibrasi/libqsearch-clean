@@ -1,21 +1,28 @@
-require('dotenv').config();
-
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-// http://localhost:3000/language/fetch?file=frn.pdf
+// /api/language/fetch?file=frn.pdf
 router.get("/fetch", async (req, res) => {
     const queryParams = req.query;
 
     const fileName = (queryParams && queryParams.file) || "eng.pdf";
 
     try {
-        const response = await axios.get(`https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/${fileName}`);
-        res.send(response.data);
+        const response = await axios.get(
+            `https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/${fileName}`,
+            {
+                responseType: 'stream',
+            }
+        );
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="document.pdf"');
+
+        response.data.pipe(res);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({error: 'Error fetching data from NCBI'});
+        console.error('Error fetching or returning the PDF:', error.message);
+        res.status(500).send('Failed to fetch and return the PDF.');
     }
 });
 

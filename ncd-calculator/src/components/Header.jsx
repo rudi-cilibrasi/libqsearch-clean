@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
 import axios from 'axios';
-import {BASE_URL} from '../config/api.js'
+import {BACKEND_BASE_URL} from '../config/api.js'
 
 const Header = () => {
 
@@ -17,7 +17,7 @@ const Header = () => {
 
     const handleGoogleLogin = async () => {
         try {
-            window.location.href = `${BASE_URL}/api/auth/google`;
+            window.location.href = `${BACKEND_BASE_URL}/auth/google`;
         } catch (error) {
             console.error('Google login failed', error);
         }
@@ -25,7 +25,7 @@ const Header = () => {
 
     const handleGithubLogin = async () => {
         try {
-            window.location.href = `${BASE_URL}/api/auth/github`;
+            window.location.href = `${BACKEND_BASE_URL}/auth/github`;
         } catch (error) {
             console.error('Github login failed', error);
         }
@@ -33,7 +33,7 @@ const Header = () => {
 
     const fetchUserData = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/api/auth/user-info`, {credentials: 'include'});
+            const response = await fetch(`${BACKEND_BASE_URL}/auth/user-info`, {credentials: 'include'});
             if (response.ok) {
                 const data = await response.json();
                 setUserName(data.userName);
@@ -51,7 +51,7 @@ const Header = () => {
     }, []);
 
     const handleLogout = async () => {
-        await axios.get(`${BASE_URL}/api/auth/logout`, {withCredentials: true})
+        await axios.get(`${BACKEND_BASE_URL}/auth/logout`, {withCredentials: true})
             .then(res => {
                 console.log('response ', res);
                 setUserName(res.data.user);
