@@ -1,10 +1,33 @@
-import {Dna, Globe2, X} from 'lucide-react';
+import {Dna, FileType2, Globe2, X} from 'lucide-react';
+import {FASTA, LANGUAGE} from "./constants/modalConstants.js";
 
 export const InputAccumulator = ({
                                      MIN_ITEMS = 4,
                                      selectedItems,
                                      onRemoveItem
                                  }) => {
+    const renderItemWithIcon = (item, type) => {
+        switch (type) {
+            case FASTA:
+                return (<div className="flex items-center gap-3">
+                    <Dna size={18} className={"text-blue-500"}/>
+                    <span className="text-gray-600">{item.label}</span>
+                </div>)
+            case LANGUAGE:
+                return (<div className="flex items-center gap-3">
+                    <Globe2 size={18} className={"text-blue-500"}/>
+                    <span className="text-gray-600">{item.label}</span>
+                </div>)
+            default:
+                return (
+                    <div className="flex items-center gap-3">
+                        <FileType2 size={18} className={"text-blue-500"}/>
+                        <span className="text-gray-600">{item.label}</span>
+                    </div>
+                )
+
+        }
+    }
     return (
         <div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-200">
@@ -20,21 +43,7 @@ export const InputAccumulator = ({
                             key={item.id}
                             className="flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200"
                         >
-                            {item.type === 'fasta' ? (
-
-                                    <div className="flex items-center gap-3">
-                                        <Dna size={18} className={"text-blue-500"}/>
-                                        <span className="text-gray-600">{item.label}</span>
-                                    </div>
-                                ) :
-                                (
-
-                                    <div className="flex items-center gap-3">
-                                        <Globe2 size={18} className={"text-blue-500"}/>
-                                        <span className="text-gray-600">{item.label}</span>
-                                    </div>
-                                )
-                            }
+                            {renderItemWithIcon(item, item.type)}
                             <X
                                 size={18}
                                 className="text-gray-400 hover:text-gray-600 cursor-pointer"

@@ -1,8 +1,9 @@
-import React, {useCallback, useState} from "react";
+import {useCallback, useState} from "react";
 import {getCleanSequence, isFasta} from "../functions/fasta.js";
 import {getFile} from "../functions/file.js";
-import {Eye, EyeOff, Upload} from "lucide-react";
+import {Eye, EyeOff} from "lucide-react";
 import {SearchInput} from "./SearchInput.jsx";
+import {FASTA} from "./constants/modalConstants.js";
 
 
 export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, setSelectedItems}) => {
@@ -12,8 +13,8 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
     const [projections, setProjections] = useState({
         Accession: true,
         ScientificName: false,
-        CommonName: true,
         FileName: false,
+        CommonName: true,
     });
 
 
@@ -32,7 +33,6 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
         setSearchTerm(searchTerm);
     }
 
-    const FASTA = "fasta";
 
 
     const handleDrop = useCallback(async (e) => {
@@ -111,45 +111,26 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
 
 
     return (
-        <div className="flex flex-col">
-            <SearchInput searchTerm={searchTerm} addItem={addItem} label="Search FASTA" type="fasta"
-                         handleSearchTerm={handleSearchTerm}/>
-            <div
-                className={`flex-1 mb-6 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center p-8
-                    ${isDragging
-                    ? 'border-blue-400 bg-blue-50'
-                    : 'border-gray-300 hover:border-blue-300 hover:bg-gray-50'}`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-            >
-                <Upload
-                    size={40}
-                    className={`mb-4 ${isDragging ? 'text-blue-500' : 'text-gray-400'}`}
+        <div className="p-4 h-full flex flex-col">
+            {/* Fixed top section */}
+            <div>
+                <SearchInput
+                    searchTerm={searchTerm}
+                    addItem={addItem}
+                    label="Search FASTA"
+                    type="fasta"
+                    handleSearchTerm={handleSearchTerm}
                 />
-                <p className="text-center mb-4 text-gray-600">
-                    Drag and drop your FASTA files here
-                    <br/>or
-                </p>
-                <label className="cursor-pointer">
-                    <span
-                        className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors">
-                      Browse Files
-                    </span>
-                    <input
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={handleFileInput}
-                        onKeyDown={(event) => handleKeydown(event)}
-                    />
-                </label>
             </div>
 
-            {/* FASTA Options */
-            }
+            {/* Flexible middle section - can grow/shrink */}
+            <div className="flex-1">
+                {/* Content between search input and options goes here */}
+            </div>
+
+            {/* Fixed bottom section */}
             <div className="mt-auto border-t border-gray-200 pt-4">
-                <div className="mb-4">
+                <div className="mb-4 mx-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         API Key
                     </label>
@@ -158,11 +139,12 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
                         placeholder="Enter your API key"
                         value={apiKey}
                         onChange={(e) => handleApiKey(e.target.value)}
-                        className="w-full p-3 border border-gray-200 rounded-lg text-sm"
+                        className="w-full py-3 px-4 border-2 border-gray-200 rounded-lg text-base
+                bg-black text-white placeholder-gray-400"
                     />
                 </div>
 
-                <div>
+                <div className="mb-4 mx-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         Search Options
                     </label>
@@ -173,19 +155,15 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
                                 onClick={() => toggleProjection(key)}
                                 disabled={key === 'Accession'}
                                 className={`
-            flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm 
-            transition-all duration-200 ease-in-out
-            ${value
+                            flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm 
+                            transition-all duration-200 ease-in-out
+                            ${value
                                     ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
                                     : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}
-            ${key === 'Accession' ? 'cursor-not-allowed' : 'hover:bg-opacity-75'}
-          `}
+                            ${key === 'Accession' ? 'cursor-not-allowed' : 'hover:bg-opacity-75'}
+                        `}
                             >
-                                {value ? (
-                                    <Eye className="w-4 h-4"/>
-                                ) : (
-                                    <EyeOff className="w-4 h-4"/>
-                                )}
+                                {value ? <Eye className="w-4 h-4"/> : <EyeOff className="w-4 h-4"/>}
                                 <span>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
                             </button>
                         ))}

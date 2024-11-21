@@ -192,7 +192,7 @@ export const QSearch = () => {
     };
 
     return (
-        <div style={{margin: "20px", textAlign: "center"}}>
+        <div style={{margin: "20px", textAlign: "center", width: "1100px"}}>
             <ListEditor onComputedNcdInput={onNcdInput} labelMapRef={labelMapRef} setLabelMap={setLabelMap}
                         setIsLoading={setIsLoading} resetDisplay={resetDisplay}/>
             {
