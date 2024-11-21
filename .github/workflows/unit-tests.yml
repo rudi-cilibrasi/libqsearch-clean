@@ -19,11 +19,13 @@ jobs:
         run: docker build --target cpp-builder -t libqsearch-clean-test .
       
       - name: Run C++ build
-        run: docker run --rm libqsearch-clean-test ./runtests --build
+        run: |
+          docker run --rm libqsearch-clean-test sh -c "rm -rf build && ./runtests --build"
       
       - name: Run C++ unit tests
         run: docker run --rm libqsearch-clean-test ./runtests --unit
 
+  # Rest of your workflow remains the same
   emscripten-build:
     runs-on: ubuntu-latest
     steps:
