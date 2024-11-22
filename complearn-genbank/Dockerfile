@@ -1,13 +1,14 @@
-FROM node:19.5.0-alpine
+FROM node:18-alpine
+WORKDIR /app
 
-ARG WORKDIR_PATH=/complearn
-ARG USER_NAME=node
+# Copy package files
+COPY package*.json ./
 
-RUN mkdir -p ${WORKDIR_PATH}/node_modules && chown -R ${USER_NAME}:${USER_NAME} ${WORKDIR_PATH}
-WORKDIR ${WORKDIR_PATH}
-USER ${USER_NAME}
-COPY --chown=${USER_NAME}:${USER_NAME} . .
+# Install dependencies
 RUN npm install
 
-EXPOSE 3000
+# Copy source code
+COPY . .
+
+EXPOSE 3001
 CMD ["node", "./bin/www"]

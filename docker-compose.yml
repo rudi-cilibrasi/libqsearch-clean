@@ -1,14 +1,44 @@
 version: '3.8'
 services:
-  web:
+  qsearch:
     build:
       context: .
+      target: cpp-builder  
+    container_name: complearn_cpp
+    networks:
+      - app_network
+    command: ./runtests --unit  
+
+  ncd-calculator:
+    build:
+      context: ./ncd-calculator
       args:
-        - VITE_API_URL=${VITE_API_URL}
+        - VITE_API_URL=${VITE_API_URL:-http://complearn-genbank:3001}
     container_name: complearn_web
     restart: unless-stopped
+    env_file:
+      - ./ncd-calculator/.env
+    environment:
+      - NODE_ENV=production
     ports:
-      - "3000:80"  # Map container's port 80 to host's port 3000
+      - "3000:80"
+    networks:
+      - app_network
+    depends_on:
+      - complearn-genbank
+
+  complearn-genbank:
+    build:
+      context: ./complearn-genbank
+    container_name: complearn_api
+    restart: unless-stopped
+    env_file:
+      - ./complearn-genbank/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+    ports:
+      - "3001:3001"
     networks:
       - app_network
 
