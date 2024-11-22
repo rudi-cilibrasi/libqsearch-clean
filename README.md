@@ -2,7 +2,7 @@
 ##### Config the API key for using NCBI APIs
 1. Go to: https://account.ncbi.nlm.nih.gov/settings/ > *Account Settings*
 2. In the *API Key Management* section at the bottom, take the API key
-##### Run the `ncd-calculator`:
+##### Add ENV variables for `ncd-calculator`:
 ```
 cd ncd-calculator
 ```
@@ -24,7 +24,7 @@ VITE_BACKEND_BASE_URL=<BACKEND-SERVER-DOMAIN> (i.e. https://openscienceresearchp
 npm install && npm run dev
 ```
 
-##### Run the `complearn-genbank`:
+##### Add ENV variables for `complearn-genbank`:
 ```
 cd complearn-genbank
 ```
@@ -57,13 +57,9 @@ FRONTEND_BASE_URL=<FRONTEND_BASE_URL> (i.e. https://openscienceresearchpark.com)
 BASE_URL=<BACKEND_BASE_URL> (i.e. https://openscienceresearchpark.com/api)
 PORT=3001
 ```
-4. Running commands
-```bash
-npm install
-node ./bin/www
-```
-5. Docker commands
-```bash
-docker build -t complearn-genbank .
-docker run -p 3001:3001 --env-file .env complearn-genbank
+
+##### Start up all services:
+Each sub-project has their own respective Dockerfile. All running by the `docker-compose.yml` in the root folder. Run this to start all services with docker-compose:
+```sh
+sh ./deploy.sh
 ```
