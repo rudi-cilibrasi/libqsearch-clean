@@ -15,8 +15,10 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@react-three/drei": "^9.115.0",
+    "@react-three/drei": "^9.117.3",
     "@react-three/fiber": "^8.17.10",
+    "@react-three/test-renderer": "^8.2.1",
+    "@testing-library/user-event": "^14.5.2",
     "@types/three": "^0.169.0",
     "axios": "^1.7.7",
     "buffer": "^6.0.3",
@@ -38,9 +40,11 @@
     "text-encoding-utf-8": "^1.0.2",
     "three": "^0.169.0",
     "troika-three-text": "^0.50.2",
+    "vitest-canvas-mock": "^0.3.3",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@babel/plugin-transform-modules-commonjs": "^7.25.9",
     "@babel/preset-env": "^7.25.9",
     "@eslint/js": "^9.11.1",
@@ -55,6 +59,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.12",
     "globals": "^15.9.0",
+    "jsdom": "^24.0.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",

@@ -8,7 +8,7 @@ import {Loader} from "lucide-react";
 import ListEditor from "./ListEditor.jsx";
 
 
-export const QSearch = () => {
+const QSearch = () => {
     const [ncdMatrix, setNcdMatrix] = useState([]);
     const [labels, setLabels] = useState([]);
     const [hasMatrix, setHasMatrix] = useState(false);
@@ -217,3 +217,5 @@ export const QSearch = () => {
         </div>
     );
 };
+
+export default QSearch;

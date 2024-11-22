@@ -7,7 +7,6 @@ import {
     getFastaList,
     getFastaListUri,
     getSequenceIdsBySearchTermUri,
-    parseFastaAndClean
 } from "../functions/getPublicFasta.js";
 import {Parser} from "xml2js"
 import fs, {readFileSync} from "fs";
@@ -23,7 +22,7 @@ const listSize = 20;
 const apiKey = "secretApiKey"
 
 const getSampleFasta = () => {
-    return readFileSync(join(__dirname, "buffaloes_fasta.json"), 'utf-8');
+    return readFileSync(join(__dirname, "./mock_response/buffaloes_fasta.json"), 'utf-8');
 }
 
 const SAMPLE_FASTA = JSON.parse(getSampleFasta());

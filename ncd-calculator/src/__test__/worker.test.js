@@ -3,11 +3,11 @@ import {readFileSync} from "fs";
 import {join} from "node:path";
 
 const getSampleBuffaloes = () => {
-    return readFileSync(join(__dirname, "buffaloes_fasta.json"), 'utf-8');
+    return readFileSync(join(__dirname, "./mock_response/buffaloes_fasta.json"), 'utf-8');
 }
 
 const getSampleSequenceJson = () => {
-    return JSON.parse(readFileSync(join(__dirname, "sequences.txt"), 'utf-8'));
+    return JSON.parse(readFileSync(join(__dirname, "./mock_response/sequences.txt"), 'utf-8'));
 }
 
 
@@ -64,6 +64,13 @@ test('test labels unique', () => {
     expect(len === setLen);
 })
 
+beforeAll(() => {
+    global.Blob.prototype.stream = jest.fn(() => ({
+        getReader: jest.fn(),
+        pipeThrough: jest.fn(),
+    }));
+});
+
 test('test sequences unique', () => {
     let len = SAMPLE_JSON.contents.length;
     let setLen = new Set([...SAMPLE_JSON.contents]).size;
@@ -71,14 +78,14 @@ test('test sequences unique', () => {
 })
 
 test('calculate single pair NCD', async () => {
-   const labelA = SAMPLE_JSON.labels[0];
-   const labelB = SAMPLE_JSON.labels[1];
-   const a = SAMPLE_JSON.contents[0];
-   const b = SAMPLE_JSON.contents[1];
-   let sizeA = await compressedSizeSingle(a);
-   let sizeB = await compressedSizeSingle(b);
-   let sizeAB = await compressedSizePair(a, b);
-   console.log('NCD: (' + labelA + ", " + labelB + "): " + calculateNCD(sizeA, sizeB, sizeAB));
+    const labelA = SAMPLE_JSON.labels[0];
+    const labelB = SAMPLE_JSON.labels[1];
+    const a = SAMPLE_JSON.contents[0];
+    const b = SAMPLE_JSON.contents[1];
+    let sizeA = await compressedSizeSingle(a);
+    let sizeB = await compressedSizeSingle(b);
+    let sizeAB = await compressedSizePair(a, b);
+    console.log('NCD: (' + labelA + ", " + labelB + "): " + calculateNCD(sizeA, sizeB, sizeAB));
 });
 
 
