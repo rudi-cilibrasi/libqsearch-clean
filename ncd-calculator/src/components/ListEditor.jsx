@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Dna, Globe2, FileType2} from 'lucide-react';
+import {Dna, FileType2, Globe2} from 'lucide-react';
 import {getTranslationResponse} from '../functions/udhr.js';
 import {InputAccumulator} from "./InputAccumulator.jsx";
 import {parseFastaAndClean} from "../functions/fasta.js";
@@ -11,7 +11,7 @@ import {
     filterValidAccessionAndParse,
     getCachedAccessionBySearchTerm,
     getCachedSequenceByAccession,
-    getTranslationCache
+    getTranslationCache, parseAccessionNumber
 } from "../functions/cache.js";
 import {
     getFastaAccessionNumbersFromIds,
@@ -28,7 +28,7 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
     const [searchMode, setSearchMode] = useState('language');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItems, setSelectedItems] = useState([]);
-    const [apiKey, setApiKey] = useState('');
+    const [apiKey, setApiKey] = useState(import.meta.env.VITE_NCBI_API_KEY);
     const [isDragging, setIsDragging] = useState(false);
     const [projections, setProjections] = useState({
         Accession: true,
@@ -221,14 +221,14 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
             searchTerms: [],
         }
         const resultSet = new Set([...nonProjectedInput.accessions]);
-        if (projectionOptions.commonName) {
-            const itemsUniqueNames = getUniqueAccessions(nonProjectedInput, "commonName");
-            Object.assign(resultSet, intersect(resultSet, itemsUniqueNames));
-        }
-        if (projectionOptions.scientificName) {
-            const itemUniqueScientificNames = getUniqueAccessions(nonProjectedInput, "scientificName");
-            Object.assign(resultSet, intersect(resultSet, itemUniqueScientificNames));
-        }
+        // if (projectionOptions.commonName) {
+        //     const itemsUniqueNames = getUniqueAccessions(nonProjectedInput, "commonName");
+        //     Object.assign(resultSet, intersect(resultSet, itemsUniqueNames));
+        // }
+        // if (projectionOptions.scientificName) {
+        //     const itemUniqueScientificNames = getUniqueAccessions(nonProjectedInput, "scientificName");
+        //     Object.assign(resultSet, intersect(resultSet, itemUniqueScientificNames));
+        // }
         const resultSetArr = Array.from(resultSet);
         for (let i = 0; i < resultSetArr.length; i++) {
             const data = map.get(resultSetArr[i]);
@@ -265,9 +265,10 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
          * }
          **/
         const langNcdInput = await computeLanguageNcdInput(langItems);
-        let fastaNcdInput = getNcdInputFromFastaContent(fastaItems);
-        fastaNcdInput = [...fastaNcdInput, ...await computeFastaNcdInput(fastaItems.filter(item => !item.content || item.content.trim() === ''), projections, apiKey)];
-        return mergeAndPreserveInitialOrder(langNcdInput, fastaNcdInput, orderMap);
+        const fastaNcdInput = getNcdInputFromFastaContent(fastaItems.filter(item => item.content && item.content.trim() !== ''));
+        const needComputeFastaList = await computeFastaNcdInput(fastaItems.filter(item => !item.content || item.content.trim() === ''), projections, apiKey);
+        const mergedFastaInput = [...fastaNcdInput, ...needComputeFastaList];
+        return mergeAndPreserveInitialOrder(langNcdInput, mergedFastaInput, orderMap);
     }
 
 
@@ -366,14 +367,17 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
         if (emptySearchTerms(searchTerms)) {
             return;
         }
-        const accessionToSearchTerm = new Map();
         const results = [];
-        for (let i = 0; i < searchTerms.length; i++) {
-            const rs = await getSearchResult(searchTerms[i], apiKey);
+        const accessionLabel = new Map();
+        for(let i = 0; i < fastaItems.length; i++) {
+            accessionLabel.set(fastaItems[i].id, fastaItems[i].searchTerm);
+        }
+        for (let i = 0; i < fastaItems.length; i++) {
+            const rs = await getSearchResult(fastaItems[i], apiKey);
             if (rs.contents.length !== 0) {
                 results.push(rs);
                 for (let j = 0; j < rs.accessions.length; j++) {
-                    accessionToSearchTerm.set(rs.accessions[j], searchTerms[i]);
+                    accessionLabel.set(rs.accessions[j], accessionLabel.get(rs.accessions[j]));
                 }
             }
         }
@@ -408,7 +412,7 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
             } else {
                 for (let j = 0; j < results[i].accessions.length; j++) {
                     missAccessions.add({
-                        searchTerm: results[i].searchTerm,
+                        searchTerm: results[i].searchTerm && results[i].searchTerm.trim() !== '' ? results[i].searchTerm.trim() : results[i].labels[0],
                         accession: results[i].accessions[j]
                     });
                     accessions.push(results[i].accessions[j]);
@@ -431,7 +435,7 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
                     accession: missedSequences.accessions[i],
                     searchTerm: arr[i].searchTerm
                 });
-                const searchTerm = accessionToSearchTerm.get(missedSequences.accessions[i]);
+                const searchTerm = accessionLabel.get(missedSequences.accessions[i]);
                 cacheSearchTermAccessions(searchTerm, {
                     accessions: [missedSequences.accessions[i]],
                     labels: [missedSequences.labels[i]],
@@ -458,11 +462,20 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
             putNonProjectedItem(nonProjectedInput, seqRes);
         }
         const projectedInput = getProjectedInput(nonProjectedInput, projectionOptions);
-        const filteredItems = getFilteredItems(selectedItems, projectedInput);
+        // const filteredItems = getFilteredItems(selectedItems, projectedInput);
+        const projectedInputArr = projectedInput.contents.map((content, index) => ({
+            content,
+            label: projectedInput.labels[index],
+            scientificName: projectedInput.scientificNames[index],
+            commonName: projectedInput.commonNames[index],
+            accession: projectedInput.accessions[index],
+            searchTerm: projectedInput.searchTerms[index]
+        }));
         const items = [];
-        for (let i = 0; i < filteredItems.length; i++) {
-            const item = Object.assign({}, filteredItems[i]);
-            item.content = projectedInput.contents[i];
+        for (let i = 0; i < projectedInputArr.length; i++) {
+            const item = Object.assign({}, projectedInputArr[i]);
+            item.content = projectedInputArr[i].content;
+            item.id = projectedInputArr[i].accession;
             items.push(item);
         }
         return items;
@@ -477,7 +490,8 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
     }
 
 
-    const getSearchResult = async (searchTerm, apiKey) => {
+    const getSearchResult = async (fastaItem, apiKey) => {
+        let searchTerm = fastaItem.searchTerm;
         const emptyResult = {
             searchTerm: searchTerm,
             contents: [],
@@ -487,10 +501,14 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
             scientificNames: [],
             cacheHit: false
         }
-        if (!searchTerm || searchTerm.trim() === '') {
+        if (!fastaItem.id && (!searchTerm || searchTerm.trim() === '')) {
             return emptyResult;
         }
-        searchTerm = searchTerm.toLowerCase().trim();
+        return getResultFromAccessionId(fastaItem.id, emptyResult, apiKey)
+    };
+
+    const getResultFromSearchTerm = async (searchTerm, defaultRes, apiKey) => {
+        searchTerm = searchTerm.trim().toLowerCase();
         const cachedAccessions = getCachedAccessionBySearchTerm(searchTerm);
         if (cacheHit(cachedAccessions)) {
             // labels, contents, accessions
@@ -525,9 +543,33 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
                 data.searchTerm = searchTerm;
                 return data;
             } else {
-                return emptyResult;
+                return defaultRes;
             }
         }
+    }
+
+    const getResultFromAccessionId = async (id, defaultRes, apiKey) => {
+        const unfilteredAccessions = await getFastaAccessionNumbersFromIds([id], apiKey);
+        const accessions = filterValidAccessionAndParse(unfilteredAccessions);
+        const data = await getGenbankSequences(accessions, accessions.length);
+        if (!data.contents[0] || data.contents[0].trim() === '') {
+            // fall back to get the fasta sequence when sequence from genbank data is empty
+            const fasta = await getFastaList([id], apiKey);
+            let parsedFasta = parseFastaAndClean(fasta);
+            if (parsedFasta && parsedFasta.length !== 0) {
+                data.contents[0] = parsedFasta[0].sequence;
+            }
+        }
+        data.cacheHit = false;
+        data.searchTerm = searchTerm;
+        return hasAnyValidSequence(data.contents) ? data : defaultRes;
+    }
+
+
+    const hasAnyValidSequence = (sequences) => {
+        if (!sequences || sequences.length === 0) return false;
+        if (!sequences[0] || sequences[0].trim() === '') return false;
+        return true;
     }
 
     const addItem = (item) => {

@@ -1,5 +1,5 @@
 import {parseAccessionNumber} from "./cache";
-import {getApiResponseText} from "./fetch";
+import {getApiResponseText} from "./fetchProxy.js";
 import {encodeURIWithApiKey} from "./api.js";
 import {BACKEND_BASE_URL} from '../config/api.js'
 

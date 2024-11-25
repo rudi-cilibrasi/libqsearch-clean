@@ -4,6 +4,7 @@ import {getFile} from "../functions/file.js";
 import {Eye, EyeOff} from "lucide-react";
 import {SearchInput} from "./SearchInput.jsx";
 import {FASTA} from "./constants/modalConstants.js";
+import {FastaSearchSuggestion} from "./FastaSearchSuggestion.jsx";
 
 
 export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, setSelectedItems}) => {
@@ -16,7 +17,7 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
         FileName: false,
         CommonName: true,
     });
-
+    const [searchError, setSearchError] = useState(null);
 
     const handleDragOver = useCallback((e) => {
         e.preventDefault();
@@ -110,6 +111,27 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
     };
 
 
+    const handleSuggestionSelect = (suggestion) => {
+        handleSearchTerm(suggestion.primaryCommonName);
+        addItem({
+            id: suggestion.id,
+            name: suggestion.primaryCommonName,
+            scientificName: suggestion.scientificName,
+            type: suggestion.type
+        });
+    };
+
+
+    const onSelectSearchTerm = (item) => {
+        addItem({
+            id: item.accessionId,
+            type: FASTA,
+            content: '',
+            label: item.title
+        })
+    }
+
+
     return (
         <div className="p-4 h-full flex flex-col">
             {/* Fixed top section */}
@@ -120,15 +142,24 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
                     label="Search FASTA"
                     type="fasta"
                     handleSearchTerm={handleSearchTerm}
+                    setSearchError={setSearchError}
                 />
             </div>
-
-            {/* Flexible middle section - can grow/shrink */}
             <div className="flex-1">
-                {/* Content between search input and options goes here */}
+                {searchError && (
+                    <div className="text-red-500 text-sm mt-2 ml-2">
+                        {searchError}
+                    </div>
+                )}
+                <FastaSearchSuggestion
+                    onSelectSearchTerm={onSelectSearchTerm}
+                    searchTerm={searchTerm}
+                    onSuggestionSelect={handleSuggestionSelect}
+                    className="mt-2"
+                    addItem={addItem}
+                    setError={setSearchError}
+                />
             </div>
-
-            {/* Fixed bottom section */}
             <div className="mt-auto border-t border-gray-200 pt-4">
                 <div className="mb-4 mx-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">

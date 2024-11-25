@@ -50,7 +50,19 @@ const commonHandler = async (urlBase, req, res) => {
     }
 }
 
+const forward = async (request, res) => {
+    const requestUri = request.query.uri;
+    try {
+        const response = await axios.get(requestUri);
+        res.send(response.data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({error: 'Error fetching data from NCBI'});
+    }
+}
+
 router.get("/fetch", (req, res) => commonHandler("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi", req, res));
 router.get("/search", (req, res) => commonHandler("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi", req, res));
+router.get("/forward", (req, res) => forward(req, res));
 
 module.exports = router;

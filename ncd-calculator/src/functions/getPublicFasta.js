@@ -1,4 +1,4 @@
-import {getApiResponseText} from "./fetch.js";
+import {getApiResponseText} from "./fetchProxy.js";
 import {encodeURIWithApiKey} from "./api.js";
 import {parseFastaAndClean} from "./fasta.js";
 import {BACKEND_BASE_URL} from "../config/api.js";

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 5;
 const CACHE_VERSION_KEY = "cache_version";
 const ACCESSION_CACHE_ID = "accession_cache";
 const UDHR_CACHE = "udhr_cache";

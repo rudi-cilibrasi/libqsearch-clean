@@ -197,11 +197,21 @@ export const isFasta = (fileInfo) => {
 
 export const parseFastaAndClean = (fastaData) => {
     const fastaList = parseFasta(fastaData);
+    if (!isValidFastaWithSequence(fastaList)) return [];
     for(let i = 0; i < fastaList.length; i++) {
         const fasta = fastaList[i];
         fasta.sequence = getCleanSequence(fasta.sequence);
     }
     return fastaList;
+}
+
+const isValidFastaWithSequence = (fastaList) => {
+    if (!fastaList || fastaList.length === 0 ) return false;
+    for(let i = 0; i < fastaList.length; i++) {
+        if (!fastaList[i].sequence || fastaList[i].sequence.trim() === '') return false;
+        if (!isValidFastaSequenceWithoutHeader(fastaList[i].sequence)) return false;
+    }
+    return true;
 }
 
 

@@ -1,17 +1,28 @@
 import {Search} from "lucide-react";
+import {FastaSuggestionHandler} from "../functions/fastaSuggestions.js";
+import {parseAccessionNumber} from "../functions/cache.js";
 
-export const SearchInput = ({addItem, type, label, searchTerm, handleSearchTerm}) => {
-    const handlePress = (event) => {
+export const SearchInput = ({addItem, type, label, searchTerm, handleSearchTerm, setSearchError}) => {
+    const fastaSuggestionHandler = new FastaSuggestionHandler(import.meta.env.VITE_NCBI_API_KEY);
+    const handlePress = async (event) => {
         if (event.key === 'Enter' || event.key === 'Return') {
             event.preventDefault();
             if (type === 'fasta') {
+                const recordItem = await fastaSuggestionHandler.checkGenbankRecordAndGet(searchTerm);
+                if (recordItem.isValid) {
                 const input = {
                     type: type,
                     content: '',
                     label: searchTerm,
-                    id: searchTerm
+                    id: parseAccessionNumber(recordItem.accessionId),
+                    searchTerm: searchTerm
                 }
-                addItem(input);
+                    addItem(input);
+                    setSearchError(null);
+                } else {
+                    setSearchError("There was no Genbank record found for the search term");
+                }
+
             }
         }
     }
