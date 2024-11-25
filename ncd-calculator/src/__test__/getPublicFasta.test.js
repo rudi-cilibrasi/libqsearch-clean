@@ -7,7 +7,6 @@ import {
     getFastaList,
     getFastaListUri,
     getSequenceIdsBySearchTermUri,
-    parseFastaAndClean
 } from "../functions/getPublicFasta.js";
 import {Parser} from "xml2js"
 import fs, {readFileSync} from "fs";
@@ -16,6 +15,7 @@ import {parseAccessionNumber} from "../functions/cache.js";
 import {join} from "node:path";
 import {parseFastaAndClean} from "../functions/fasta.js";
 import path from "path";
+import {fetchWithRetry} from "../functions/fetchProxy.js";
 
 const parser = new Parser([]);
 const searchTerm = "buffalo";
@@ -117,42 +117,8 @@ const arraysEqual = (a, b) => {
     return true;
 }
 
-const delay = (ms) => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 
-const retries = 5;
-const delayMs = 1000;
 
-async function fetchWithRetry(func, ...params) {
-    for (let i = 0; i < retries; i++) {
-        let response;
-        try {
-            if (params.length === 1) {
-                response = await func(params[0]);
-            } else {
-                response = await func(params[0], params[1]);
-            }
-            if (response && response.length !== 0) {
-                return response;
-            } else {
-                if (i < retries - 1) {
-                    console.log(`Attempt ${i + 1} failed. Retrying in 1 seconds...`);
-                    await delay(delayMs);
-                } else {
-                    console.log('All retries failed.');
-                    return null;
-                }
-            }
-        } catch (error) {
-            if (i < retries - 1) {
-                console.log(`Attempt ${i + 1} failed. Retrying in 1 seconds...`);
-                await delay(delayMs);
-            } else {
-                console.log('All retries failed.');
-                return null;
-            }
-        }
-    }
-}
+
+

@@ -131,6 +131,12 @@ test("parseMultipleFasta handles empty input gracefully", () => {
     expect(parsed).toEqual([]);
 });
 
+test("parseMultipleFasta handles invalid fasta input", () => {
+    const fastaData = "\\n";
+    const parsed = parseFastaAndClean(fastaData);
+    expect(parsed).toEqual([]);
+});
+
 
 test("test parseFasta with multiple sequences with headers", () => {
     const fastaData = ">seq1 scientificName1 (commonName1)\nATGCATGGGGGCCGGA\n>seq2 scientificName2 (commonName2)\nAAGTAAGTTAG";
