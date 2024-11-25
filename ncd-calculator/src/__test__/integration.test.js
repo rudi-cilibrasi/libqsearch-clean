@@ -77,9 +77,6 @@ test('test fasta search terms', async () => {
     const result = screen.getByText('Search FASTA');
     expect(result).toBeInTheDocument();
 
-    const myElement = await screen.findByText("dog");
-    screen.debug(myElement, 1000000);
-
     const calculateNCDButton = screen.getByText('Calculate NCD Matrix');
     // fireEvent.click(calculateNCDButton);
     //
