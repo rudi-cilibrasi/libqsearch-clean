@@ -1,4 +1,5 @@
-import {parseAccessionNumber} from "./cache.js";
+import {parseAccessionAndRemoveVersion} from "./cache.js";
+import {FILE_UPLOAD} from "../components/constants/modalConstants.js";
 
 export const hasMetadata = (content) => {
     if (!content || content.trim() === '') {
@@ -104,18 +105,21 @@ export const parseMetadata = (content) => {
         scientificName: "",
         commonName: "",
     }
+
     const header = content.split("\n")[0];
+
+    const accession = header.split(">")[1].split(" ")[0];
+    metadata.accession = parseAccessionAndRemoveVersion(accession);
+
     const commonNameMatch = header.match(/\((.*?)\)/);
     if (commonNameMatch) {
         metadata.commonName = commonNameMatch[1].trim();
     }
-    const accession = parseAccessionNumber(header.split(">")[1].split(" ")[0]);
-    metadata.accession = accession;
-    const names = header.substring(header.indexOf(accession) + accession.length);
-    const scientificNameMatch = names.match(/\s*([\w\s]+?)(?:\s*\(|$)/);
-    if (scientificNameMatch) {
-        metadata.scientificName = scientificNameMatch[1].trim();
-    }
+    const afterAccession = header.substring(header.indexOf(accession) + accession.length);
+    const beforeParentheses = commonNameMatch ?
+        afterAccession.substring(0, afterAccession.indexOf('(')) :
+        afterAccession
+    metadata.scientificName = beforeParentheses.split(",")[0].trim();
     return metadata;
 }
 
@@ -214,4 +218,39 @@ const isValidFastaWithSequence = (fastaList) => {
     return true;
 }
 
+
+export const getFastaInfoFromFile = (fileInfo) => {
+    const content = fileInfo.content;
+    let label = fileInfo.name;
+    if (hasMetadata(content)) {
+        const headerWithSequence = parseFasta(content);
+        const first = headerWithSequence[0];
+        if (first.commonName && first.commonName.trim() !== "") {
+            label = first.commonName;
+        } else if (first.scientificName && first.scientificName.trim() !== "") {
+            const p = first.scientificName.split(" ");
+            const t = [];
+            for(let i = 0; i < p.length && i < 2; i++) {
+                t.push(p[i]);
+            }
+            label = t.join(" ");
+        } else {
+            label = first.accession
+        }
+        return {
+            type: FILE_UPLOAD,
+            content: getCleanSequence(first.sequence),
+            label: label,
+            id: fileInfo.name
+        }
+    } else {
+        return {
+            type: FILE_UPLOAD,
+            content: getCleanSequence(fileInfo.content),
+            label: label,
+            id: fileInfo.name
+        }
+    }
+
+}
 

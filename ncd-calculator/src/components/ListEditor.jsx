@@ -11,7 +11,7 @@ import {
     filterValidAccessionAndParse,
     getCachedAccessionBySearchTerm,
     getCachedSequenceByAccession,
-    getTranslationCache, parseAccessionNumber
+    getTranslationCache, parseAccessionAndRemoveVersion
 } from "../functions/cache.js";
 import {
     getFastaAccessionNumbersFromIds,

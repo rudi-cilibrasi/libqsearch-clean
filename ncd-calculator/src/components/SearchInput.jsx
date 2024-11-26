@@ -1,6 +1,6 @@
 import {Search} from "lucide-react";
 import {FastaSuggestionHandler} from "../functions/fastaSuggestions.js";
-import {parseAccessionNumber} from "../functions/cache.js";
+import {parseAccessionAndRemoveVersion} from "../functions/cache.js";
 
 export const SearchInput = ({addItem, type, label, searchTerm, handleSearchTerm, setSearchError}) => {
     const fastaSuggestionHandler = new FastaSuggestionHandler(import.meta.env.VITE_NCBI_API_KEY);
@@ -14,7 +14,7 @@ export const SearchInput = ({addItem, type, label, searchTerm, handleSearchTerm,
                     type: type,
                     content: '',
                     label: searchTerm,
-                    id: parseAccessionNumber(recordItem.accessionId),
+                    id: parseAccessionAndRemoveVersion(recordItem.accessionId),
                     searchTerm: searchTerm
                 }
                     addItem(input);

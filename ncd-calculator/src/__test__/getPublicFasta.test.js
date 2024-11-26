@@ -11,7 +11,7 @@ import {
 import {Parser} from "xml2js"
 import fs, {readFileSync} from "fs";
 
-import {parseAccessionNumber} from "../functions/cache.js";
+import {parseAccessionAndRemoveVersion} from "../functions/cache.js";
 import {join} from "node:path";
 import {parseFastaAndClean} from "../functions/fasta.js";
 import path from "path";
@@ -56,7 +56,7 @@ test('test fetch accessions numbers from fasta IDs', async () => {
     });
     let fastaAccessionNumbersFromIdsUri = getFastaAccessionNumbersFromIdsUri(IDS, apiKey);
     let textResponse = await fetchWithRetry(getApiResponse, fastaAccessionNumbersFromIdsUri)
-    const accessionNumbers = textResponse.trim().split("\n").map(parseAccessionNumber);
+    const accessionNumbers = textResponse.trim().split("\n").map(parseAccessionAndRemoveVersion);
     expect(arraysEqual(accessionNumbers, ACCESSIONS));
 }, 30000);
 
