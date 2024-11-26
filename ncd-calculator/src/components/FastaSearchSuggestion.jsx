@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {AlertCircle, ChevronRight, Info, Loader2, PawPrint, Search, Tag} from 'lucide-react';
 import {FastaSuggestionHandler} from "../functions/fastaSuggestions.js";
-import {parseAccessionNumber} from "../functions/cache.js";
+import {parseAccessionAndRemoveVersion} from "../functions/cache.js";
 
 export const FastaSearchSuggestion = ({
                                           searchTerm,
@@ -45,7 +45,7 @@ export const FastaSearchSuggestion = ({
             type: type,
             content: '',
             label: suggestion.primaryCommonName,
-            id: parseAccessionNumber(suggestion.id),
+            id: parseAccessionAndRemoveVersion(suggestion.id),
             searchTerm: suggestion.primaryCommonName
         };
         addItem(input);

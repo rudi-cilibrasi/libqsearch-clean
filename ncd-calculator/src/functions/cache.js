@@ -66,7 +66,7 @@ export const getCachedAccessionBySearchTerm = searchTerm => {
 }
 
 export const cacheAccessionSequence = (accession, sequence) => {
-    accession = parseAccessionNumber(accession);
+    accession = parseAccessionAndRemoveVersion(accession);
     let accessionCache = JSON.parse(localStorage.getItem(ACCESSION_CACHE_ID));
     if (!accessionCache) {
         accessionCache = JSON.parse(initAccessionCacheAndGet());
@@ -131,15 +131,17 @@ const merge = (existingArr, newArr) => {
 }
 
 export const filterValidAccessionAndParse = (accessions) => {
-    return accessions.filter(accession => accession != null && accession !== '').map(accession => parseAccessionNumber(accession));
+    return accessions.filter(accession => accession != null && accession !== '').map(accession => parseAccessionAndRemoveVersion(accession));
 }
 
-export const parseAccessionNumber = label => {
+export const parseAccessionAndRemoveVersion = label => {
     if (!label || label === '') {
         return null;
     }
+    if (label.indexOf(".") === -1) return label;
     return label.split(".")[0].trim().toLowerCase();
 }
+
 
 
 export const cacheTranslation = (lang, content) => {

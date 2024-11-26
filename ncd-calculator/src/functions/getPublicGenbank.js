@@ -1,4 +1,4 @@
-import {parseAccessionNumber} from "./cache";
+import {parseAccessionAndRemoveVersion} from "./cache";
 import {getApiResponseText} from "./fetchProxy.js";
 import {encodeURIWithApiKey} from "./api.js";
 import {BACKEND_BASE_URL} from '../config/api.js'
@@ -112,7 +112,7 @@ const formatResponse = (sequences, labels) => {
         scientificNames: sequences.map(seq => seq.scientificName),
         commonNames: sequences.map(seq => seq.commonName),
         contents: sequences.map(seq => seq.sequence),
-        accessions: sequences.map(seq => parseAccessionNumber(seq.accessionNumber)),
+        accessions: sequences.map(seq => parseAccessionAndRemoveVersion(seq.accessionNumber)),
         metadata: sequences.map(seq => ({
             commonName: seq.commonName,
             scientificName: seq.scientificName,

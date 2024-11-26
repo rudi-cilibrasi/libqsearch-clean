@@ -1,13 +1,14 @@
 /* eslint-disable */
 import {expect, test} from "vitest";
 import {
-    getCleanSequence,
+    getCleanSequence, getFastaInfoFromFile,
     hasMetadata,
     isValidFastaSequenceWithHeader,
     isValidFastaSequenceWithoutHeader,
     parseFasta,
     parseFastaAndClean,
-    parseMetadata, parseMultipleMetadata,
+    parseMetadata,
+    parseMultipleMetadata,
     validSequence
 } from "../functions/fasta.js";
 
@@ -182,3 +183,135 @@ test('parse multiple fasta without headers', () => {
         expect(parsed[i].sequence).toStrictEqual(expected[i].sequence);
     }
 })
+
+const FILE_UPLOAD = "file_upload";
+
+test('should extract common name when present', () => {
+    const fileInfo = {
+        name: 'test.fasta',
+        content: ">NC_001323.1 Gallus gallus (chicken) mitochondrion, complete genome\nACGTACGT"
+    };
+
+    const expected = {
+        type: FILE_UPLOAD,
+        content: 'acgtacgt',
+        label: 'chicken',
+        id: 'test.fasta'
+    };
+
+    expect(getFastaInfoFromFile(fileInfo)).toEqual(expected);
+});
+
+test('should use first two words of scientific name when no common name', () => {
+    const fileInfo = {
+        name: 'test.fasta',
+        content: ">NC_005089.1 Mus musculus mitochondrion, complete genome\nACGTACGT"
+    };
+
+    const expected = {
+        type: FILE_UPLOAD,
+        content: 'acgtacgt',
+        label: 'Mus musculus',
+        id: 'test.fasta'
+    };
+
+    expect(getFastaInfoFromFile(fileInfo)).toEqual(expected);
+});
+
+
+test('should use filename when no metadata present', () => {
+    const fileInfo = {
+        name: 'test.fasta',
+        content: "acgtacgt"
+    };
+
+    const expected = {
+        type: FILE_UPLOAD,
+        content: 'acgtacgt',
+        label: 'test.fasta',
+        id: 'test.fasta'
+    };
+
+    expect(getFastaInfoFromFile(fileInfo)).toEqual(expected);
+});
+
+test('should clean sequence by removing whitespace and newlines', () => {
+    const fileInfo = {
+        name: 'test.fasta',
+        content: ">NC_001323.1 Gallus gallus (chicken)\nACGT\nACGT\n"
+    };
+
+    const expected = {
+        type: FILE_UPLOAD,
+        content: 'acgtacgt',
+        label: 'chicken',
+        id: 'test.fasta'
+    };
+
+    expect(getFastaInfoFromFile(fileInfo)).toEqual(expected);
+});
+
+test('should handle empty content', () => {
+    const fileInfo = {
+        name: 'test.fasta',
+        content: ''
+    };
+
+    const expected = {
+        type: FILE_UPLOAD,
+        content: '',
+        label: 'test.fasta',
+        id: 'test.fasta'
+    };
+
+    expect(getFastaInfoFromFile(fileInfo)).toEqual(expected);
+});
+
+
+test('should handle multiple headers (should use first one)', () => {
+    const fileInfo = {
+        name: 'test.fasta',
+        content: ">NC_001323.1 Gallus gallus (chicken)\nacgt\n>NC_0013234.1 Gallus gallus2 (chicken2)\nacgt"
+    };
+
+    const expected = {
+        type: FILE_UPLOAD,
+        content: 'acgt',
+        label: 'chicken',
+        id: 'test.fasta'
+    };
+
+    expect(getFastaInfoFromFile(fileInfo)).toEqual(expected);
+});
+
+test('should handle headers with special characters', () => {
+    const fileInfo = {
+        name: 'test.fasta',
+        content: ">NC_001323.1 Gallus-gallus (domestic_chicken) genome\nacgtacgt"
+    };
+
+    const expected = {
+        type: FILE_UPLOAD,
+        content: 'acgtacgt',
+        label: 'domestic_chicken',
+        id: 'test.fasta'
+    };
+
+    expect(getFastaInfoFromFile(fileInfo)).toEqual(expected);
+});
+
+test('should handle case sensitivity in metadata', () => {
+    const fileInfo = {
+        name: 'test.fasta',
+        content: ">nc_001323.1 GALLUS GALLUS (Chicken) genome\nacgtacgt"
+    };
+
+    const expected = {
+        type: FILE_UPLOAD,
+        content: 'acgtacgt',
+        label: 'Chicken',
+        id: 'test.fasta'
+    };
+
+    expect(getFastaInfoFromFile(fileInfo)).toEqual(expected);
+});

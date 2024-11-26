@@ -1,6 +1,6 @@
 import React, {useCallback, useState} from "react";
-import {getCleanSequence, isFasta} from "../functions/fasta.js";
-import {FASTA, FILE_UPLOAD} from "./constants/modalConstants.js";
+import {getCleanSequence, getFastaInfoFromFile, hasMetadata, isFasta, parseMetadata} from "../functions/fasta.js";
+import {FILE_UPLOAD} from "./constants/modalConstants.js";
 import {Info, Upload} from "lucide-react";
 import {getFile} from "../functions/file.js";
 
@@ -33,14 +33,7 @@ export const FileUpload = ({addItem, selectedItems, onSetApiKey, setSelectedItem
 
     const getFileItem = (fileInfo) => {
         if (isFasta(fileInfo)) {
-            const sequenceClean = getCleanSequence(fileInfo.content);
-            const item = {
-                type: FILE_UPLOAD,
-                content: sequenceClean,
-                label: fileInfo.name,
-                id: fileInfo.name
-            }
-            return item;
+            return getFastaInfoFromFile(fileInfo);
         } else {
             const item = {
                 type: FILE_UPLOAD,
@@ -51,6 +44,9 @@ export const FileUpload = ({addItem, selectedItems, onSetApiKey, setSelectedItem
             return item;
         }
     }
+
+
+
 
     const handleFileInput = async (e) => {
         const files = Array.from(e.target.files);
