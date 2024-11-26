@@ -1,6 +1,10 @@
 export const encodeURIWithApiKey = (uri, apiKey = null) => {
+    return encodeURI(uri + getApiKeyRequestParam(apiKey));
+}
+
+export const getApiKeyRequestParam = (apiKey) => {
     if (apiKey) {
-        uri += "&api_key" + apiKey;
+        return "&api_key" + apiKey;
     }
-    return encodeURI(uri);
+    return ""
 }

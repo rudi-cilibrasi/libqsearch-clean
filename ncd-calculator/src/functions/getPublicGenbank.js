@@ -1,7 +1,6 @@
 import {parseAccessionAndRemoveVersion} from "../cache/cache.js";
-import {getApiResponseText} from "./fetchProxy.js";
+import {sendRequestToProxy} from "./fetchProxy.js";
 import {encodeURIWithApiKey} from "./api.js";
-import {BACKEND_BASE_URL} from '../config/api.js'
 
 const parseGenbankEntry = (entry) => {
     const sourceMatch = entry.match(/SOURCE\s+([^\n]+)/);
@@ -125,13 +124,15 @@ const formatResponse = (sequences, labels) => {
 const getGenbankListUri = (ids, apiKey) => {
     const IDS = ids.join(",");
     return encodeURIWithApiKey(
-        `${BACKEND_BASE_URL}/ncbi/fetch?db=nuccore&id=${IDS}&rettype=genbank&retmode=text`, apiKey
+        `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${IDS}&rettype=genbank&retmode=text`, apiKey
     );
 };
 
 export const getGenbankSequences = async (ids, maxResults, options = {}) => {
     const uri = getGenbankListUri(ids);
-    const textResponse = await getApiResponseText(uri);
+    const textResponse = await sendRequestToProxy({
+        externalUrl: uri
+    });
     return parseGenbankList(textResponse, maxResults, {
         skipDuplicates: options.skipDuplicates || false,
         showAccession: options.showAccession || false,

@@ -1,21 +1,32 @@
+import {BACKEND_BASE_URL} from "../config/api.js";
 import axios from "axios";
 
-export const getApiResponseText = async (url, params) => {
-    const response = await axios.get(url, {params: params});
-    if (!response.data) {
-        throw new Error("Network response was not ok");
+// export const sendRequestToProxy = async (requestInfo) => {
+//     try {
+//         const response = await fetch(`${BACKEND_BASE_URL}/external/forward`, {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//             },
+//             body: JSON.stringify(requestInfo),
+//         });
+//
+//         return await response;
+//     } catch (error) {
+//         console.error('Error in sending request to proxy:', error);
+//         throw error;
+//     }
+// };
+
+export const sendRequestToProxy = async (requestBody, requestHeader = {}) => {
+    try {
+        const response = await axios.post(`${BACKEND_BASE_URL}/external/forward`, requestBody, requestHeader);
+        return await response.data;
+    } catch (error) {
+        console.error('Error in sending request to proxy:', error);
+        throw error;
     }
-    return await response.data;
-}
-
-
-export const sendRequestToProxy = async (proxy = "http://localhost:3001/api/ncbi/forward", uriToForward) => {
-    const params = {
-       uri: uriToForward
-    }
-    return await fetchWithRetry(getApiResponseText, proxy, params);
-}
-
+};
 
 const retries = 5;
 const delayMs = 1000;
@@ -45,6 +56,7 @@ export async function fetchWithRetry(func, ...params) {
                 }
             }
         } catch (error) {
+            console.log(error);
             if (i < retries - 1) {
                 console.log(`Attempt ${i + 1} failed. Retrying in 1 seconds...`);
                 await delay(delayMs);
