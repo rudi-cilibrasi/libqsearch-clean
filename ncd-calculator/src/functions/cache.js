@@ -23,7 +23,7 @@ export const getCachedSequenceByAccession = accessionNum => {
     if (!cache) {
         cache = JSON.parse(initAccessionCacheAndGet());
     }
-    return cache[accessionNum] || null;
+    return cache[accessionNum.toLowerCase()] || null;
 }
 
 export const initCache = () => {

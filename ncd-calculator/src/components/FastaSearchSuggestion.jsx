@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {AlertCircle, ChevronRight, Info, Loader2, PawPrint, Search, Tag} from 'lucide-react';
+import {useEffect, useState} from 'react';
+import {ChevronRight, Info, PawPrint, Search, Tag} from 'lucide-react';
 import {FastaSuggestionHandler} from "../functions/fastaSuggestions.js";
 import {parseAccessionAndRemoveVersion} from "../functions/cache.js";
 
@@ -46,7 +46,7 @@ export const FastaSearchSuggestion = ({
             content: '',
             label: suggestion.primaryCommonName,
             id: parseAccessionAndRemoveVersion(suggestion.id),
-            searchTerm: suggestion.primaryCommonName
+            searchTerm: suggestion.primaryCommonName.trim().toLowerCase()
         };
         addItem(input);
         setLastAddedTerm(searchTerm);

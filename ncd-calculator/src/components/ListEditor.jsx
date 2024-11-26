@@ -23,6 +23,7 @@ import {getGenbankSequences} from "../functions/getPublicGenbank.js";
 import {FastaSearch} from "./FastaSearch.jsx";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "./constants/modalConstants.js";
 import {FileUpload} from "./FileUpload.jsx";
+import {getSearchResult} from "../functions/cacheFastaFetch.js";
 
 const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay}) => {
     const [searchMode, setSearchMode] = useState('language');
@@ -481,96 +482,6 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
         return items;
     }
 
-
-    const cacheHit = (checkedResult) => {
-        if (!checkedResult || checkedResult.length === 0) {
-            return false;
-        }
-        return true;
-    }
-
-
-    const getSearchResult = async (fastaItem, apiKey) => {
-        let searchTerm = fastaItem.searchTerm;
-        const emptyResult = {
-            searchTerm: searchTerm,
-            contents: [],
-            labels: [],
-            accessions: [],
-            commonNames: [],
-            scientificNames: [],
-            cacheHit: false
-        }
-        if (!fastaItem.id && (!searchTerm || searchTerm.trim() === '')) {
-            return emptyResult;
-        }
-        return getResultFromAccessionId(fastaItem.id, emptyResult, apiKey)
-    };
-
-    const getResultFromSearchTerm = async (searchTerm, defaultRes, apiKey) => {
-        searchTerm = searchTerm.trim().toLowerCase();
-        const cachedAccessions = getCachedAccessionBySearchTerm(searchTerm);
-        if (cacheHit(cachedAccessions)) {
-            // labels, contents, accessions
-            const firstAccession = cachedAccessions[0];
-            const accession = firstAccession.accession;
-            const label = firstAccession.label;
-            const scientificName = firstAccession.scientificName;
-            const commonName = firstAccession.commonName;
-            const sequence = getCachedSequenceByAccession(accession);
-            return {
-                searchTerm: searchTerm,
-                contents: [sequence],
-                labels: [label],
-                accessions: [accession],
-                scientificNames: [scientificName],
-                commonNames: [commonName],
-                cacheHit: true
-            }
-        } else {
-            const ids = await getSequenceIdsBySearchTerm(searchTerm, 1, apiKey);
-            if (ids && ids.length !== 0) {
-                const unfilteredAccessions = await getFastaAccessionNumbersFromIds(ids);
-                const accessions = filterValidAccessionAndParse(unfilteredAccessions);
-                const data = await getGenbankSequences(accessions, accessions.length);
-                if (!data.contents[0] || data.contents[0].trim() === '') {
-                    // fall back to get the fasta sequence when sequence from genbank data is empty
-                    const fasta = await getFastaList(ids);
-                    let parsedFasta = parseFastaAndClean(fasta);
-                    data.contents[0] = parsedFasta[0].sequence;
-                }
-                data.cacheHit = false;
-                data.searchTerm = searchTerm;
-                return data;
-            } else {
-                return defaultRes;
-            }
-        }
-    }
-
-    const getResultFromAccessionId = async (id, defaultRes, apiKey) => {
-        const unfilteredAccessions = await getFastaAccessionNumbersFromIds([id], apiKey);
-        const accessions = filterValidAccessionAndParse(unfilteredAccessions);
-        const data = await getGenbankSequences(accessions, accessions.length);
-        if (!data.contents[0] || data.contents[0].trim() === '') {
-            // fall back to get the fasta sequence when sequence from genbank data is empty
-            const fasta = await getFastaList([id], apiKey);
-            let parsedFasta = parseFastaAndClean(fasta);
-            if (parsedFasta && parsedFasta.length !== 0) {
-                data.contents[0] = parsedFasta[0].sequence;
-            }
-        }
-        data.cacheHit = false;
-        data.searchTerm = searchTerm;
-        return hasAnyValidSequence(data.contents) ? data : defaultRes;
-    }
-
-
-    const hasAnyValidSequence = (sequences) => {
-        if (!sequences || sequences.length === 0) return false;
-        if (!sequences[0] || sequences[0].trim() === '') return false;
-        return true;
-    }
 
     const addItem = (item) => {
         if (!selectedItems.find(selected => selected.id === item.id)) {
