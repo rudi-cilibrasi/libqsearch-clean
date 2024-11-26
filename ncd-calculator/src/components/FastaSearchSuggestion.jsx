@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
-import { ChevronRight, Info, PawPrint, Search, Tag } from "lucide-react";
-import { FastaSuggestionHandler } from "../functions/fastaSuggestions.js";
-import { parseAccessionAndRemoveVersion } from "../cache/cache.js";
-import {
-  cacheSuggestions,
-  getCachedFastaSuggestions,
-} from "../cache/fastaSuggestionCache.js";
+import {useEffect, useState} from "react";
+import {ChevronRight, Info, PawPrint, Search, Tag} from "lucide-react";
+import {FastaSuggestionHandler} from "../functions/fastaSuggestions.js";
+import {parseAccessionAndRemoveVersion} from "../cache/cache.js";
+import {cacheSuggestions, getCachedFastaSuggestions,} from "../cache/fastaSuggestionCache.js";
 
 export const FastaSearchSuggestion = ({
   searchTerm,
@@ -17,41 +14,67 @@ export const FastaSearchSuggestion = ({
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastAddedTerm, setLastAddedTerm] = useState("");
+  const [searchTimestamp, setSearchTimestamp] = useState(Date.now());
+  const [lastInput, setLastInput] = useState({
+    term: "",
+    id: 0
+  });
 
   const ncbiService = new FastaSuggestionHandler(
     import.meta.env.VITE_NCBI_API_KEY
   );
 
   useEffect(() => {
+        setSearchTimestamp(Date.now());
     setError(null);
+
     const fetchSuggestions = async () => {
       if (!searchTerm?.trim() || searchTerm.trim().length <= 2) {
         setSuggestions([]);
         return;
       }
-      searchTerm = searchTerm.trim().toLowerCase();
-      const cachedSuggestions = getCachedFastaSuggestions(searchTerm);
-      if (cachedSuggestions && cachedSuggestions.length !== 0) {
+
+      const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+      setLoading(true);
+      setLastInput({
+        term: normalizedSearchTerm,
+        id: lastInput.id + 1
+      });
+
+      try {
+        const cachedSuggestions = getCachedFastaSuggestions(normalizedSearchTerm);
+        if (cachedSuggestions && cachedSuggestions.length !== 0) {
           setSuggestions([...cachedSuggestions]);
-      } else {
-        try {
-          const results = await ncbiService.getSuggestions(searchTerm);
-          setSuggestions(results);
+        } else {
+          const results = await ncbiService.getSuggestions(normalizedSearchTerm);
           if (results && results.length !== 0) {
-            cacheSuggestions(searchTerm, results);
+          setSuggestions(results);
+            cacheSuggestions(normalizedSearchTerm, results);
           }
-        } catch (err) {
-          console.error("Error fetching suggestions:", err);
-          setSuggestions([]);
-        } finally {
-          setLoading(false);
         }
+      } catch
+          (err) {
+          console.error("Error fetching suggestions:", err);
+        // Try cache on error
+        const cachedSuggestions = getCachedFastaSuggestions(normalizedSearchTerm);
+        if (cachedSuggestions && cachedSuggestions.length !== 0) {
+          setSuggestions([...cachedSuggestions]);
+        } else {
+          setSuggestions([]);
+        }
+      } finally {
+          setLoading(false);
       }
     };
 
     const timer = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+      }, [searchTerm, searchTimestamp]
+  );
+
+
+  const shouldShowSuggestions = searchTerm?.trim() && suggestions.length > 0;
+  if (!shouldShowSuggestions) return null;
 
   const handleSuggestionSelect = (suggestion) => {
     const input = {
@@ -81,8 +104,8 @@ export const FastaSearchSuggestion = ({
           </div>
           <div>
             {suggestions.map((suggestion) => (
-              <div
-                key={suggestion.id}
+                <div
+                    key={suggestion.id}
                 onClick={() => handleSuggestionSelect(suggestion)}
                 className="p-3 hover:bg-gray-100 cursor-pointer transition-colors"
               >
