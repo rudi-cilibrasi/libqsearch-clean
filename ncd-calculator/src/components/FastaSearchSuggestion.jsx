@@ -13,68 +13,57 @@ export const FastaSearchSuggestion = ({
 }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [lastAddedTerm, setLastAddedTerm] = useState("");
-  const [searchTimestamp, setSearchTimestamp] = useState(Date.now());
-  const [lastInput, setLastInput] = useState({
-    term: "",
-    id: 0
-  });
-
+  const [selectedIds, setSelectedIds] = useState(new Set()); // Track selected suggestions
   const ncbiService = new FastaSuggestionHandler(
     import.meta.env.VITE_NCBI_API_KEY
   );
 
   useEffect(() => {
-        setSearchTimestamp(Date.now());
     setError(null);
-
     const fetchSuggestions = async () => {
       if (!searchTerm?.trim() || searchTerm.trim().length <= 2) {
         setSuggestions([]);
         return;
       }
-
       const normalizedSearchTerm = searchTerm.trim().toLowerCase();
       setLoading(true);
-      setLastInput({
-        term: normalizedSearchTerm,
-        id: lastInput.id + 1
-      });
 
       try {
         const cachedSuggestions = getCachedFastaSuggestions(normalizedSearchTerm);
         if (cachedSuggestions && cachedSuggestions.length !== 0) {
-          setSuggestions([...cachedSuggestions]);
+          const filteredCachedSuggestions = cachedSuggestions.filter(
+            suggestion => !selectedIds.has(suggestion.id)
+          );
+          setSuggestions(filteredCachedSuggestions);
         } else {
           const results = await ncbiService.getSuggestions(normalizedSearchTerm);
           if (results && results.length !== 0) {
-          setSuggestions(results);
-            cacheSuggestions(normalizedSearchTerm, results);
+            const filteredResults = results.filter(
+              suggestion => !selectedIds.has(suggestion.id)
+            );
+            setSuggestions(filteredResults);
+            cacheSuggestions(normalizedSearchTerm, results); // Cache all results
           }
         }
-      } catch
-          (err) {
-          console.error("Error fetching suggestions:", err);
-        // Try cache on error
+      } catch (err) {
+        console.error("Error fetching suggestions:", err);
         const cachedSuggestions = getCachedFastaSuggestions(normalizedSearchTerm);
         if (cachedSuggestions && cachedSuggestions.length !== 0) {
-          setSuggestions([...cachedSuggestions]);
+          const filteredCachedSuggestions = cachedSuggestions.filter(
+            suggestion => !selectedIds.has(suggestion.id)
+          );
+          setSuggestions(filteredCachedSuggestions);
         } else {
           setSuggestions([]);
         }
       } finally {
-          setLoading(false);
+        setLoading(false);
       }
     };
 
     const timer = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(timer);
-      }, [searchTerm, searchTimestamp]
-  );
-
-
-  const shouldShowSuggestions = searchTerm?.trim() && suggestions.length > 0;
-  if (!shouldShowSuggestions) return null;
+  }, [searchTerm, selectedIds]); // Add selectedIds as dependency
 
   const handleSuggestionSelect = (suggestion) => {
     const input = {
@@ -85,11 +74,13 @@ export const FastaSearchSuggestion = ({
       searchTerm: suggestion.primaryCommonName.trim().toLowerCase(),
     };
     addItem(input);
-    setSuggestions([]);
+    setSelectedIds(prev => new Set([...prev, suggestion.id]));
+    setSuggestions(current =>
+      current.filter(s => s.id !== suggestion.id)
+    );
   };
 
-  if (!searchTerm?.trim() || searchTerm === lastAddedTerm) return null;
-  if (!suggestions.length) return null;
+  if (!searchTerm?.trim() || !suggestions.length) return null;
 
   return (
     <div className={`w-full ${className}`}>
