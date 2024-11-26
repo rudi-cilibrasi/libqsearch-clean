@@ -11,7 +11,7 @@ import {
 import {Parser} from "xml2js"
 import fs, {readFileSync} from "fs";
 
-import {parseAccessionAndRemoveVersion} from "../functions/cache.js";
+import {parseAccessionAndRemoveVersion} from "../cache/cache.js";
 import {join} from "node:path";
 import {parseFastaAndClean} from "../functions/fasta.js";
 import path from "path";

@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from "react";
 import {workerCode} from "../workers/ncdWorker.js";
-import {initCache,} from "../functions/cache.js";
+import {initCache,} from "../cache/cache.js";
 
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
 import {MatrixTree} from "./MatrixTree.jsx";

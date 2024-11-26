@@ -12,7 +12,7 @@ import {
     getCachedAccessionBySearchTerm,
     getCachedSequenceByAccession,
     getTranslationCache, parseAccessionAndRemoveVersion
-} from "../functions/cache.js";
+} from "../cache/cache.js";
 import {
     getFastaAccessionNumbersFromIds,
     getFastaList,
@@ -23,7 +23,7 @@ import {getGenbankSequences} from "../functions/getPublicGenbank.js";
 import {FastaSearch} from "./FastaSearch.jsx";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "./constants/modalConstants.js";
 import {FileUpload} from "./FileUpload.jsx";
-import {getSearchResult} from "../functions/cacheFastaFetch.js";
+import {getSearchResult} from "../cache/cacheFastaFetch.js";
 
 const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay}) => {
     const [searchMode, setSearchMode] = useState('language');
@@ -366,7 +366,7 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
         if (!fastaItems || fastaItems.length === 0) return [];
         const searchTerms = fastaItems.map(item => item.label.toLowerCase().trim());
         if (emptySearchTerms(searchTerms)) {
-            return;
+            return [];
         }
         const results = [];
         const accessionLabel = new Map();
@@ -380,10 +380,12 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
                 for (let j = 0; j < rs.accessions.length; j++) {
                     accessionLabel.set(rs.accessions[j], accessionLabel.get(rs.accessions[j]));
                 }
+            } else {
+                console.error(`Result from this search term ${fastaItems[i].searchTerm} has empty sequence response.`);
             }
         }
         if (results.length === 0) {
-            return;
+            return [];
         }
 
         const hitAccessions = new Set();

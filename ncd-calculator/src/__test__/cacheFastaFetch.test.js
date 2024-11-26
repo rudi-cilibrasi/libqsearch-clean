@@ -1,5 +1,5 @@
 import {beforeEach, describe, expect, test, vi} from 'vitest';
-import {getSearchResult} from "../functions/cacheFastaFetch.js";
+import {getSearchResult} from "../cache/cacheFastaFetch.js";
 import {getFastaAccessionNumbersFromIds, getFastaList} from "../functions/getPublicFasta.js";
 import {getGenbankSequences} from "../functions/getPublicGenbank.js";
 import {parseFastaAndClean} from "../functions/fasta.js";
