@@ -85,7 +85,6 @@ export const FastaSearchSuggestion = ({
       searchTerm: suggestion.primaryCommonName.trim().toLowerCase(),
     };
     addItem(input);
-    setLastAddedTerm(searchTerm);
     setSuggestions([]);
   };
 
