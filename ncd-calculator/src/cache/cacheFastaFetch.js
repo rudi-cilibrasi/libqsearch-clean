@@ -1,7 +1,7 @@
 import {filterValidAccessionAndParse, getCachedAccessionBySearchTerm, getCachedSequenceByAccession} from "./cache.js";
-import {getFastaAccessionNumbersFromIds, getFastaList} from "./getPublicFasta.js";
-import {getGenbankSequences} from "./getPublicGenbank.js";
-import {parseFastaAndClean} from "./fasta.js";
+import {getFastaAccessionNumbersFromIds, getFastaList} from "../functions/getPublicFasta.js";
+import {getGenbankSequences} from "../functions/getPublicGenbank.js";
+import {parseFastaAndClean} from "../functions/fasta.js";
 
 export const getSearchResult = async (fastaItem, apiKey) => {
     let searchTerm = fastaItem.searchTerm;

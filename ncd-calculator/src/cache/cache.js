@@ -1,13 +1,17 @@
-const CACHE_VERSION = 5;
-const CACHE_VERSION_KEY = "cache_version";
-const ACCESSION_CACHE_ID = "accession_cache";
-const UDHR_CACHE = "udhr_cache";
-const SEARCH_TERM_CACHE_ID = "search_cache";
+import {initSuggestionCache} from "./fastaSuggestionCache.js";
+
+const CACHE_VERSION = 7;
+export const CACHE_VERSION_KEY = "cache_version";
+export const ACCESSION_CACHE_ID = "accession_cache";
+export const UDHR_CACHE = "udhr_cache";
+export const SEARCH_TERM_CACHE_ID = "search_cache";
+export const FASTA_SUGGESTION_CACHE = "fasta_suggestion_cache";
 
 const clearAllCaches = () => {
     localStorage.removeItem(ACCESSION_CACHE_ID);
     localStorage.removeItem(SEARCH_TERM_CACHE_ID);
     localStorage.removeItem(UDHR_CACHE);
+    localStorage.removeItem(FASTA_SUGGESTION_CACHE);
 }
 
 const checkAndUpdateVersion = () => {
@@ -30,6 +34,8 @@ export const initCache = () => {
     checkAndUpdateVersion();
     initSearchTermCacheAndGet();
     initAccessionCacheAndGet();
+    initUdhrCacheAndGet();
+    initSuggestionCache();
 }
 
 const initSearchTermCacheAndGet = () => {

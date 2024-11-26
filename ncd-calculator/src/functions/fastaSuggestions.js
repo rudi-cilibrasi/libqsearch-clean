@@ -258,7 +258,7 @@ export class FastaSuggestionHandler {
         const taxonomyPropertyExpression = this.getTaxonomyGroupPropertiesSearchCondition(this.FILTER_PROPERTY_TITLE);
 
         const requestUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=txid${taxId}[Organism] 
-            AND (${taxonomyPropertyExpression})
+            AND (${taxonomyPropertyExpression}) AND (mitochondrion[Title] OR genome[Title] OR complete genome[Title] OR whole genome[Title])
             &retmax=100&retmode=json&sort=relevance${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
 
         try {

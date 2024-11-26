@@ -1,4 +1,4 @@
-import {parseAccessionAndRemoveVersion} from "./cache.js";
+import {parseAccessionAndRemoveVersion} from "../cache/cache.js";
 import {FILE_UPLOAD} from "../components/constants/modalConstants.js";
 
 export const hasMetadata = (content) => {
