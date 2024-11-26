@@ -1,13 +1,37 @@
 version: '3.8'
 services:
+  redis:
+    image: redis:alpine
+    container_name: complearn_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - app_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - redis
+
   qsearch:
     build:
       context: .
-      target: cpp-builder  
+      target: cpp-builder
     container_name: complearn_cpp
     networks:
       - app_network
-    command: ./runtests --unit  
+    command: ./runtests --unit
+    profiles:
+      - app
+    depends_on:
+      redis:
+        condition: service_healthy
 
   ncd-calculator:
     build:
@@ -24,8 +48,13 @@ services:
       - "3000:80"
     networks:
       - app_network
+    profiles:
+      - app
     depends_on:
-      - complearn-genbank
+      redis:
+        condition: service_healthy
+      complearn-genbank:
+        condition: service_started
 
   complearn-genbank:
     build:
@@ -41,6 +70,19 @@ services:
       - "3001:3001"
     networks:
       - app_network
+    profiles:
+      - app
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /cache/redis
 
 networks:
   app_network:
