@@ -2,23 +2,15 @@ import React, {useState} from 'react';
 import {Dna, FileType2, Globe2} from 'lucide-react';
 import {getTranslationResponse} from '../functions/udhr.js';
 import {InputAccumulator} from "./InputAccumulator.jsx";
-import {parseFastaAndClean} from "../functions/fasta.js";
 import {Language} from "./Language.jsx";
 import {
     cacheAccession,
     cacheSearchTermAccessions,
     cacheTranslation,
-    filterValidAccessionAndParse,
-    getCachedAccessionBySearchTerm,
-    getCachedSequenceByAccession,
-    getTranslationCache, parseAccessionAndRemoveVersion
+    getTranslationCache,
+    useStorageState
 } from "../cache/cache.js";
-import {
-    getFastaAccessionNumbersFromIds,
-    getFastaList,
-    getFastaListAndParse,
-    getSequenceIdsBySearchTerm
-} from "../functions/getPublicFasta.js";
+import {getFastaListAndParse} from "../functions/getPublicFasta.js";
 import {getGenbankSequences} from "../functions/getPublicGenbank.js";
 import {FastaSearch} from "./FastaSearch.jsx";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "./constants/modalConstants.js";
@@ -26,7 +18,7 @@ import {FileUpload} from "./FileUpload.jsx";
 import {getSearchResult} from "../cache/cacheFastaFetch.js";
 
 const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay}) => {
-    const [searchMode, setSearchMode] = useState('language');
+    const [searchMode, setSearchMode] = useStorageState("searchMode", "language");
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItems, setSelectedItems] = useState([]);
     const [apiKey, setApiKey] = useState(import.meta.env.VITE_NCBI_API_KEY);

@@ -1,4 +1,5 @@
 import {initSuggestionCache} from "./fastaSuggestionCache.js";
+import React from "react";
 
 const CACHE_VERSION = 7;
 export const CACHE_VERSION_KEY = "cache_version";
@@ -172,3 +173,23 @@ export const getTranslationCache = (lang) => {
     return cache[lang] || null;
 }
 
+/**
+ * Combine states both useState and save to localStorage when state is changed
+ * @param key to save in localStorage
+ * @param initialState default value for the first time
+ */
+export const useStorageState = (key, initialState) => {
+    const isMounted = React.useRef(false);
+
+    const [value, setValue] = React.useState(localStorage.getItem(key) || initialState);
+
+    React.useEffect(() => {
+        // prevent saving to localStorage at the first time component is mounted
+        if (!isMounted.current) {
+            isMounted.current = true;
+        } else {
+            localStorage.setItem(key, value);
+        }
+    }, [value, key]);
+    return [value, setValue];
+};
