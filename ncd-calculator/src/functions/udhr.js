@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
 import * as pdfjs from "pdfjs-dist";
+import {sendRequestToProxy} from "./fetchProxy.js";
 import {BACKEND_BASE_URL} from "../config/api.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.mjs';
@@ -260,13 +261,19 @@ export const getTranslationResponse = async (language) => {
     if (!LANGUAGE_URLS[language]) {
         throw new Error(`No URL found for ${language}`);
     }
-    const uri = `${BACKEND_BASE_URL}/language/fetch?file=` + LANGUAGE_URLS[language];
-    const response = await fetch(uri);
-    if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-    }
-    const pdfData = await response.arrayBuffer();
-    const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
+    const uri = `https://www.ohchr.org/sites/default/files/UDHR/Documents/UDHR_Translations/` + LANGUAGE_URLS[language];
+    const response = await sendRequestToProxy({
+        externalUrl: uri,
+        responseType: "arraybuffer",
+        responseHeaders: {'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename=\"document.pdf\"'}
+    }, {
+        responseType: 'arraybuffer',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/pdf'
+        }
+    });
+    const pdfDoc = await pdfjsLib.getDocument({ data: response }).promise;
     return decodeText(pdfDoc, language);
 }
 

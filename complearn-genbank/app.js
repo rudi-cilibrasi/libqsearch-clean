@@ -10,8 +10,7 @@ const envLoader = require('./configurations/envLoader');
 
 // routes
 const loginRoutes = require("./routes/login");
-const ncbiRoutes = require("./routes/ncbi");
-const languageRoutes = require("./routes/language");
+const externalRoutes = require("./routes/external");
 const app = express();
 
 app.use(cors({ origin: envLoader.get('FRONTEND_BASE_URL'), credentials: true }));
@@ -28,6 +27,7 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(express.json());
 
 passport.use(new GitHubStrategy({
     clientID: envLoader.get('GITHUB_CLIENT_ID'),
@@ -54,8 +54,7 @@ passport.deserializeUser((user, done) => done(null, user));
 
 // mount routes with parent path
 app.use("/api/auth", loginRoutes(passport));
-app.use("/api/ncbi", ncbiRoutes);
-app.use("/api/language", languageRoutes);
+app.use("/api/external", externalRoutes);
 
 app.use((req, res, next) => {
     res.status(404).json({message: "Page not found"});

@@ -61,6 +61,8 @@ services:
       context: ./complearn-genbank
     container_name: complearn_api
     restart: unless-stopped
+    volumes:
+      - /var/log/complearn_api:/var/log/complearn_api
     env_file:
       - ./complearn-genbank/.env
     environment:

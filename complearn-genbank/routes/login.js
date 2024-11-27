@@ -1,5 +1,6 @@
 require("dotenv").config();
 const envLoader = require('../configurations/envLoader');
+const logger = require('../configurations/logger');
 
 module.exports = (passport) => {
     const router = require("express").Router();
@@ -29,14 +30,16 @@ module.exports = (passport) => {
             if (req.user) {
                 if (req.user.username) {
                     userName = req.user.username
-                    res.json({userName: req.user.username});
                 } else if (req.user.displayName) {
                     userName = req.user.displayName;
-                    res.json({userName: req.user.displayName});
+                }
+
+                if (userName) {
+                    res.json({userName: userName});
                 }
             }
 
-            console.log(`${userName} authenticated successfully`);
+            logger.info(`${userName} authenticated successfully`);
         } else {
             res.status(401).json({message: 'User not authenticated'});
         }
@@ -44,9 +47,9 @@ module.exports = (passport) => {
 
     router.get("/logout", (req, res, next) => {
         req.logout(() => {
-            //if (err) return next(err);
             req.session.destroy((err) => {
                 if (err) {
+                    logger.error("Error occurs during logout process", err);
                     return res.status(500).json({error: 'Failed to destroy session'});
                 }
                 res.clearCookie('connect.sid');

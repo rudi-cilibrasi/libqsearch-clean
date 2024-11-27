@@ -1,5 +1,6 @@
 import {sendRequestToProxy} from "./fetchProxy.js";
 import {FASTA} from "../components/constants/modalConstants.js";
+import {getApiKeyRequestParam} from "./api.js";
 
 export class FastaSuggestionHandler {
     // Taxonomic IDs and classifications
@@ -37,7 +38,6 @@ export class FastaSuggestionHandler {
     FILTER_PROPERTY_TITLE = "Title";
 
     constructor(apiKey = null) {
-        this.PROXY_URL = 'http://localhost:3001/api/ncbi/forward';
         this.apiKey = apiKey;
     }
 
@@ -50,8 +50,10 @@ export class FastaSuggestionHandler {
 
     async checkGenbankRecordAndGet(searchTerm) {
         try {
-            const requestUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&sort=relevance&term=${searchTerm} AND mitochondrion[title] AND genome[title]&retmax=1&retmode=json${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
-            const response = await sendRequestToProxy(requestUri);
+            const requestUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&sort=relevance&term=${searchTerm} AND mitochondrion[title] AND genome[title]&retmax=1&retmode=json${getApiKeyRequestParam(this.apiKey)}`}`;
+            const response = await sendRequestToProxy({
+                externalUrl: requestUri
+            });
 
             if (response.esearchresult.count === "0") {
                 return this.EMPTY_GENBANK_RESULT;
@@ -59,8 +61,10 @@ export class FastaSuggestionHandler {
 
             const id = response.esearchresult.idlist[0];
 
-            const summaryUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nuccore&id=${id}&retmode=json${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
-            const summaryResponse = await sendRequestToProxy(summaryUri);
+            const summaryUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nuccore&id=${id}&retmode=json${getApiKeyRequestParam(this.apiKey)}`}`;
+            const summaryResponse = await sendRequestToProxy({
+                externalUrl: summaryUri
+            });
 
             const result = Object.values(summaryResponse.result)[0];
             if (!result) return this.EMPTY_GENBANK_RESULT;
@@ -102,8 +106,10 @@ export class FastaSuggestionHandler {
         const taxId = this.getMatchedPredefinedTaxonomy(searchTerm);
         if (taxId) return taxId;
         try {
-            const requestUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&term="${searchTerm}"[Organism]&retmax=5&retmode=json${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
-            const response = await sendRequestToProxy(requestUri);
+            const requestUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&term="${searchTerm}"[Organism]&retmax=5&retmode=json${getApiKeyRequestParam(this.apiKey)}`}`;
+            const response = await sendRequestToProxy({
+                externalUrl: requestUri
+            });
             if (response.esearchresult.count !== "0") {
                 return response.esearchresult.idlist[0];
             }
@@ -146,13 +152,17 @@ export class FastaSuggestionHandler {
 
     async findTaxonomyIdFromVariant(searchTerm) {
         const exp = this.getTaxonomyGroupPropertiesSearchCondition(this.FILTER_PROPERTY_TITLE) + ` AND (breed[${this.FILTER_PROPERTY_TITLE}])`;
-        const requestUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=${exp} AND (${searchTerm}[${this.FILTER_PROPERTY_TITLE}])&retmax=5&sort=relevance&retmode=json${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
+        const requestUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=${exp} AND (${searchTerm}[${this.FILTER_PROPERTY_TITLE}])&retmax=5&sort=relevance&retmode=json${getApiKeyRequestParam(this.apiKey)}`}`;
         try {
-            const response = await sendRequestToProxy(requestUri);
+            const response = await sendRequestToProxy({
+                externalUrl: requestUri
+            });
             if (!response.esearchresult.idlist.length) return null;
 
-            const summaryUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nuccore&id=${response.esearchresult.idlist.join(",")}&retmode=json${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
-            const summaryResponse = await sendRequestToProxy(summaryUri);
+            const summaryUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nuccore&id=${response.esearchresult.idlist.join(",")}&retmode=json${getApiKeyRequestParam(this.apiKey)}`}`;
+            const summaryResponse = await sendRequestToProxy({
+                externalUrl: summaryUri
+            });
             return this.getBestTaxIdFromBreedName(Object.values(summaryResponse.result), searchTerm);
         } catch (error) {
             console.error('Error finding taxonomy ID from variant:', error);
@@ -214,9 +224,11 @@ export class FastaSuggestionHandler {
     }
 
     async detectTaxonomicGroup(taxId) {
-        const summaryUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id=${taxId}&retmode=json${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
+        const summaryUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id=${taxId}&retmode=json${getApiKeyRequestParam(this.apiKey)}`}`;
         try {
-            const response = await sendRequestToProxy(summaryUri);
+            const response = await sendRequestToProxy({
+                externalUrl: summaryUri
+            });
             const result = Object.values(response.result)[0];
             const division = (result?.division || '').toLowerCase();
             const genbankDivision = (result?.genbankdivision || '').toLowerCase();
@@ -259,14 +271,18 @@ export class FastaSuggestionHandler {
 
         const requestUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=txid${taxId}[Organism] 
             AND (${taxonomyPropertyExpression}) AND (mitochondrion[Title] OR genome[Title] OR complete genome[Title] OR whole genome[Title])
-            &retmax=100&retmode=json&sort=relevance${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
+            &retmax=100&retmode=json&sort=relevance${getApiKeyRequestParam(this.apiKey)}`}`;
 
         try {
-            const response = await sendRequestToProxy(requestUri);
+            const response = await sendRequestToProxy({
+                externalUrl: requestUri
+            });
             if (!response.esearchresult.idlist.length) return [];
 
-            const summaryUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nuccore&id=${response.esearchresult.idlist.join(',')}&retmode=json${this.apiKey ? '&api_key=' + this.apiKey : ''}`}`;
-            const summaryResponse = await sendRequestToProxy(summaryUri);
+            const summaryUri = `${`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nuccore&id=${response.esearchresult.idlist.join(',')}&retmode=json${getApiKeyRequestParam(this.apiKey)}`}`;
+            const summaryResponse = await sendRequestToProxy({
+                externalUrl: summaryUri
+            });
 
             return this.processVariantResults(summaryResponse.result, taxonomicGroup);
         } catch (error) {
