@@ -48,6 +48,8 @@ router.post("/forward", async (req, res) => {
             res.setHeader(key, value);
         });
 
+        logger.info(`Forwarding request to ${finalUrl}`)
+
         const response = await axios({
             url: finalUrl,
             method: method,
