@@ -3,13 +3,6 @@ import {encodeURIWithApiKey} from "./api.js";
 import {parseFastaAndClean} from "./fasta.js";
 
 
-export const getApiResponse = async (uri) => {
-    const response = await fetch(uri);
-    if (!response.ok) {
-        throw new Error("Network response was not ok");
-    }
-    return await response.text();
-}
 
 export const getFastaList = async (idList, apiKey) => {
     const FETCH_URI = getFastaListUri(idList, apiKey) ;
