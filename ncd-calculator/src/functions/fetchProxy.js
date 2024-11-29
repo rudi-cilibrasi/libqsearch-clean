@@ -1,70 +1,40 @@
 import {BACKEND_BASE_URL} from "../config/api.js";
 import axios from "axios";
+import axiosRetry from 'axios-retry';
 
-// export const sendRequestToProxy = async (requestInfo) => {
-//     try {
-//         const response = await fetch(`${BACKEND_BASE_URL}/external/forward`, {
-//             method: 'POST',
-//             headers: {
-//                 'Content-Type': 'application/json',
-//             },
-//             body: JSON.stringify(requestInfo),
-//         });
-//
-//         return await response;
-//     } catch (error) {
-//         console.error('Error in sending request to proxy:', error);
-//         throw error;
-//     }
-// };
+const delay = (ms) => new Promise(_ => setTimeout(_, ms));
+
+axiosRetry(axios, {
+    retries: 3,
+    retryDelay: (retryCount) => {
+        const baseDelay = 500; // in ms
+        return baseDelay * Math.pow(2, retryCount - 1);
+    },
+    retryCondition: (error) => {
+        return error.response && error.response.status === 429;
+    },
+});
 
 export const sendRequestToProxy = async (requestBody, requestHeader = {}) => {
     try {
-        const response = await axios.post(`${BACKEND_BASE_URL}/external/forward`, requestBody, requestHeader);
-        return await response.data;
+        const waitTime = delay(300);
+        const response = axios.post(`${BACKEND_BASE_URL}/external/forward`, requestBody, requestHeader);
+        const results = await Promise.all([waitTime, response]);
+        return results[1].data;
     } catch (error) {
         console.error('Error in sending request to proxy:', error);
         throw error;
     }
 };
 
-const retries = 5;
-const delayMs = 1000;
-
-const delay = (ms) => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export async function fetchWithRetry(func, ...params) {
-    for (let i = 0; i < retries; i++) {
-        let response;
-        try {
-            if (params.length === 1) {
-                response = await func(params[0]);
-            } else {
-                response = await func(params[0], params[1]);
-            }
-            if (response && response.length !== 0) {
-                return response;
-            } else {
-                if (i < retries - 1) {
-                    console.log(`Attempt ${i + 1} failed. Retrying in 1 seconds...`);
-                    await delay(delayMs);
-                } else {
-                    console.log('All retries failed.');
-                    return null;
-                }
-            }
-        } catch (error) {
-            console.log(error);
-            if (i < retries - 1) {
-                console.log(`Attempt ${i + 1} failed. Retrying in 1 seconds...`);
-                await delay(delayMs);
-            } else {
-                console.log('All retries failed.');
-                return null;
-            }
-        }
+export const getApiResponse = async (uri) => {
+    try {
+        const response = await axios.get(uri);
+        return response.data;
+    } catch (error) {
+        console.error('Error in getApiResponse:', error);
+        throw error;
     }
-}
+};
 
+export default axios;

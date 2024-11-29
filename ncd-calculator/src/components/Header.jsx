@@ -33,16 +33,13 @@ const Header = () => {
 
     const fetchUserData = async () => {
         try {
-            const response = await fetch(`${BACKEND_BASE_URL}/auth/user-info`, {credentials: 'include'});
-            if (response.ok) {
-                const data = await response.json();
-                setUserName(data.userName);
-            } else {
-                setUserName(null);
-            }
+            const response = await axios.get(`${BACKEND_BASE_URL}/auth/user-info`, {
+                withCredentials: true,
+            });
+            setUserName(response.data.userName);
         } catch (err) {
-            console.log(err)
-        } finally {
+            console.error(err);
+            setUserName(null);
         }
     };
 
