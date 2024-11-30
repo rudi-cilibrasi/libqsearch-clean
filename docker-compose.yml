@@ -56,6 +56,24 @@ services:
       complearn-genbank:
         condition: service_started
 
+  mysql_container:
+    image: mysql:8.0
+    container_name: mysql_container
+    env_file:
+      - ./complearn-genbank/.env.production
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app_network
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
   complearn-genbank:
     build:
       context: ./complearn-genbank
@@ -64,7 +82,7 @@ services:
     volumes:
       - /var/log/complearn_api:/var/log/complearn_api
     env_file:
-      - ./complearn-genbank/.env
+      - ./complearn-genbank/.env.production
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -75,6 +93,8 @@ services:
     profiles:
       - app
     depends_on:
+      mysql_container:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -85,6 +105,8 @@ volumes:
       type: none
       o: bind
       device: /cache/redis
+  mysql_data:
+    driver: local
 
 networks:
   app_network:

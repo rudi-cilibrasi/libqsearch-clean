@@ -8,7 +8,7 @@ axiosRetry(axios, {
     retries: 3,
     retryDelay: (retryCount) => {
         const baseDelay = 500; // in ms
-        return baseDelay * Math.pow(2, retryCount - 1);
+        return baseDelay * Math.pow(2, retryCount - 1) + Math.random() * 500;
     },
     retryCondition: (error) => {
         return error.response && error.response.status === 429;
