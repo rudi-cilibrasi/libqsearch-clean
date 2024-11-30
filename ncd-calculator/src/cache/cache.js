@@ -1,12 +1,6 @@
-import {initSuggestionCache} from "./fastaSuggestionCache.js";
 import React from "react";
 
-const CACHE_VERSION = 7;
-export const CACHE_VERSION_KEY = "cache_version";
-export const ACCESSION_CACHE_ID = "accession_cache";
 export const UDHR_CACHE = "udhr_cache";
-export const SEARCH_TERM_CACHE_ID = "search_cache";
-export const FASTA_SUGGESTION_CACHE = "fasta_suggestion_cache";
 
 const clearAllCaches = () => {
     localStorage.removeItem(ACCESSION_CACHE_ID);
@@ -15,45 +9,12 @@ const clearAllCaches = () => {
     localStorage.removeItem(FASTA_SUGGESTION_CACHE);
 }
 
-const checkAndUpdateVersion = () => {
-    const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
-    if (!storedVersion || parseInt(storedVersion) < CACHE_VERSION) {
-        clearAllCaches();
-        localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION.toString());
-    }
-}
 
-export const getCachedSequenceByAccession = accessionNum => {
-    let cache = JSON.parse(localStorage.getItem(ACCESSION_CACHE_ID));
-    if (!cache) {
-        cache = JSON.parse(initAccessionCacheAndGet());
-    }
-    return cache[accessionNum.toLowerCase()] || null;
-}
 
 export const initCache = () => {
-    checkAndUpdateVersion();
-    initSearchTermCacheAndGet();
-    initAccessionCacheAndGet();
     initUdhrCacheAndGet();
-    initSuggestionCache();
 }
 
-const initSearchTermCacheAndGet = () => {
-    const searchCache = localStorage.getItem(SEARCH_TERM_CACHE_ID);
-    if (!searchCache) {
-        localStorage.setItem(SEARCH_TERM_CACHE_ID, JSON.stringify({}));
-    }
-    return localStorage.getItem(SEARCH_TERM_CACHE_ID);
-}
-
-const initAccessionCacheAndGet = () => {
-    const accessionCache = localStorage.getItem(ACCESSION_CACHE_ID);
-    if (!accessionCache || Object.keys(accessionCache).length === 0) {
-        localStorage.setItem(ACCESSION_CACHE_ID, JSON.stringify({}));
-    }
-    return localStorage.getItem(ACCESSION_CACHE_ID);
-}
 
 
 const initUdhrCacheAndGet = () => {
@@ -64,13 +25,6 @@ const initUdhrCacheAndGet = () => {
     return localStorage.getItem(UDHR_CACHE);
 }
 
-export const getCachedAccessionBySearchTerm = searchTerm => {
-    let cache = JSON.parse(localStorage.getItem(SEARCH_TERM_CACHE_ID));
-    if (!cache || Object.keys(cache).length === 0) {
-        cache = JSON.parse(initSearchTermCacheAndGet());
-    }
-    return cache[searchTerm] || null;
-}
 
 export const cacheAccessionSequence = (accession, sequence) => {
     accession = parseAccessionAndRemoveVersion(accession);

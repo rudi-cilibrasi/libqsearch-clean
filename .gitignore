@@ -8,3 +8,6 @@ qsearch_worker_react/src/wasm/qsearch.js
 **/node_modules
 .idea
 *.env
+
+**/package-lock.json
+

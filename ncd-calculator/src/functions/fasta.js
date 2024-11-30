@@ -67,28 +67,28 @@ export const parseFasta = (content) => {
         }
         return sequences;
     } else {
-        let currentHeader = {};
+        let header = {};
         let currentSequence = "";
         let sequences = [];
         lines.forEach(line => {
             if (line.startsWith(">") || line.trim() === '') {
-                if (currentHeader && currentSequence) {
+                if (header && currentSequence) {
                     sequences.push({
-                        ...currentHeader,
+                        ...header,
                         sequence: currentSequence
                     });
-                    currentHeader = {};
+                    header = {};
                     currentSequence = "";
                 }
-                currentHeader = parseMetadata(line);
+                header = parseMetadata(line);
             } else {
                 currentSequence += line.trim();
             }
         });
-        if (currentHeader && currentSequence) {
+        if (header && currentSequence) {
             sequences.push(
                 {
-                    ...currentHeader,
+                    ...header,
                     sequence: currentSequence
                 }
             )

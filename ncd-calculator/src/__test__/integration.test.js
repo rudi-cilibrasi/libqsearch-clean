@@ -74,7 +74,7 @@ test('test fasta search terms', async () => {
     fireEvent.keyDown(searchBar, { key: 'Enter', code: 'Enter', charCode: 13 });
 
     screen.debug(undefined, Infinity);
-    const result = screen.getByText('Search FASTA');
+    const result = screen.getByText('Enter Animal Name');
     expect(result).toBeInTheDocument();
 
     const calculateNCDButton = screen.getByText('Calculate NCD Matrix');
