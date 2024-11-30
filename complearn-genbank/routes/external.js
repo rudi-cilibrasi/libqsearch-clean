@@ -1,15 +1,15 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const envLoader = require('../configurations/envLoader');
+const ENV_LOADER = require('../configurations/envLoader');
 const logger = require('../configurations/logger');
 
 let apiKeyIndex = 0;
 
 const apiKeys = [
-    envLoader.get('GENBANK_API_KEY_1'),
-    envLoader.get('GENBANK_API_KEY_2'),
-    envLoader.get('GENBANK_API_KEY_3'),
+    ENV_LOADER.GENBANK_API_KEY_1,
+    ENV_LOADER.GENBANK_API_KEY_2,
+    ENV_LOADER.GENBANK_API_KEY_3,
 ];
 
 function getNextApiKey() {

@@ -1,19 +1,18 @@
-require("dotenv").config();
-
 const express = require("express");
 const passport = require("passport");
 const cors = require("cors");
 const session = require("express-session");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const GitHubStrategy = require("passport-github2").Strategy;
-const envLoader = require('./configurations/envLoader');
+const ENV_LOADER = require('./configurations/envLoader');
 
 // routes
 const loginRoutes = require("./routes/login");
 const externalRoutes = require("./routes/external");
+const {upsertUserMut, insertUserHist} = require("./services/userService");
 const app = express();
 
-app.use(cors({ origin: envLoader.get('FRONTEND_BASE_URL'), credentials: true }));
+app.use(cors({ origin: ENV_LOADER.FRONTEND_BASE_URL, credentials: true }));
 
 app.use(session({
     secret: "secret", // A key to sign the session ID cookie
@@ -30,18 +29,24 @@ app.use(passport.session());
 app.use(express.json());
 
 passport.use(new GitHubStrategy({
-    clientID: envLoader.get('GITHUB_CLIENT_ID'),
-    clientSecret: envLoader.get('GITHUB_CLIENT_SECRET'),
-    callbackURL: `${envLoader.get('BASE_URL')}/auth/github/callback`,
+    clientID: ENV_LOADER.GITHUB_CLIENT_ID,
+    clientSecret: ENV_LOADER.GITHUB_CLIENT_SECRET,
+    callbackURL: `${ENV_LOADER.BASE_URL}/auth/github/callback`,
 }, (accessToken, refreshToken, profile, done) => {
+    // save user info here
+    upsertUserMut(profile);
+    insertUserHist(profile);
     return done(null, profile);
 }));
 
 passport.use(new GoogleStrategy({
-    clientID: envLoader.get('GOOGLE_CLIENT_ID'),
-    clientSecret: envLoader.get('GOOGLE_CLIENT_SECRET'),
-    callbackURL: `${envLoader.get('BASE_URL')}/auth/google/callback`,
+    clientID: ENV_LOADER.GOOGLE_CLIENT_ID,
+    clientSecret: ENV_LOADER.GOOGLE_CLIENT_SECRET,
+    callbackURL: `${ENV_LOADER.BASE_URL}/auth/google/callback`,
 }, (accessToken, refreshToken, profile, done) => {
+    // save user info here
+    upsertUserMut(profile);
+    insertUserHist(profile);
     return done(null, profile);
 }));
 

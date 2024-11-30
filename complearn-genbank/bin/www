@@ -7,6 +7,7 @@ const app = require('../app'); // Import the Express app
 const debug = require('debug')('myapp:server'); // For debugging
 const http = require('http'); // HTTP module to create server
 const logger = require('../configurations/logger');
+const {syncSequelize} = require('../configurations/databaseConnection');
 
 /**
  * Get port from environment and store in Express.
@@ -18,6 +19,9 @@ app.set('port', port);
  * Create HTTP server.
  */
 const server = http.createServer(app);
+
+// Sync database schema before the app start
+syncSequelize();
 
 /**
  * Listen on provided port, on all network interfaces.
