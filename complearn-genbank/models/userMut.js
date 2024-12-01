@@ -20,12 +20,18 @@ const UserMut = sequelize.define('UserMut', {
     additional_info: {
         type: DataTypes.JSON,
         allowNull: true
-    }
+    },
+    created_at: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    updated_at: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
 }, {
     timestamps: true,
     tableName: "user_mut",
-    createdAt: 'created_at',
-    updatedAt: 'updated_at'
 });
 
 module.exports = UserMut;

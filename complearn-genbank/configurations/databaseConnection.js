@@ -18,6 +18,13 @@ const sequelizeNormal = new Sequelize(
         logging: (sql) => {
             logger.info(sql);  // Log SQL queries
         },
+        dialectOptions: {
+            charset: 'utf8mb4', // Global charset
+        },
+        define: {
+            charset: 'utf8mb4', // Default charset for models
+            collate: 'utf8mb4_general_ci', // Default collation for models
+        },
     });
 
 const sequelizeTestMode = new Sequelize({
@@ -25,6 +32,13 @@ const sequelizeTestMode = new Sequelize({
     storage: ':memory:',
     logging: (sql) => {
         logger.info(sql);  // Log SQL queries
+    },
+    dialectOptions: {
+        charset: 'utf8mb4', // Global charset
+    },
+    define: {
+        charset: 'utf8mb4', // Default charset for models
+        collate: 'utf8mb4_general_ci', // Default collation for models
     },
 });
 
