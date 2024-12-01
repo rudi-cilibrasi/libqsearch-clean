@@ -20,16 +20,18 @@ const userHist = sequelize.define('UserHist', {
         type: DataTypes.JSON,
         allowNull: true
     },
-    createdAt: {
-        type: DataTypes.DATE,
-        defaultValue: Sequelize.NOW,
+    created_at: {
+        type: DataTypes.STRING,
         allowNull: false,
         primaryKey: true,
+    },
+    updated_at: {
+        type: DataTypes.STRING,
+        allowNull: false,
     },
 }, {
     timestamps: true,
     tableName: "user_hist",
-    updatedAt: 'updated_at'
 });
 
 module.exports = userHist;

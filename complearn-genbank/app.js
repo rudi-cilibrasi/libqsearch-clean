@@ -5,11 +5,12 @@ const session = require("express-session");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const GitHubStrategy = require("passport-github2").Strategy;
 const ENV_LOADER = require('./configurations/envLoader');
+const logger = require('./configurations/logger');
 
 // routes
 const loginRoutes = require("./routes/login");
 const externalRoutes = require("./routes/external");
-const {upsertUserMut, insertUserHist} = require("./services/userService");
+const {upsertUser} = require("./services/userService");
 const app = express();
 
 app.use(cors({ origin: ENV_LOADER.FRONTEND_BASE_URL, credentials: true }));
@@ -32,22 +33,28 @@ passport.use(new GitHubStrategy({
     clientID: ENV_LOADER.GITHUB_CLIENT_ID,
     clientSecret: ENV_LOADER.GITHUB_CLIENT_SECRET,
     callbackURL: `${ENV_LOADER.BASE_URL}/auth/github/callback`,
-}, (accessToken, refreshToken, profile, done) => {
-    // save user info here
-    upsertUserMut(profile);
-    insertUserHist(profile);
-    return done(null, profile);
+}, async (accessToken, refreshToken, profile, done) => {
+    try {
+        await upsertUser(profile);
+        return done(null, profile);
+    } catch (error) {
+        logger.error(error);
+        return done(error);
+    }
 }));
 
 passport.use(new GoogleStrategy({
     clientID: ENV_LOADER.GOOGLE_CLIENT_ID,
     clientSecret: ENV_LOADER.GOOGLE_CLIENT_SECRET,
     callbackURL: `${ENV_LOADER.BASE_URL}/auth/google/callback`,
-}, (accessToken, refreshToken, profile, done) => {
-    // save user info here
-    upsertUserMut(profile);
-    insertUserHist(profile);
-    return done(null, profile);
+}, async (accessToken, refreshToken, profile, done) => {
+    try {
+        await upsertUser(profile);
+        return done(null, profile);
+    } catch (error) {
+        logger.error(error);
+        return done(error);
+    }
 }));
 
 // user = the profile object above strategy
