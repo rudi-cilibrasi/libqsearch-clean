@@ -1,18 +1,19 @@
-import {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 import axios from 'axios';
 import {BACKEND_BASE_URL} from '../config/api.js'
+import {getLoginUser} from '../functions/user.js';
+import {useStorageState} from "../cache/cache.js";
 
-const Header = () => {
+const Header = ({openLogin, setOpenLogin}) => {
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [userName, setUserName] = useState(null);
+    const [userName, setUserName] = useStorageState("userName", "");
 
     const openModal = () => {
-        setIsModalOpen(true);
+        setOpenLogin(true);
     };
 
     const closeModal = () => {
-        setIsModalOpen(false);
+        setOpenLogin(false);
     };
 
     const handleGoogleLogin = async () => {
@@ -32,15 +33,8 @@ const Header = () => {
     };
 
     const fetchUserData = async () => {
-        try {
-            const response = await axios.get(`${BACKEND_BASE_URL}/auth/user-info`, {
-                withCredentials: true,
-            });
-            setUserName(response.data.userName);
-        } catch (err) {
-            console.error(err);
-            setUserName(null);
-        }
+        const userName = await getLoginUser();
+        setUserName(userName);
     };
 
     useEffect(() => {
@@ -76,13 +70,13 @@ const Header = () => {
                 </div>
             )}
 
-            {isModalOpen && (
+            {openLogin && (
                 <div
                     className="fixed z-50 inset-0 flex justify-center items-center bg-black bg-opacity-50 backdrop-blur-sm"
                     onClick={closeModal}>
                     <div
                         className="bg-white p-6 rounded-lg w-80" onClick={(e) => e.stopPropagation()}>
-                        <h2 className="text-center text-xl font-semibold mb-4 text-black">Choose Login Options:</h2>
+                        <h2 className="text-center text-xl font-semibold mb-4 text-black">Login to continue</h2>
                         <div className="flex flex-col items-center space-y-4">
                             <button
                                 className="bg-red-500 text-white px-6 py-2 rounded-full w-full"
