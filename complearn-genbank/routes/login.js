@@ -10,13 +10,15 @@ module.exports = (passport) => {
     router.get("/github", passport.authenticate("github", {scope: ["user:email"]}));
 
     // handle the callback after authentication complete
-    router.get("/google/callback", passport.authenticate("google", {failureRedirect: "/"}), (req, res) => {
-        res.redirect(`${ENV_LOADER.FRONTEND_BASE_URL}`);
-    });
+    router.get("/google/callback", passport.authenticate("google", {failureRedirect: `${ENV_LOADER.FRONTEND_BASE_URL}/error`}),
+        (req, res) => {
+            res.redirect(`${ENV_LOADER.FRONTEND_BASE_URL}`);
+        });
 
-    router.get("/github/callback", passport.authenticate("github", {failureRedirect: "/"}), (req, res) => {
-        res.redirect(`${ENV_LOADER.FRONTEND_BASE_URL}`);
-    });
+    router.get("/github/callback", passport.authenticate("github", {failureRedirect: `${ENV_LOADER.FRONTEND_BASE_URL}/error`}),
+        (req, res) => {
+            res.redirect(`${ENV_LOADER.FRONTEND_BASE_URL}`);
+        });
 
     router.get("/profile", (req, res) => {
         res.send(`Welcome ${req.user.displayName}`);

@@ -181,15 +181,38 @@ export const getTranslationCache = (lang) => {
 export const useStorageState = (key, initialState) => {
     const isMounted = React.useRef(false);
 
-    const [value, setValue] = React.useState(localStorage.getItem(key) || initialState);
+    const [value, setValue] = React.useState(() => {
+        const storedValue = localStorage.getItem(key);
+        if (!storedValue || storedValue === "null") {
+            return initialState;
+        }
+        try {
+            return JSON.parse(storedValue);
+        } catch (e) {
+            console.error(`Error parsing localStorage key "${key}":`, e);
+        }
+        return initialState;
+    });
 
     React.useEffect(() => {
-        // prevent saving to localStorage at the first time component is mounted
         if (!isMounted.current) {
-            isMounted.current = true;
+            isMounted.current = true; // Skip the first render
         } else {
-            localStorage.setItem(key, value);
+            try {
+                if (value) {
+                    localStorage.setItem(key, JSON.stringify(value));
+                } else {
+                    localStorage.setItem(key, null);
+                }
+            } catch (e) {
+                console.error(`Error saving to localStorage key "${key}":`, e);
+            }
         }
     }, [value, key]);
     return [value, setValue];
 };
+
+export const getAuthenticatedUser = () => {
+    let userName = localStorage.getItem("userName");
+    return userName === "null" ? null : userName;
+}

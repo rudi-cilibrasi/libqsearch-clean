@@ -16,11 +16,13 @@ import {FastaSearch} from "./FastaSearch.jsx";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "./constants/modalConstants.js";
 import {FileUpload} from "./FileUpload.jsx";
 import {getSearchResult} from "../cache/cacheFastaFetch.js";
+import {getAuthenticatedUser} from "../cache/cache.js";
 
-const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay}) => {
+const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay, setOpenLogin}) => {
     const [searchMode, setSearchMode] = useStorageState("searchMode", "language");
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedItems, setSelectedItems] = useState([]);
+    // prevent users have to reselect items when authentication callback happens
+    const [selectedItems, setSelectedItems] = useStorageState('selectedItems', []);
     const [apiKey, setApiKey] = useState(import.meta.env.VITE_NCBI_API_KEY);
     const [isDragging, setIsDragging] = useState(false);
     const [projections, setProjections] = useState({
@@ -155,6 +157,10 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
 
 
     const sendNcdInput = async () => {
+        if (selectedItems && selectedItems.length > 8 && !getAuthenticatedUser()) {
+            setOpenLogin(true);
+            return;
+        }
         setIsLoading(true);
         const computedNcdInput = await computeNcdInput();
         const ncdSelectedItems = getNcdSelectedItems(computedNcdInput, selectedItems);

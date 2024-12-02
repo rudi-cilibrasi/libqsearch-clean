@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import {workerCode} from "../workers/ncdWorker.js";
 import {initCache,} from "../cache/cache.js";
 
@@ -6,6 +6,7 @@ import QSearchWorker from "../workers/qsearchWorker.js?worker";
 import {MatrixTree} from "./MatrixTree.jsx";
 import {Loader} from "lucide-react";
 import ListEditor from "./ListEditor.jsx";
+import Header from "./Header.jsx";
 
 
 const QSearch = () => {
@@ -23,7 +24,7 @@ const QSearch = () => {
     const [activeTab, setActiveTab] = useState('fastaSearch');
     const [isLoading, setIsLoading] = useState(false);
     const [isSearchDisabled, setIsSearchDisabled] = useState(true);
-
+    const [openLogin, setOpenLogin] = useState(false);
 
     useEffect(() => {
         initCache();
@@ -192,29 +193,32 @@ const QSearch = () => {
     };
 
     return (
-        <div style={{margin: "20px", textAlign: "center", width: "1100px"}}>
-            <ListEditor onComputedNcdInput={onNcdInput} labelMapRef={labelMapRef} setLabelMap={setLabelMap}
-                        setIsLoading={setIsLoading} resetDisplay={resetDisplay}/>
-            {
-                (isLoading) && (
-                    <div className="flex items-center gap-2 text-slate-600" style={{
-                        paddingLeft: "20px",
-                        color: "#bfdbfe"
-                    }}>
-                        <Loader className="animate-spin" size={20}/>
-                        <span>{isLoading ? 'Computing result...' : 'Processing results...'}</span>
-                    </div>
-                )
-            }
-            {
-                (!isLoading) && (
-                    <MatrixTree hasMatrix={hasMatrix} ncdMatrix={ncdMatrix} labels={labels}
-                                confirmedSearchTerm={confirmedSearchTerm} errorMsg={errorMsg}
-                                qSearchTreeResult={qSearchTreeResult} executionTime={executionTime}/>
-                )
-            }
+        <>
+            <Header openLogin={openLogin} setOpenLogin={setOpenLogin}/>
+            <div style={{margin: "20px", textAlign: "center", width: "1100px"}}>
+                <ListEditor onComputedNcdInput={onNcdInput} labelMapRef={labelMapRef} setLabelMap={setLabelMap}
+                            setIsLoading={setIsLoading} resetDisplay={resetDisplay} setOpenLogin={setOpenLogin}/>
+                {
+                    (isLoading) && (
+                        <div className="flex items-center gap-2 text-slate-600" style={{
+                            paddingLeft: "20px",
+                            color: "#bfdbfe"
+                        }}>
+                            <Loader className="animate-spin" size={20}/>
+                            <span>{isLoading ? 'Computing result...' : 'Processing results...'}</span>
+                        </div>
+                    )
+                }
+                {
+                    (!isLoading) && (
+                        <MatrixTree hasMatrix={hasMatrix} ncdMatrix={ncdMatrix} labels={labels}
+                                    confirmedSearchTerm={confirmedSearchTerm} errorMsg={errorMsg}
+                                    qSearchTreeResult={qSearchTreeResult} executionTime={executionTime}/>
+                    )
+                }
 
-        </div>
+            </div>
+        </>
     );
 };
 

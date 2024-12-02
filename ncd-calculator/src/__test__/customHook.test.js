@@ -23,7 +23,7 @@ describe('useStorageState', () => {
     });
 
     it('should initialize with the value from localStorage or initialState', () => {
-        localStorageMock.setItem('testKey', 'storedValue');
+        localStorageMock.setItem("testKey", "\"storedValue\"");
         const { result } = renderHook(() => useStorageState('testKey', 'initialValue'));
 
         expect(result.current[0]).toBe('storedValue');
@@ -48,7 +48,7 @@ describe('useStorageState', () => {
             result.current[1]('newValue');
         });
 
-        expect(localStorageMock.setItem).toHaveBeenCalledWith('testKey', 'newValue');
+        expect(localStorageMock.setItem).toHaveBeenCalledWith("testKey", "\"newValue\"");
     });
 
     it('should handle multiple renders and updates correctly', () => {
@@ -61,9 +61,9 @@ describe('useStorageState', () => {
             result.current[1]('updatedValue');
         });
 
-        expect(localStorageMock.setItem).toHaveBeenCalledWith('testKey', 'updatedValue');
+        expect(localStorageMock.setItem).toHaveBeenCalledWith('testKey', "\"updatedValue\"");
 
         rerender({ key: 'testKey', initialState: 'newInitialValue' });
-        expect(result.current[0]).toBe('updatedValue');
+        expect(result.current[0]).toBe("updatedValue");
     });
 });

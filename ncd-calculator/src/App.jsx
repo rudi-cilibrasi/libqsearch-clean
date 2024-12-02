@@ -1,15 +1,18 @@
 import './App.css'
 import QSearch from "./components/QSearch.jsx";
-import Header from "./components/Header.jsx";
+import ErrorPage from "./components/ErrorPage.jsx";
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 
 function App() {
     return (
-        <>
-            <Header/>
-            <div className="card">
-                <QSearch/>
+        <Router>
+            <div>
+                <Routes>
+                    <Route path="/" element={<QSearch />} />
+                    <Route path="/error" element={<ErrorPage />} />
+                </Routes>
             </div>
-        </>
+        </Router>
     )
 }
 
