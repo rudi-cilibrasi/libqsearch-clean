@@ -1,9 +1,12 @@
 version: '3.8'
 services:
+
   redis:
     image: redis:alpine
     container_name: complearn_redis
-    command: redis-server --appendonly yes
+    command: >
+      --requirepass ${VITE_REDIS_PASSWORD}
+      --appendonly yes
     volumes:
       - redis_data:/data
     ports:
@@ -12,10 +15,17 @@ services:
       - app_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "-a", "${VITE_REDIS_PASSWORD:-complearn}", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
     profiles:
       - redis
 
@@ -86,6 +96,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
+      - REDIS_URL=redis://complearn_redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-complearn}
     ports:
       - "3001:3001"
     networks:

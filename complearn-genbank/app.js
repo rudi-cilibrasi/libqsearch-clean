@@ -11,6 +11,7 @@ const logger = require('./configurations/logger');
 const loginRoutes = require("./routes/login");
 const externalRoutes = require("./routes/external");
 const {upsertUser} = require("./services/userService");
+const redisRoutes = require("./routes/redis");
 const app = express();
 
 app.use(cors({ origin: ENV_LOADER.FRONTEND_BASE_URL, credentials: true }));
@@ -67,6 +68,7 @@ passport.deserializeUser((user, done) => done(null, user));
 // mount routes with parent path
 app.use("/api/auth", loginRoutes(passport));
 app.use("/api/external", externalRoutes);
+app.use("/api/redis", redisRoutes);
 
 app.use((req, res, next) => {
     res.status(404).json({message: "Page not found"});

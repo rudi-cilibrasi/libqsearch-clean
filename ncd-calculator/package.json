@@ -41,11 +41,13 @@
     "react-force-graph-2d": "^1.25.7",
     "react-router-dom": "^7.0.1",
     "react-treebeard": "^3.2.4",
+    "redis": "^4.7.0",
     "shadcn-ui": "^0.9.3",
     "text-encoding-utf-8": "^1.0.2",
     "three": "^0.169.0",
     "troika-three-text": "^0.50.2",
     "vitest-canvas-mock": "^0.3.3",
+    "winston": "^3.17.0",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {

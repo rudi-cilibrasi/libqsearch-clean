@@ -7,6 +7,7 @@ import {MatrixTree} from "./MatrixTree.jsx";
 import {Loader} from "lucide-react";
 import ListEditor from "./ListEditor.jsx";
 import Header from "./Header.jsx";
+import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.js";
 
 
 const QSearch = () => {
@@ -25,9 +26,11 @@ const QSearch = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSearchDisabled, setIsSearchDisabled] = useState(true);
     const [openLogin, setOpenLogin] = useState(false);
+    const storageKeyManager = new LocalStorageKeyManager();
+
 
     useEffect(() => {
-        initCache();
+        storageKeyManager.checkVersion();
         runNCDWorker();
         qSearchWorkerRef.current = new QSearchWorker();
         qSearchWorkerRef.current.onmessage = handleQsearchMessage;

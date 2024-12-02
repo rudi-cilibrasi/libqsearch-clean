@@ -2,7 +2,6 @@ import * as pdfjsLib from 'pdfjs-dist';
 
 import * as pdfjs from "pdfjs-dist";
 import {sendRequestToProxy} from "./fetchProxy.js";
-import {BACKEND_BASE_URL} from "../config/api.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.mjs';
 

@@ -5,6 +5,8 @@ import {Eye, EyeOff} from "lucide-react";
 import {SearchInput} from "./SearchInput.jsx";
 import {FASTA} from "./constants/modalConstants.js";
 import {FastaSearchSuggestion} from "./FastaSearchSuggestion.jsx";
+import {GenBankSearchService} from "../clients/GenBankSearchService.js";
+import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.js";
 
 
 export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, setSelectedItems}) => {
@@ -18,6 +20,8 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
         CommonName: true,
     });
     const [searchError, setSearchError] = useState(null);
+    const genbankSearchService = new GenBankSearchService();
+    const localStorageKeyManager = new LocalStorageKeyManager();
 
     const handleDragOver = useCallback((e) => {
         e.preventDefault();
@@ -139,10 +143,11 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
                 <SearchInput
                     searchTerm={searchTerm}
                     addItem={addItem}
-                    label="Search FASTA"
+                    label="Enter Animal Name"
                     type="fasta"
                     handleSearchTerm={handleSearchTerm}
                     setSearchError={setSearchError}
+                    genbankSearchService={genbankSearchService}
                 />
             </div>
             <div className="flex-1">
@@ -157,7 +162,9 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
                     onSuggestionSelect={handleSuggestionSelect}
                     className="mt-2"
                     addItem={addItem}
+                    genbankSearchService={genbankSearchService}
                     setError={setSearchError}
+                    localStorageKeyManager={localStorageKeyManager}
                 />
             </div>
             <div className="mt-auto border-t border-gray-200 pt-4">
