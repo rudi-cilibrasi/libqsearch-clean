@@ -12,6 +12,7 @@ import {FASTA, FILE_UPLOAD, LANGUAGE} from "./constants/modalConstants.js";
 import {FileUpload} from "./FileUpload.jsx";
 import {getAuthenticatedUser} from "../cache/cache.js";
 import {LocalStorageKeyManager, LocalStorageKeys} from "../cache/LocalStorageKeyManager.js";
+import {getFastaSequences} from "../functions/getPublicGenbank.js";
 
 const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay, setOpenLogin}) => {
     const [searchMode, setSearchMode] = useStorageState("searchMode", "language");
