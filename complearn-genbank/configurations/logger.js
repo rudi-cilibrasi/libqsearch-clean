@@ -5,19 +5,23 @@ const logger = createLogger({
     level: 'info',
     format: format.combine(
         format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        format.errors({ stack: true }), // Include stack trace for error objects
-        format.printf(({ timestamp, level, message, stack }) =>
-            stack
-                ? `${timestamp} [${level.toUpperCase()}]: ${message}\nStack Trace:\n${stack}`
-                : `${timestamp} [${level.toUpperCase()}]: ${message}`
-        )
+        format.errors({ stack: true }),
+        format.printf(({ timestamp, level, message, requestId, transaction }) => {
+            const baseLine = `${timestamp} [${level.toUpperCase()}] [${requestId}] ${message}`;
+            if (transaction) {
+                const prettyJson = JSON.stringify(transaction, null, 2);
+                return `${baseLine}\n${prettyJson}`;
+            }
+
+            return baseLine;
+        })
     ),
     transports: [
         new transports.Console(),
         new transports.File({
-            filename: '/var/log/complearn_api', // Rotated files are application.log.1, application.log.2, ...
-            maxsize: 50 * 1024 * 1024,       // 50 MB
-            maxFiles: 5,                     // Keep 5 rotated files, older will be removed
+            filename: '/var/log/complearn_api',
+            maxsize: 50 * 1024 * 1024,
+            maxFiles: 5,
         }),
     ],
 });

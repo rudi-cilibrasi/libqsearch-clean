@@ -12,6 +12,8 @@ import loginRoutes from "./routes/login.js";
 import externalRoutes from "./routes/external.js";
 import { upsertUser } from "./services/userService.js";
 import redisRoutes from "./routes/redis.js";
+import {requestLogger} from "./middleware/requestLogger.js";
+
 const app = express();
 
 app.use(cors({ origin: ENV_LOADER.FRONTEND_BASE_URL, credentials: true }));
@@ -29,6 +31,8 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.json());
+app.use(requestLogger);
+
 
 passport.use(new GitHubStrategy({
     clientID: ENV_LOADER.GITHUB_CLIENT_ID,
@@ -70,8 +74,29 @@ app.use("/api/auth", loginRoutes(passport));
 app.use("/api/external", externalRoutes);
 app.use("/api/redis", redisRoutes);
 
-app.use((req, res, next) => {
-    res.status(404).json({message: "Page not found"});
+app.use((err, req, res, next) => {
+    logger.error({
+        requestId: req.requestId,
+        level: 'error',
+        message: 'Unhandled error',
+        error: {
+            name: err.name,
+            message: err.message,
+            stack: err.stack
+        }
+    });
+
+    res.status(500).json({
+        error: 'Internal server error',
+        requestId: req.requestId
+    });
+});
+
+app.use((req, res) => {
+    res.status(404).json({
+        message: "Page not found",
+        requestId: req.requestId
+    });
 });
 
 export default app;
