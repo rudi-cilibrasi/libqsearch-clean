@@ -165,8 +165,3 @@ export const useStorageState = (key, initialState) => {
     }, [value, key]);
     return [value, setValue];
 };
-
-export const getAuthenticatedUser = () => {
-    let userName = localStorage.getItem("userName");
-    return userName === "null" ? null : userName;
-}

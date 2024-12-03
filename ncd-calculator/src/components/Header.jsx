@@ -2,11 +2,10 @@ import React, {useEffect, useState} from "react";
 import axios from 'axios';
 import {BACKEND_BASE_URL} from '../config/api.js'
 import {getLoginUser} from '../functions/user.js';
-import {useStorageState} from "../cache/cache.js";
 
-const Header = ({openLogin, setOpenLogin}) => {
+const Header = ({openLogin, setOpenLogin, setAuthenticated}) => {
 
-    const [userName, setUserName] = useStorageState("userName", "");
+    const [userName, setUserName] = useState(null);
 
     const openModal = () => {
         setOpenLogin(true);
@@ -33,8 +32,10 @@ const Header = ({openLogin, setOpenLogin}) => {
     };
 
     const fetchUserData = async () => {
-        const userName = await getLoginUser();
-        setUserName(userName);
+        const authUserName = await getLoginUser();
+        setUserName(authUserName);
+        setAuthenticated(!!authUserName);
+        console.log(`User is authenticated ${!!authUserName} ${authUserName}`);
     };
 
     useEffect(() => {
@@ -42,12 +43,16 @@ const Header = ({openLogin, setOpenLogin}) => {
     }, []);
 
     const handleLogout = async () => {
-        await axios.get(`${BACKEND_BASE_URL}/auth/logout`, {withCredentials: true})
-            .then(res => {
-                console.log('response ', res);
-                setUserName(res.data.user);
-            })
-            .catch(e=> console.log(e))
+        try {
+            const res = await axios.get(`${BACKEND_BASE_URL}/auth/logout`, { withCredentials: true });
+            console.log('handleLogout response', res);
+            const returnedUser = res.data.user;
+            setUserName(returnedUser);
+            setAuthenticated(!!returnedUser);
+            console.log(`User is authenticated ${!!returnedUser}`);
+        } catch (error) {
+            console.log(error);
+        }
     };
 
     return (
