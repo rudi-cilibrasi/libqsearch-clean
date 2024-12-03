@@ -1,5 +1,5 @@
-const { Sequelize, DataTypes } = require('sequelize');
-const {sequelize} = require('../configurations/databaseConnection'); // Import the configured Sequelize instance
+import { Sequelize, DataTypes } from "sequelize";
+import { sequelize } from "../configurations/databaseConnection.js";
 
 const userHist = sequelize.define('UserHist', {
     provider_name: {
@@ -34,4 +34,4 @@ const userHist = sequelize.define('UserHist', {
     tableName: "user_hist",
 });
 
-module.exports = userHist;
+export default userHist;

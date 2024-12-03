@@ -1,8 +1,7 @@
-const { Sequelize, DataTypes } = require('sequelize');
-const {sequelize} = require('../configurations/databaseConnection');
-const logger = require("../configurations/logger");
+import { DataTypes } from "sequelize";
+import { sequelize } from "../configurations/databaseConnection.js";
 
-const UserMut = sequelize.define('UserMut', {
+const UserMut = sequelize.define("UserMut", {
     provider_name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -34,4 +33,4 @@ const UserMut = sequelize.define('UserMut', {
     tableName: "user_mut",
 });
 
-module.exports = UserMut;
+export default UserMut;

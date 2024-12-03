@@ -1,12 +1,12 @@
-const dotenv = require('dotenv');
-const path = require('path');
-const logger = require('./logger');
+import 'dotenv/config'
+import path from "path";
+import logger from "./logger.js";
+import {config} from "dotenv";
 
-currentEnvironment = process.env.NODE_ENV;
+const currentEnvironment = process.env.NODE_ENV;
 
 const envFile = currentEnvironment ? `.env.${currentEnvironment}` : '.env';
-
-dotenv.config({path: path.resolve(__dirname, "..", envFile)});
+config({path: `../${envFile}`});
 
 logger.info(`Loaded environment: ${currentEnvironment}`);
 logger.info(`Sample base url: ${process.env.BASE_URL}`);
@@ -30,6 +30,10 @@ const ENV_LOADER = {
     MYSQL_USER: process.env.MYSQL_USER || "",
     MYSQL_PASSWORD: process.env.MYSQL_PASSWORD || "",
     MYSQL_DATABASE: process.env.MYSQL_DATABASE || "",
+
+    NODE_ENV: process.env.NODE_ENV || "",
+    REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+    REDIS_PASSWORD: process.env.REDIS_PASSWORD || 'complearn'
 };
 
-module.exports = ENV_LOADER;
+export default ENV_LOADER;

@@ -1,17 +1,17 @@
-const express = require("express");
-const passport = require("passport");
-const cors = require("cors");
-const session = require("express-session");
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
-const GitHubStrategy = require("passport-github2").Strategy;
-const ENV_LOADER = require('./configurations/envLoader');
-const logger = require('./configurations/logger');
+import express from "express";
+import passport from "passport";
+import cors from "cors";
+import session from "express-session";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Strategy as GitHubStrategy } from "passport-github2";
+import ENV_LOADER from "./configurations/envLoader.js";
+import logger from "./configurations/logger.js";
 
 // routes
-const loginRoutes = require("./routes/login");
-const externalRoutes = require("./routes/external");
-const {upsertUser} = require("./services/userService");
-const redisRoutes = require("./routes/redis");
+import loginRoutes from "./routes/login.js";
+import externalRoutes from "./routes/external.js";
+import { upsertUser } from "./services/userService.js";
+import redisRoutes from "./routes/redis.js";
 const app = express();
 
 app.use(cors({ origin: ENV_LOADER.FRONTEND_BASE_URL, credentials: true }));
@@ -74,4 +74,4 @@ app.use((req, res, next) => {
     res.status(404).json({message: "Page not found"});
 });
 
-module.exports = app;
+export default app;

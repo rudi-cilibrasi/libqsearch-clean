@@ -1,6 +1,6 @@
-const {Sequelize} = require('sequelize');
-const ENV_LOADER = require('./envLoader');
-const logger = require("./logger");
+import { Sequelize } from "sequelize";
+import ENV_LOADER from "./envLoader.js";
+import logger from "./logger.js";
 
 const sequelizeNormal = new Sequelize(
     ENV_LOADER.MYSQL_DATABASE,
@@ -42,11 +42,11 @@ const sequelizeTestMode = new Sequelize({
     },
 });
 
-const sequelize = process.env.NODE_ENV === 'test' ? sequelizeTestMode : sequelizeNormal;
+const sequelize = ENV_LOADER.NODE_ENV === 'test' ? sequelizeTestMode : sequelizeNormal;
 
 const syncSequelize = async () => {
     try {
-        let syncOptions = process.env.NODE_ENV === 'production' ? {} : {alter: true};
+        let syncOptions = ENV_LOADER.NODE_ENV === 'production' ? {} : {alter: true};
         await sequelize.sync(syncOptions);
         logger.info('Database synchronized!');
     } catch (error) {
@@ -54,4 +54,4 @@ const syncSequelize = async () => {
     }
 };
 
-module.exports = {sequelize, syncSequelize};
+export {sequelize, syncSequelize};

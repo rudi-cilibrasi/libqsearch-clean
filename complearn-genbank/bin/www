@@ -3,16 +3,19 @@
 /**
  * Module dependencies.
  */
-const app = require('../app'); // Import the Express app
-const debug = require('debug')('myapp:server'); // For debugging
-const http = require('http'); // HTTP module to create server
-const logger = require('../configurations/logger');
-const {syncSequelize} = require('../configurations/databaseConnection');
+import app from "../app.js";
+import debug from "debug";
+import http from "http";
+import logger from "../configurations/logger.js";
+import { syncSequelize } from "../configurations/databaseConnection.js";
+import ENV_LOADER from "../configurations/envLoader.js";
+
+const debugServer = debug('myapp:server'); // For debugging
 
 /**
  * Get port from environment and store in Express.
  */
-const port = normalizePort(process.env.PORT || '3001');
+const port = normalizePort(ENV_LOADER.PORT || '3001');
 app.set('port', port);
 
 /**
@@ -78,6 +81,6 @@ function onError(error) {
 function onListening() {
     const addr = server.address();
     const bind = typeof addr === 'string' ? 'pipe ' + addr : 'port ' + addr.port;
-    debug('Listening on ' + bind);
+    debugServer('Listening on ' + bind);
     logger.info(`Server is running at http://localhost:${port}`);
 }

@@ -1,8 +1,9 @@
-const express = require('express');
-const axios = require('axios');
+import express from "express";
+import axios from "axios";
+import ENV_LOADER from "../configurations/envLoader.js";
+import logger from "../configurations/logger.js";
+
 const router = express.Router();
-const ENV_LOADER = require('../configurations/envLoader');
-const logger = require('../configurations/logger');
 
 let apiKeyIndex = 0;
 
@@ -71,4 +72,4 @@ router.post("/forward", async (req, res) => {
 
 });
 
-module.exports = router;
+export default router;

@@ -1,8 +1,9 @@
-const ENV_LOADER = require('../configurations/envLoader');
-const logger = require('../configurations/logger');
+import ENV_LOADER from "../configurations/envLoader.js";
+import logger from "../configurations/logger.js";
+import { Router } from "express";
 
-module.exports = (passport) => {
-    const router = require("express").Router();
+const login = (passport) => {
+    const router = Router();
 
     // redirect the user to authentication page
     router.get("/google", passport.authenticate("google", {scope: ["profile", "email"]}));
@@ -62,3 +63,4 @@ module.exports = (passport) => {
     return router;
 }
 
+export default login;
