@@ -1,8 +1,8 @@
-const {describe, it, expect, beforeAll, afterAll} = require('@jest/globals');
-const {upsertUserMut, insertUserHist, upsertUser} = require("../services/userService");
-const UserMut = require("../models/userMut");
-const UserHist = require("../models/userHist");
-const {sequelize, syncSequelize} = require("../configurations/databaseConnection");
+import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
+import { upsertUserMut, insertUserHist, upsertUser } from "../services/userService.js";
+import UserMut from "../models/userMut.js";
+import UserHist from "../models/userHist.js";
+import { sequelize, syncSequelize } from "../configurations/databaseConnection.js";
 
 beforeEach(async () => {
     await sequelize.sync({ force: true }); // Drops and recreates tables

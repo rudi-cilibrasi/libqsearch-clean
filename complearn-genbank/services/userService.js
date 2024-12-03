@@ -1,7 +1,7 @@
-const logger = require('../configurations/logger');
-const UserMut = require("../models/userMut");
-const UserHist = require("../models/userHist");
-const {sequelize} = require("../configurations/databaseConnection");
+import logger from "../configurations/logger.js";
+import UserMut from "../models/userMut.js";
+import UserHist from "../models/userHist.js";
+import { sequelize } from "../configurations/databaseConnection.js";
 
 async function upsertUser(profile) {
     const transaction = await sequelize.transaction();
@@ -51,7 +51,7 @@ async function insertUserHist(profile, newDate = "" + new Date(), transaction) {
     return user;
 }
 
-module.exports = {
+export {
     upsertUserMut,
     insertUserHist,
     upsertUser

@@ -1,16 +1,26 @@
-const redis = require('redis');
-const express = require('express');
-const {error, info} = require("../configurations/logger");
+import redis from "redis";
+import express from "express";
+import logger from "../configurations/logger.js";
+import ENV_LOADER from "../configurations/envLoader.js";
 
 const router = express.Router();
 const client = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
-    password: process.env.REDIS_PASSWORD || 'complearn'
+    url: ENV_LOADER.REDIS_URL,
+    password: ENV_LOADER.REDIS_PASSWORD
 });
 
-client.connect().catch(error);
+const connectToRedis = async () => {
+    try {
+        await client.connect();
+        logger.info('Connected to Redis');
+    } catch (err) {
+        logger.error('Error connecting to Redis:', err);
+    }
+};
 
-info('Redis routes being registered');
+connectToRedis();
+
+logger.info('Redis routes being registered');
 
 router.post("/get", async (req, res) => {
     try {
@@ -18,7 +28,7 @@ router.post("/get", async (req, res) => {
         const value = await client.get(key);
         res.json({ value });
     } catch (error) {
-        error('Redis get error:', error);
+        logger.error('Redis get error:', error);
         res.status(500).json({ error: 'Redis operation failed' });
     }
 });
@@ -34,7 +44,7 @@ router.post("/set", async (req, res) => {
         }
         res.json({ success: true });
     } catch (error) {
-        error('Redis set error:', error);
+        logger.error('Redis set error:', error);
         res.status(500).json({ error: 'Redis operation failed' });
     }
 });
@@ -46,7 +56,7 @@ router.post("/incr", async (req, res) => {
         const value = await client.incr(key);
         res.json({ value });
     } catch (error) {
-        error('Redis increment error:', error);
+        logger.error('Redis increment error:', error);
         res.status(500).json({ error: 'Redis operation failed' });
     }
 });
@@ -58,9 +68,9 @@ router.post("/del", async (req, res) => {
         await client.del(key);
         res.json({ success: true });
     } catch (error) {
-        error('Redis delete error:', error);
+        logger.error('Redis delete error:', error);
         res.status(500).json({ error: 'Redis operation failed' });
     }
 });
 
-module.exports = router;
+export default router;
