@@ -26,6 +26,7 @@ const QSearch = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSearchDisabled, setIsSearchDisabled] = useState(true);
     const [openLogin, setOpenLogin] = useState(false);
+    const [authenticated, setAuthenticated] = useState(false);
     const storageKeyManager = new LocalStorageKeyManager();
 
 
@@ -197,10 +198,10 @@ const QSearch = () => {
 
     return (
         <>
-            <Header openLogin={openLogin} setOpenLogin={setOpenLogin}/>
+            <Header openLogin={openLogin} setOpenLogin={setOpenLogin} setAuthenticated={setAuthenticated}/>
             <div style={{margin: "20px", textAlign: "center", width: "1100px"}}>
                 <ListEditor onComputedNcdInput={onNcdInput} labelMapRef={labelMapRef} setLabelMap={setLabelMap}
-                            setIsLoading={setIsLoading} resetDisplay={resetDisplay} setOpenLogin={setOpenLogin}/>
+                            setIsLoading={setIsLoading} resetDisplay={resetDisplay} setOpenLogin={setOpenLogin} authenticated={authenticated}/>
                 {
                     (isLoading) && (
                         <div className="flex items-center gap-2 text-slate-600" style={{

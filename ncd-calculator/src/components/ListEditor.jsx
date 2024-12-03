@@ -10,11 +10,10 @@ import {
 import {FastaSearch} from "./FastaSearch.jsx";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "./constants/modalConstants.js";
 import {FileUpload} from "./FileUpload.jsx";
-import {getAuthenticatedUser} from "../cache/cache.js";
 import {LocalStorageKeyManager, LocalStorageKeys} from "../cache/LocalStorageKeyManager.js";
 import {getFastaSequences} from "../functions/getPublicGenbank.js";
 
-const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay, setOpenLogin}) => {
+const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay, setOpenLogin, authenticated}) => {
     const [searchMode, setSearchMode] = useStorageState("searchMode", "language");
     const [searchTerm, setSearchTerm] = useState('');
     // prevent users have to reselect items when authentication callback happens
@@ -52,7 +51,7 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
 
 
     const sendNcdInput = async () => {
-        if (selectedItems && selectedItems.length > 8 && !getAuthenticatedUser()) {
+        if (selectedItems && selectedItems.length > 8 && !authenticated) {
             setOpenLogin(true);
             return;
         }
@@ -357,7 +356,8 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
                 <InputAccumulator
                     selectedItems={selectedItems}
                     onRemoveItem={removeItem}
-                    MIN_ITEMS={MIN_ITEMS}/>
+                    MIN_ITEMS={MIN_ITEMS}
+                    authenticated={authenticated}/>
             </div>
 
             <div className="flex justify-end mt-6">

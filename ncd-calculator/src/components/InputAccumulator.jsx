@@ -1,11 +1,11 @@
 import {Dna, FileType2, Globe2, X} from 'lucide-react';
 import {FASTA, LANGUAGE} from "./constants/modalConstants.js";
-import {getAuthenticatedUser} from "../cache/cache.js";
 
 export const InputAccumulator = ({
                                      MIN_ITEMS = 4,
                                      selectedItems,
-                                     onRemoveItem
+                                     onRemoveItem,
+                                     authenticated
                                  }) => {
     const renderItemWithIcon = (item, type) => {
         switch (type) {
@@ -32,7 +32,7 @@ export const InputAccumulator = ({
     return (
         <div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-200">
-                {!getAuthenticatedUser() && selectedItems.length > 8 &&  <p className="text-sm text-red-500">
+                {!authenticated && selectedItems.length > 8 &&  <p className="text-sm text-red-500">
                     Please log in to increase your item selection limit (maximum 8).
                 </p>}
                 <h3 className="text-lg font-bold text-gray-900">
