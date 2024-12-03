@@ -1,6 +1,6 @@
 import {sendRequestToProxy} from "../functions/fetchProxy.js";
 import {getUri} from "../functions/url.js";
-import * as url from "node:url";
+import {animalGroups, TAXONOMIC_SEARCH_STRATEGIES} from "../constants/taxonomy.js";
 
 export class GenBankQueries {
     constructor(apiKey) {
@@ -9,36 +9,126 @@ export class GenBankQueries {
         this.baseUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils`;
     }
 
-    TAXONOMIC_GROUPS = {
-        MAMMAL: {
-            id: "40674",
-            searchTerms: ["breed", "strain", "subspecies"]
-        },
-        BIRD: {
-            id: "8782",
-            searchTerms: ["breed", "strain", "subspecies"]
-        },
-        FISH: {
-            id: "7898",
-            searchTerms: ["strain", "variety", "population"]
-        },
-        REPTILE: {
-            id: "8504",
-            searchTerms: ["strain", "subspecies", "population"]
-        },
-        AMPHIBIAN: {
-            id: "8292",
-            searchTerms: ["strain", "population", "subspecies"]
-        },
-        INSECT: {
-            id: "50557",
-            searchTerms: ["strain", "variety", "ecotype"]
-        },
-        VERTEBRATE: {
-            id: "7742",
-            searchTerms: ["breed", "strain", "subspecies"]
-        }
+
+    buildVariantFetchUri(searchTerm, taxId, taxonomicGroup, page = 1, pageSize = this.DEFAULT_PAGE_SIZE) {
+        const startIndex = (page - 1) * pageSize;
+
+        // Build optimized query using group-specific strategy
+        const query = this.buildOptimizedQuery(searchTerm, taxonomicGroup, taxId);
+
+        const params = new URLSearchParams({
+            db: 'nuccore',
+            term: query,
+            retstart: startIndex.toString(),
+            retmax: pageSize.toString(),
+            retmode: 'json',
+            sort: 'relevance',
+            usehistory: 'y'
+        });
+
+        return getUri(this.baseUrl, "esearch.fcgi", params);
     }
+
+
+    buildAdvancedVariantSearchUri(searchTerm, page = 1, pageSize = this.DEFAULT_PAGE_SIZE) {
+        const startIndex = (page - 1) * pageSize;
+
+        const searchConditions = [
+            // Main search terms
+            `"${searchTerm}"[Title] OR "${searchTerm}"[Organism]`,
+
+            // Variant/breed related terms
+            '(breed[Title] OR strain[Title] OR variant[Title] OR subspecies[Title] OR population[Title])',
+
+            // Genetic material terms
+            '(genome[Title] OR mitochondrion[Title] OR chromosome[Title] OR complete genome[Title])'
+        ];
+
+        const params = new URLSearchParams({
+            db: 'nuccore',
+            term: searchConditions.join(' AND '),
+            retstart: startIndex.toString(),
+            retmax: pageSize.toString(),
+            retmode: 'json',
+            sort: 'relevance',
+            usehistory: 'y',
+        });
+
+        return getUri(this.baseUrl, "esearch.fcgi", params);
+    }
+
+    determineGroupType(taxId) {
+        // Map taxIds to their groups
+        const taxIdMap = {
+            '40674': 'MAMMAL',  // Mammals
+            '8782': 'BIRD',     // Birds
+            '7898': 'FISH',     // Fish
+            '8504': 'REPTILE',  // Reptiles
+            '8292': 'AMPHIBIAN', // Amphibians
+            '50557': 'INSECT',   // Insects
+            '7742': 'VERTEBRATE' // Vertebrates
+        };
+
+        return taxIdMap[taxId] || 'VERTEBRATE'; // Default to VERTEBRATE if unknown
+    }
+
+    // buildOptimizedQuery(taxId, strategy) {
+    //     // Primary search terms (most important)
+    //     const primaryTerms = strategy.primary
+    //         .map(term => `"${term}"[Title]`)
+    //         .join(" OR ");
+    //
+    //     // Sequence terms
+    //     const sequenceTerms = strategy.sequences
+    //         .map(term => `"${term}"[Title]`)
+    //         .join(" OR ");
+    //
+    //     // Exclude terms
+    //     const excludeClause = strategy.excludeTerms
+    //         .map(term => `NOT "${term}"[Title]`)
+    //         .join(" ");
+    //
+    //     // Build complete query
+    //     return `txid${taxId}[Organism] AND (${primaryTerms}) AND (${sequenceTerms}) ${excludeClause}`;
+    // }
+
+
+    buildOptimizedQuery(searchTerm, taxonomicGroup, taxId) {
+        const animalMatch = Object.entries(animalGroups)
+            .find(([key, value]) => {
+                const searchLower = searchTerm.toLowerCase();
+                return key === searchLower ||
+                    value.includes?.some(name => name.toLowerCase() === searchLower);
+            });
+
+        if (animalMatch) {
+            const [_, animal] = animalMatch;
+
+            // Get appropriate search terms for this animal
+            const searchTerms = animal.searchTerms || taxonomicGroup;
+
+            // Build search terms based on animal type
+            const variantTerms = searchTerms
+                .map(term => `"${term}"[Title]`)
+                .join(" OR ");
+
+            // Core sequence terms that work for all animals
+            const sequenceTerms = [
+                "complete genome",
+                "mitochondrial genome",
+                "whole genome",
+                "mitochondrion"
+            ].map(term => `"${term}"[Title]`).join(" OR ");
+
+            // Build query with both terms but connected with OR
+            return `txid${taxId}[Organism] AND ((${sequenceTerms}) OR (${variantTerms})) NOT patent[Title]`;
+        }
+
+        // Default case for unknown animals
+        return `txid${taxId}[Organism] AND ("complete genome"[Title] OR "mitochondrial genome"[Title]) NOT patent[Title]`;
+    }
+
+
 
     buildTaxonomySearchUri(searchTerm, page = 1, pageSize = this.DEFAULT_PAGE_SIZE) {
         const startIndex = (page - 1) * pageSize;
@@ -52,21 +142,6 @@ export class GenBankQueries {
         });
         return getUri(this.baseUrl, "esearch.fcgi", params);
     }
-
-    buildVariantSearchUri(searchTerm, page = 1, pageSize = this.DEFAULT_PAGE_SIZE) {
-        const startIndex = (page - 1) * pageSize;
-        const params = new URLSearchParams({
-            db: 'nuccore',
-            term: `${searchTerm}[Title] AND (breed[Title])`,
-            retstart: startIndex.toString(),
-            retmax: pageSize.toString(),
-            retmode: 'json',
-            sort: 'relevance',
-            usehistory: 'y',
-        });
-        return getUri(this.baseUrl, "esearch.fcgi", params);
-    }
-
     buildTaxonomicSummaryUri(taxIds) {
         const params = new URLSearchParams({
             db: 'taxonomy',
@@ -90,27 +165,7 @@ export class GenBankQueries {
     }
 
 
-    getTaxonomyGroupPropertiesSearchCondition(propertyVals, appliedProperty) {
-        const mapped = propertyVals.map(property => property + `[${appliedProperty}]`);
-        return mapped.join(" OR ");
-    }
 
-    buildVariantFetchUri(taxId, taxonomicGroup, page = 1, pageSize = this.DEFAULT_PAGE_SIZE) {
-        const startIndex = (page - 1) * pageSize;
-        const taxonomyPropertyExpression = this.getTaxonomyGroupPropertiesSearchCondition(taxonomicGroup, "Title");
-
-        const params = new URLSearchParams({
-            db: 'nuccore',
-            term: `txid${taxId}[Organism] AND (${taxonomyPropertyExpression}) AND (mitochondrion[Title] OR genome[Title])`,
-            retstart: startIndex.toString(),
-            retmax: pageSize.toString(),
-            retmode: 'json',
-            sort: 'relevance',
-            usehistory: 'y',
-        });
-
-        return getUri(this.baseUrl, "esearch.fcgi", params);
-    }
 
     buildWebEnvFetchUri(webEnv, queryKey, page = 1, pageSize = this.DEFAULT_PAGE_SIZE) {
         const startIndex = (page - 1) * pageSize;

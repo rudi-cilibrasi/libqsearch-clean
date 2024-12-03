@@ -1,5 +1,5 @@
 const STORAGE_VERSION_NAME = "complearn_storage_version";
-const STORAGE_VERSION = 6;
+const STORAGE_VERSION = 8;
 
 export const LocalStorageKeys = {
     SUGGESTIONS: () => `fasta_suggestions`,

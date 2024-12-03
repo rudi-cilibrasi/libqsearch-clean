@@ -3,13 +3,13 @@ import {getCleanSequence, isFasta} from "../functions/fasta.js";
 import {getFile} from "../functions/file.js";
 import {Eye, EyeOff} from "lucide-react";
 import {SearchInput} from "./SearchInput.jsx";
-import {FASTA} from "./constants/modalConstants.js";
+import {FASTA} from "../constants/modalConstants.js";
 import {FastaSearchSuggestion} from "./FastaSearchSuggestion.jsx";
 import {GenBankSearchService} from "../clients/GenBankSearchService.js";
 import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.js";
 
 
-export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, setSelectedItems}) => {
+export const FastaSearch = ({addItem, selectedItems, onSetApiKey, setSelectedItems, getAllFastaSuggestionWithLastIndex, getFastaSuggestionStartIndex, setFastaSuggestionStartIndex}) => {
     const [apiKey, setApiKey] = useState('');
     const [isDragging, setIsDragging] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -165,6 +165,9 @@ export const FastaSearch = ({MIN_ITEMS, addItem, selectedItems, onSetApiKey, set
                     genbankSearchService={genbankSearchService}
                     setError={setSearchError}
                     localStorageKeyManager={localStorageKeyManager}
+                    getAllFastaSuggestionWithLastIndex={getAllFastaSuggestionWithLastIndex}
+                    setFastaSuggestionStartIndex={setFastaSuggestionStartIndex}
+                    getFastaSuggestionStartIndex={getFastaSuggestionStartIndex}
                 />
             </div>
             <div className="mt-auto border-t border-gray-200 pt-4">

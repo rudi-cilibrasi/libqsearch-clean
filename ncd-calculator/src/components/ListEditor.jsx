@@ -3,23 +3,21 @@ import {Dna, FileType2, Globe2} from 'lucide-react';
 import {getTranslationResponse} from '../functions/udhr.js';
 import {InputAccumulator} from "./InputAccumulator.jsx";
 import {Language} from "./Language.jsx";
-import {
-    cacheTranslation,
-    getTranslationCache, useStorageState,
-} from "../cache/cache.js";
+import {cacheTranslation, getTranslationCache, useStorageState,} from "../cache/cache.js";
 import {FastaSearch} from "./FastaSearch.jsx";
-import {FASTA, FILE_UPLOAD, LANGUAGE} from "./constants/modalConstants.js";
 import {FileUpload} from "./FileUpload.jsx";
 import {LocalStorageKeyManager, LocalStorageKeys} from "../cache/LocalStorageKeyManager.js";
 import {getFastaSequences} from "../functions/getPublicGenbank.js";
+import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants.js";
 
 const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading, resetDisplay, setOpenLogin, authenticated}) => {
-    const [searchMode, setSearchMode] = useStorageState("searchMode", "language");
+    const [searchMode, setSearchMode] = useStorageState("searchMode", FASTA);
     const [searchTerm, setSearchTerm] = useState('');
     // prevent users have to reselect items when authentication callback happens
     const [selectedItems, setSelectedItems] = useStorageState('selectedItems', []);
     const [apiKey, setApiKey] = useState(import.meta.env.VITE_NCBI_API_KEY);
     const [isDragging, setIsDragging] = useState(false);
+    const [fastaSuggestionStartIndex, setFastaSuggestionStartIndex] = useState({})
     const [projections, setProjections] = useState({
         Accession: true,
         ScientificName: false,
@@ -237,11 +235,17 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
     }
 
 
-
-    function isValidInput(fastaItems) {
+    const isValidInput = (fastaItems) => {
         if (!fastaItems?.length) return false;
         const searchTerms = fastaItems.map(item => item.label.toLowerCase().trim());
         return searchTerms.some(term => term.length > 0);
+    }
+
+    const getFastaSuggestionStartIndex = (searchTerm) => {
+        if (!fastaSuggestionStartIndex || !fastaSuggestionStartIndex[searchTerm]) {
+            return 0;
+        }
+        return fastaSuggestionStartIndex[searchTerm] || 0;
     }
 
     async function fetchFastaSequenceAndProcess(fastaItems) {
@@ -290,12 +294,19 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
         resetDisplay();
     }
 
+    const getAllFastaSuggestionWithLastIndex = () => {
+        return fastaSuggestionStartIndex;
+    }
+
     const renderModal = (mode) => {
         switch (mode) {
             case FASTA:
                 return (<FastaSearch addItem={addItem} searchTerm={searchTerm} MIN_ITEMS={MIN_ITEMS}
                                      selectedItems={selectedItems}
-                                     onSetApiKey={setApiKey} setSelectedItems={setSelectedItems}/>)
+                                     onSetApiKey={setApiKey} setSelectedItems={setSelectedItems}
+                                     getAllFastaSuggestionWithLastIndex={getAllFastaSuggestionWithLastIndex}
+                                     getFastaSuggestionStartIndex={getFastaSuggestionStartIndex}
+                                     setFastaSuggestionStartIndex={setFastaSuggestionStartIndex}/>)
             case LANGUAGE:
                 return (<Language selectedItems={selectedItems} searchTerm={searchTerm} addItem={addItem}
                                   MIN_ITEMS={MIN_ITEMS}/>)
@@ -311,16 +322,7 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
         <div className="p-6 w-full max-w-6xl mx-auto">
             {/* Mode Selector */}
             <div className="flex gap-4 mb-6">
-                <button
-                    onClick={() => setSearchMode(LANGUAGE)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-            ${searchMode === LANGUAGE
-                        ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                        : 'bg-gray-100 text-gray-600 border-2 border-transparent'}`}
-                >
-                    <Globe2 size={20}/>
-                    <span>Language Analysis</span>
-                </button>
+
                 <button
                     onClick={() => setSearchMode(FASTA)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
@@ -330,6 +332,16 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
                 >
                     <Dna size={20}/>
                     <span>FASTA Search</span>
+                </button>
+                <button
+                    onClick={() => setSearchMode(LANGUAGE)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+            ${searchMode === LANGUAGE
+                        ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                        : 'bg-gray-100 text-gray-600 border-2 border-transparent'}`}
+                >
+                    <Globe2 size={20}/>
+                    <span>Language Analysis</span>
                 </button>
                 <button
                     onClick={() => setSearchMode(FILE_UPLOAD)}
@@ -356,8 +368,7 @@ const ListEditor = ({onComputedNcdInput, labelMapRef, setLabelMap, setIsLoading,
                 <InputAccumulator
                     selectedItems={selectedItems}
                     onRemoveItem={removeItem}
-                    MIN_ITEMS={MIN_ITEMS}
-                    authenticated={authenticated}/>
+                    MIN_ITEMS={MIN_ITEMS}/>
             </div>
 
             <div className="flex justify-end mt-6">

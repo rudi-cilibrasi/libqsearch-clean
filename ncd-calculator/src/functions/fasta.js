@@ -1,5 +1,5 @@
 import {parseAccessionAndRemoveVersion} from "../cache/cache.js";
-import {FILE_UPLOAD} from "../components/constants/modalConstants.js";
+import {FILE_UPLOAD} from "../constants/modalConstants.js";
 
 export const hasMetadata = (content) => {
     if (!content || content.trim() === '') {
