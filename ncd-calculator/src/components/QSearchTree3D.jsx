@@ -2,6 +2,8 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Canvas, useFrame} from "@react-three/fiber";
 import * as THREE from "three";
 import {Text, OrbitControls} from "@react-three/drei";
+import { saveAs } from 'file-saver';
+import createGraph from '../functions/graphExport.js';
 
 export const QSearchTree3D = ({data}) => {
     const scaleFactor = Math.max(1, Math.sqrt(data.nodes.length) / 4);
@@ -12,8 +14,21 @@ export const QSearchTree3D = ({data}) => {
         overflow: 'hidden'
     };
 
+    const handleExport = () => {
+        const dotFormat = createGraph(data, false);
+        const blob = new Blob([dotFormat], { type: 'text/plain;charset=utf-8' });
+        saveAs(blob, 'graph.dot');
+    };
+
     return (
         <div style={containerStyle}>
+            <div className="grid justify-items-end p-6">
+                <button
+                    onClick={handleExport}
+                    className="bg-blue-600 text-white hover:bg-blue-700 shadow-md">
+                    Export Graph
+                </button>
+            </div>
             <Canvas
                 camera={{
                     position: [scaleFactor * 100, scaleFactor * 100, scaleFactor * 100],
@@ -29,7 +44,7 @@ export const QSearchTree3D = ({data}) => {
                     autoRotate={true}
                     autoRotateSpeed={0.5}
                 />
-                <QSearchTree data={data} scaleFactor={scaleFactor} />
+                <QSearchTree data={data} scaleFactor={scaleFactor}/>
             </Canvas>
         </div>
     );
