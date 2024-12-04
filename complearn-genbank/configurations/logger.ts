@@ -1,7 +1,7 @@
-import winston from 'winston';
+import winston, {Logger} from 'winston';
 const { createLogger, format, transports } = winston;
 
-const logger = createLogger({
+const logger: Logger = createLogger({
     level: 'info',
     format: format.combine(
         format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),

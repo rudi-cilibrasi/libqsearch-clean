@@ -1,14 +1,12 @@
-#!/usr/bin/env node
-
 /**
  * Module dependencies.
  */
-import app from "../app.js";
+import app from "../app";
 import debug from "debug";
 import http from "http";
-import logger from "../configurations/logger.js";
-import { syncSequelize } from "../configurations/databaseConnection.js";
-import ENV_LOADER from "../configurations/envLoader.js";
+import logger from "../configurations/logger";
+import { syncSequelize } from "../configurations/databaseConnection";
+import ENV_LOADER from "../configurations/envLoader";
 
 const debugServer = debug('myapp:server'); // For debugging
 
@@ -36,7 +34,7 @@ server.on('listening', onListening); // Handle successful server start
 /**
  * Normalize a port into a number, string, or false.
  */
-function normalizePort(val) {
+function normalizePort(val: any) {
     const port = parseInt(val, 10);
 
     if (isNaN(port)) {
@@ -53,7 +51,7 @@ function normalizePort(val) {
 /**
  * Event listener for HTTP server "error" event.
  */
-function onError(error) {
+function onError(error: any) {
     if (error.syscall !== 'listen') {
         throw error;
     }
@@ -79,7 +77,7 @@ function onError(error) {
  * Event listener for HTTP server "listening" event.
  */
 function onListening() {
-    const addr = server.address();
+    const addr: any = server.address();
     const bind = typeof addr === 'string' ? 'pipe ' + addr : 'port ' + addr.port;
     debugServer('Listening on ' + bind);
     logger.info(`Server is running at http://localhost:${port}`);

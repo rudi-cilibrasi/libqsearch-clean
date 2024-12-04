@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    // defines the module system that TypeScript will use when transpiling your TypeScript code to JavaScript.
+    "module": "commonjs",
+    // version of output JavaScript
+    "target": "ES2020",
+    // controls how the compiler resolves modules when using import
+    "moduleResolution": "node",
+    "rootDir": "./",
+    "types": [
+      "jest"
+    ],
+    "allowJs": true,
+    "outDir": "dist",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "exclude": ["node_modules"]
+}

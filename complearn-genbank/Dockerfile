@@ -10,5 +10,8 @@ RUN npm install
 # Copy source code
 COPY . .
 
+RUN if [ -d "./dist" ]; then rm -rf ./dist; fi && \
+    npx tsc # compile typescript to javascript
+
 EXPOSE 3001
-CMD ["node", "./bin/www"]
+CMD ["node", "./dist/bin/www.js"]

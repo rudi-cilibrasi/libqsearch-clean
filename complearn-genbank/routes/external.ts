@@ -1,7 +1,8 @@
 import express from "express";
 import axios from "axios";
-import ENV_LOADER from "../configurations/envLoader.js";
-import logger from "../configurations/logger.js";
+import ENV_LOADER from "../configurations/envLoader";
+import logger from "../configurations/logger";
+import { Request, Response } from "express";
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ function getNextApiKey() {
     return apiKey;
 }
 
-router.post("/forward", async (req, res) => {
+router.post("/forward", async (req: Request, res: Response): Promise<any> => {
     const { externalUrl = "", method = "GET", body = null, responseType = "json", responseHeaders = {} } = req.body;
 
     if (!externalUrl) {
@@ -45,7 +46,7 @@ router.post("/forward", async (req, res) => {
         let nextApiKey = userApiKey ? userApiKey : `api_key${encodeURIComponent(getNextApiKey())}`;
         const finalUrl = `${parsedUrl.origin}${parsedUrl.pathname}?${queryString}&${nextApiKey}`
 
-        Object.entries(responseHeaders).forEach(([key, value]) => {
+        Object.entries(responseHeaders).forEach(([key, value]: [any, any]) => {
             res.setHeader(key, value);
         });
 
@@ -67,7 +68,7 @@ router.post("/forward", async (req, res) => {
 
     } catch (error) {
         logger.error('Error forwarding request:', error);
-        res.status(500).send({ error: 'Failed to forward request', details: error.message });
+        res.status(500).send({ error: 'Failed to forward request', details: (error as Error).message });
     }
 
 });
