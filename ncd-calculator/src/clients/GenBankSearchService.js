@@ -5,6 +5,7 @@ import {RedisStorageCache} from "../cache/RedisStorageCache.js";
 import {GenBankQueries} from "./GenBankQueries.js";
 import {sendRequestToProxy} from "../functions/fetchProxy.js";
 import {LocalStorageKeys} from "../cache/LocalStorageKeyManager.js";
+import {animalGroups} from "../constants/taxonomy.js";
 
 export class GenBankSearchService {
     TAXONOMIC_MAPPING = {
@@ -136,115 +137,117 @@ export class GenBankSearchService {
     };
 
 
-    animalGroups = {
-        // Canids
+    animalgroups = {
+        // canids
         'fox': {
-            genus: 'Vulpes',
-            family: 'Canidae',
-            taxId: '9627',
-            group: 'MAMMAL',
+            genus: 'vulpes',
+            family: 'canidae',
+            taxid: '9627',
+            group: 'mammal',
             includes: ['red fox', 'arctic fox', 'fennec fox']
         },
         'wolf': {
-            genus: 'Canis',
-            family: 'Canidae',
-            taxId: '9612',
-            group: 'MAMMAL',
+            genus: 'canis',
+            family: 'canidae',
+            taxid: '9612',
+            group: 'mammal',
             includes: ['gray wolf', 'timber wolf']
         },
         'coyote': {
-            genus: 'Canis',
-            family: 'Canidae',
-            taxId: '9614',
-            group: 'MAMMAL'
+            genus: 'canis',
+            family: 'canidae',
+            taxid: '9614',
+            group: 'mammal'
         },
 
-        // Felids
+        // felids
         'lion': {
-            genus: 'Panthera',
-            family: 'Felidae',
-            taxId: '9689',
-            group: 'MAMMAL'
+            genus: 'panthera',
+            family: 'felidae',
+            taxid: '9689',
+            group: 'mammal'
         },
         'tiger': {
-            genus: 'Panthera',
-            family: 'Felidae',
-            taxId: '9694',
-            group: 'MAMMAL',
+            genus: 'panthera',
+            family: 'felidae',
+            taxid: '9694',
+            group: 'mammal',
             includes: ['bengal tiger', 'siberian tiger']
         },
         'leopard': {
-            genus: 'Panthera',
-            family: 'Felidae',
-            taxId: '9691',
-            group: 'MAMMAL'
+            genus: 'panthera',
+            family: 'felidae',
+            taxid: '9691',
+            group: 'mammal'
         },
 
-        // Reptiles
+        // reptiles
         'crocodile': {
-            genus: 'Crocodylus',
-            family: 'Crocodylidae',
-            taxId: '8496',
-            group: 'REPTILE',
-            includes: ['nile crocodile', 'saltwater crocodile']
+            genus: 'crocodylus',
+            family: 'crocodylidae',
+            taxid: '8496',
+            group: 'reptile',
+            includes: ['nile crocodile', 'saltwater crocodile'],
+            searchTerms: ['species', 'population', 'isolate', 'subspecies']
         },
         'alligator': {
-            genus: 'Alligator',
-            family: 'Alligatoridae',
-            taxId: '8496',
-            group: 'REPTILE',
-            includes: ['american alligator', 'chinese alligator']
+            genus: 'alligator',
+            family: 'alligatoridae',
+            taxid: '8496',
+            group: 'reptile',
+            includes: ['american alligator', 'chinese alligator'],
+            searchTerms: ['species', 'population', 'isolate', 'subspecies']
         },
         'python': {
-            genus: 'Python',
-            family: 'Pythonidae',
-            taxId: '8777',
-            group: 'REPTILE'
+            genus: 'python',
+            family: 'pythonidae',
+            taxid: '8777',
+            group: 'reptile'
         },
 
-        // Marine Mammals
+        // marine mammals
         'dolphin': {
-            genus: 'Tursiops',
-            family: 'Delphinidae',
-            taxId: '9739',
-            group: 'MAMMAL',
+            genus: 'tursiops',
+            family: 'delphinidae',
+            taxid: '9739',
+            group: 'mammal',
             includes: ['bottlenose dolphin']
         },
         'whale': {
-            genus: 'Balaenoptera',
-            family: 'Balaenopteridae',
-            taxId: '9771',
-            group: 'MAMMAL',
+            genus: 'balaenoptera',
+            family: 'balaenopteridae',
+            taxid: '9771',
+            group: 'mammal',
             includes: ['blue whale', 'humpback whale']
         },
 
-        // Bears
+        // bears
         'bear': {
-            genus: 'Ursus',
-            family: 'Ursidae',
-            taxId: '9632',
-            group: 'MAMMAL',
+            genus: 'ursus',
+            family: 'ursidae',
+            taxid: '9632',
+            group: 'mammal',
             includes: ['brown bear', 'black bear', 'polar bear']
         },
 
-        // Primates
+        // primates
         'gorilla': {
-            genus: 'Gorilla',
-            family: 'Hominidae',
-            taxId: '9593',
-            group: 'MAMMAL'
+            genus: 'gorilla',
+            family: 'hominidae',
+            taxid: '9593',
+            group: 'mammal'
         },
         'chimpanzee': {
-            genus: 'Pan',
-            family: 'Hominidae',
-            taxId: '9598',
-            group: 'MAMMAL'
+            genus: 'pan',
+            family: 'hominidae',
+            taxid: '9598',
+            group: 'mammal'
         },
         'orangutan': {
-            genus: 'Pongo',
-            family: 'Hominidae',
-            taxId: '9600',
-            group: 'MAMMAL'
+            genus: 'pongo',
+            family: 'hominidae',
+            taxid: '9600',
+            group: 'mammal'
         }
     };
 
@@ -413,11 +416,25 @@ export class GenBankSearchService {
         this.CACHE_TTL = 30 * 60 * 1000;
     }
 
-
-    async getSuggestions(searchTerm, page = 1) {
+    /**
+     * The basic steps here are as follows:
+     * - First, check in the cache whether the search term has valid suggestions, if there are, then return
+     * - At the same time, if there are still suggestions available for the search term on Genbank, then fetching them in the background.
+     * and add them back to the cache.
+     * - If the desired page the the search term is not available, then starting fetching on Genbank and then populate all cache layers.
+     * - We first detect the taxonomic group of the search term, and then finding the summary of relevant animals.
+     *
+     * - We have a global last page for each search term,
+     *   the value for the global last page could possibly be incremented by a successful suggestions fetching from the FE
+     * - On the FE, each term has a local last page and will be increased by 1 every time a valid search term is entered again,
+     *   and this valid is valid when it's <= global last page of this search term.
+     * - Once there is no more suggestion to fetch for a search term, the "complete marker" becomes true, at that time, there will be no more
+     *   network route trips to Genbank anymore.
+     */
+    async getSuggestions(searchTerm, page = 1, startIndex) {
         if (!searchTerm?.trim()) return [];
         try {
-            const cachedData = await this.getFromCacheHierarchy(searchTerm, page);
+            const cachedData = await this.getFromCacheHierarchy(searchTerm, page, startIndex);
             if (!cachedData || !cachedData.isComplete) {
                 Promise.resolve().then(() => {
                     this.triggerBackgroundTasks(searchTerm, page);
@@ -427,18 +444,18 @@ export class GenBankSearchService {
                 return cachedData;
             }
             // if no cache hit, fetch initial data
-            return await this.fetchData(searchTerm, page);
+            return await this.fetchData(searchTerm, page, startIndex);
         } catch (error) {
             console.error('Error in getSuggestions:', error);
             return { suggestions: [], metadata: { error: error.message } };
         }
     }
 
-    async getFromCacheHierarchy(searchTerm, page) {
+    async getFromCacheHierarchy(searchTerm, page, startIndex) {
         // Check memory cache
         const memCache = await this.memoryCache.getCacheEntry(LocalStorageKeys.SUGGESTIONS(), searchTerm);
-        if (memCache && this.hasPageData(memCache, page)) {
-            const result = this.paginateResults(memCache, page);
+        if (memCache && this.hasPageData(memCache, startIndex)) {
+            const result = this.paginateResults(memCache, page, startIndex);
             if (result.suggestions.length > 0) {
                 return result;
             }
@@ -446,9 +463,9 @@ export class GenBankSearchService {
 
         // Check localStorage
         const localCache = await this.localStorageCache.getCacheEntry(LocalStorageKeys.SUGGESTIONS(), searchTerm);
-        if (localCache && this.hasPageData(localCache, page)) {
+        if (localCache && this.hasPageData(localCache, startIndex)) {
             await this.memoryCache.setCacheEntry(LocalStorageKeys.SUGGESTIONS(), searchTerm, localCache);
-            const result = this.paginateResults(localCache, page);
+            const result = this.paginateResults(localCache, page, startIndex);
             if (result.suggestions.length > 0) {
                 return result;
             }
@@ -456,9 +473,9 @@ export class GenBankSearchService {
 
         // Check Redis
         const redisCache = await this.redisCache.getCacheEntry(LocalStorageKeys.SUGGESTIONS(), searchTerm);
-        if (redisCache && this.hasPageData(redisCache, page)) {
+        if (redisCache && this.hasPageData(redisCache, startIndex)) {
             await this.distributeToCaches(searchTerm, redisCache);
-            const result = this.paginateResults(redisCache, page);
+            const result = this.paginateResults(redisCache, page, startIndex);
             if (result.suggestions.length > 0) {
                 return result;
             }
@@ -492,7 +509,7 @@ export class GenBankSearchService {
         await this.redisCache.setCacheEntry(LocalStorageKeys.SUGGESTIONS(), searchTerm, updatedCache);
     }
 
-    async checkAndFetchNewData(searchTerm, currentPage) {
+    async checkAndFetchNewData(searchTerm) {
         const shouldFetch = await this.shouldFetchMoreData(searchTerm);
         if (!shouldFetch) return;
         const redisCache = await this.redisCache.getCacheEntry(LocalStorageKeys.SUGGESTIONS(), searchTerm);
@@ -500,6 +517,7 @@ export class GenBankSearchService {
         const nextPage = (redisCache.globalLastPage || 0) + 1;
         try {
             const variantResponse = await this.getVariantsResponse(
+                searchTerm,
                 redisCache.taxId,
                 redisCache.taxonomicGroup,
                 nextPage
@@ -553,17 +571,26 @@ export class GenBankSearchService {
 
 
     mergeSuggestions(existingSuggestions, newSuggestions) {
-        const seenIds = new Set(existingSuggestions.map(s => s.id));
-        const uniqueNewSuggestions = newSuggestions.filter(s => !seenIds.has(s.id));
+        const seenSuggestions = new Map();
+        for(let i = 0; i < existingSuggestions.length; i++) {
+            seenSuggestions.set(existingSuggestions[i].id, existingSuggestions[i]);
+        }
+        const equalAny = (name, names) => {
+            for(let i = 0; i < names.length; i++) {
+                if (names[i] === name) return true;
+            }
+            return false;
+        }
+        const uniqueNewSuggestions = newSuggestions.filter(s => !seenSuggestions.has(s.id) && !equalAny(s.primaryCommonName, Array.from(seenSuggestions.values()).map(v => v.primaryCommonName)));
         return [...existingSuggestions, ...uniqueNewSuggestions];
     }
 
-    async fetchData(searchTerm, page) {
+    async fetchData(searchTerm, page, startIndex) {
         try {
             const data = await this.fetchAndMergeSuggestions(searchTerm, page);
             if (data) {
                 await this.distributeToCaches(searchTerm, data);
-                return this.paginateResults(data, page);
+                return this.paginateResults(data, page, startIndex);
             }
             return { suggestions: [], metadata: { error: 'No data found' } };
         } catch (error) {
@@ -606,10 +633,10 @@ export class GenBankSearchService {
         ]);
     }
 
-    paginateResults(cacheEntry, page) {
+    paginateResults(cacheEntry, page, startIndex) {
         const { pageSize = this.genBankQueries.DEFAULT_PAGE_SIZE } = cacheEntry;
-        const start = (page - 1) * pageSize;
-        const end = start + pageSize;
+        const start = startIndex;
+        const end = Math.min(start + pageSize, cacheEntry.suggestions.length);
 
         return {
             suggestions: cacheEntry.suggestions.slice(start, end),
@@ -659,7 +686,7 @@ export class GenBankSearchService {
             // Step 2: If no direct match, try enhanced search
             if (!taxonomicInfo.taxId) {
                 // Try specific animal match
-                const animalMatch = this.animalGroups[searchTerm.toLowerCase()];
+                const animalMatch = animalGroups[searchTerm.toLowerCase()];
                 if (animalMatch) {
                     taxonomicInfo = {
                         taxId: animalMatch.taxId,
@@ -687,6 +714,7 @@ export class GenBankSearchService {
 
             // Step 3: Get variants using the best available taxonomy info
             const variantResponse = await this.getVariantsResponse(
+                searchTerm,
                 taxonomicInfo.taxId,
                 taxonomicInfo.taxonomicGroup,
                 nextPage
@@ -719,57 +747,46 @@ export class GenBankSearchService {
         }
     }
 
-    async getVariantsResponse(taxId, taxonomicGroup, nextPage) {
-        // If no valid taxonomy info, return empty response
+
+    async getVariantsResponse(searchTerm, taxId, taxonomicGroup, nextPage) {
         if (!taxId || !taxonomicGroup) {
-            return {
-                result: [],
-                count: 0,
-                retmax: 0,
-                retstart: 0,
-                isComplete: true
-            };
+            return this.createEmptyVariantResponse();
         }
-
         try {
-            const taxonomyUri = this.genBankQueries.buildVariantFetchUri(taxId, taxonomicGroup, nextPage);
+            const animalVariantsUri = this.genBankQueries.buildVariantFetchUri(searchTerm, taxId, taxonomicGroup, nextPage);
             const response = await sendRequestToProxy({
-                externalUrl: taxonomyUri
-            });
-
-            if (!response.esearchresult?.idlist?.length) {
+                externalUrl: animalVariantsUri
+            })
+            if (response.esearchresult?.idlist?.length > 0) {
+                const summaryUri = this.genBankQueries.buildSequenceSummaryUri(response.esearchresult.idlist);
+                const summaryResponse = await sendRequestToProxy({externalUrl: summaryUri});
                 return {
-                    result: [],
-                    count: parseInt(response.esearchresult?.count || '0'),
-                    retmax: parseInt(response.esearchresult?.retmax || '0'),
-                    retstart: parseInt(response.esearchresult?.retstart || '0'),
-                    isComplete: true
+                    ...summaryResponse,
+                    count: parseInt(response.esearchresult.count),
+                    retmax: parseInt(response.esearchresult.retmax),
+                    retstart: parseInt(response.esearchresult.retstart),
+                    isComplete: (parseInt(response.esearchresult.retstart) + response.esearchresult.idlist.length) >= parseInt(response.esearchresult.count),
+                    queryTranslation: response.esearchresult.querytranslation,
                 };
             }
-
-            const summaryUri = this.genBankQueries.buildSequenceSummaryUri(response.esearchresult.idlist);
-            const summaryResponse = await sendRequestToProxy({externalUrl: summaryUri});
-
-            return {
-                ...summaryResponse,
-                count: parseInt(response.esearchresult.count),
-                retmax: parseInt(response.esearchresult.retmax),
-                retstart: parseInt(response.esearchresult.retstart),
-                isComplete: (parseInt(response.esearchresult.retstart) + response.esearchresult.idlist.length) >= parseInt(response.esearchresult.count),
-                queryTranslation: response.esearchresult.querytranslation
-            };
+            return this.createEmptyVariantResponse();
 
         } catch (error) {
             console.error('Error in getVariantsResponse:', error);
-            return {
-                result: [],
-                count: 0,
-                retmax: 0,
-                retstart: 0,
-                isComplete: true,
-                error: error.message
-            };
+            return this.createEmptyVariantResponse(error.message);
         }
+    }
+
+
+    createEmptyVariantResponse(error = null) {
+        return {
+            result: [],
+            count: 0,
+            retmax: 0,
+            retstart: 0,
+            isComplete: true,
+            error: error
+        };
     }
 
     async getTaxonomicGroupInfo(searchTerm, page) {
@@ -778,34 +795,53 @@ export class GenBankSearchService {
 
             // 1. Check memory cache
             const cached = this.getCachedResult(searchTerm);
-
             if (cached) return cached;
 
-            // 2. Check exact matches in TAXONOMIC_MAPPING
+            // 2. Check specific animal groups first (most specific match)
+            const animalMatch = animalGroups[searchTerm];
+            if (animalMatch) {
+                return this.cacheAndReturn(searchTerm, {
+                    taxId: animalMatch.taxId,
+                    taxonomicGroup: this.TAXONOMIC_BASE_GROUPS[animalMatch.group].searchTerms,
+                    scientificName: animalMatch.genus,
+                    group: animalMatch.group,
+                    family: animalMatch.family,
+                    isSpecificMatch: true
+                });
+            }
+
+            // 3. Check group patterns for specific families
+            for (const pattern of this.groupPatterns) {
+                if (pattern.pattern.test(searchTerm)) {
+                    return this.cacheAndReturn(searchTerm, {
+                        taxId: pattern.taxId,
+                        taxonomicGroup: this.TAXONOMIC_BASE_GROUPS[pattern.group].searchTerms,
+                        group: pattern.group,
+                        family: pattern.family,
+                        isPatternMatch: true
+                    });
+                }
+            }
+
+            // 4. Check exact matches in TAXONOMIC_MAPPING
             const exactMatch = this.findExactMatch(searchTerm);
             if (exactMatch) return this.cacheAndReturn(searchTerm, exactMatch);
 
-            // 3. Check common names
+            // 5. Check common names
             const commonNameMatch = this.findCommonNameMatch(searchTerm);
             if (commonNameMatch) return this.cacheAndReturn(searchTerm, commonNameMatch);
 
-            // 4. Check general group names
+            // 6. Check general group names (least specific match)
             const groupMatch = this.findGroupMatch(searchTerm);
             if (groupMatch) return this.cacheAndReturn(searchTerm, groupMatch);
 
-            // 5. Try taxonomy APIs if no matches found
-            const [directTaxId, variantTaxId] = await Promise.all([
-                this.findTaxonomyId(searchTerm),
-                this.findTaxonomyIdFromVariant(searchTerm)
-            ]);
-
-            const taxId = directTaxId || variantTaxId;
+            // 7. Try comprehensive taxonomy search
+            const taxId = await this.findTaxonomyId(searchTerm);
             if (taxId) {
                 const taxonomyMatch = this.findTaxonomyMatch(taxId);
                 if (taxonomyMatch) return this.cacheAndReturn(searchTerm, taxonomyMatch);
             }
 
-            // 6. Fallback to VERTEBRATE group if no match found
             return this.createEmptyResult(page);
 
         } catch (error) {
@@ -813,6 +849,50 @@ export class GenBankSearchService {
             return this.createEmptyResult(page);
         }
     }
+
+
+    async findTaxonomyId(searchTerm) {
+        try {
+            // Run all search strategies in parallel
+            const [taxonomyResult, breedResult] = await Promise.all([
+                this.searchTaxonomyDirect(searchTerm),
+                this.searchVariantBreeds(searchTerm),
+            ]);
+
+            return this.getBestTaxIdMatch({
+                taxonomyMatch: taxonomyResult,
+                breedMatch: breedResult,
+                searchTerm
+            });
+        } catch (error) {
+            console.error('Error in findTaxonomyId:', error);
+            return null;
+        }
+    }
+
+    async searchVariantBreeds(searchTerm) {
+        const uri = this.genBankQueries.buildAdvancedVariantSearchUri(searchTerm);
+        const response = await sendRequestToProxy({externalUrl: uri});
+
+        if (!response.esearchresult?.idlist?.length) return null;
+
+        const summaryUri = this.genBankQueries.buildSequenceSummaryUri(response.esearchresult.idlist);
+        const summaryResponse = await sendRequestToProxy({externalUrl: summaryUri});
+
+        return summaryResponse.result;
+    }
+
+    getBestTaxIdFromOrganism(results, searchTerm) {
+        searchTerm = searchTerm.toLowerCase();
+        for (const result of results) {
+            const organism = (result.organism || '').toLowerCase();
+            if (organism.includes(searchTerm)) {
+                return result.taxid;
+            }
+        }
+        return null;
+    }
+
 
     findExactMatch(searchTerm) {
         const exactMatch = Object.entries(this.TAXONOMIC_MAPPING)
@@ -877,33 +957,6 @@ export class GenBankSearchService {
     }
 
 
-    findTaxonomyMatch(taxId) {
-        for (const [scientific, data] of Object.entries(this.TAXONOMIC_MAPPING)) {
-            if (data.id === taxId) {
-                return {
-                    taxId: data.id,
-                    taxonomicGroup: this.TAXONOMIC_MAPPING[data.group].searchTerms,
-                    scientificName: scientific,
-                    group: data.group,
-                    isTaxonomyMatch: true
-                };
-            }
-        }
-        for (const [group, data] of Object.entries(this.TAXONOMIC_MAPPING)) {
-            if (this.isTaxIdInGroup(taxId, data.id)) {
-                return {
-                    taxId: taxId,
-                    taxonomicGroup: data.searchTerms,
-                    group: group,
-                    isTaxonomyMatch: true,
-                    isGroupLevel: true
-                };
-            }
-        }
-
-        return null;
-    }
-
     isTaxIdInGroup(speciesTaxId, groupTaxId) {
         speciesTaxId = speciesTaxId.toString();
         groupTaxId = groupTaxId.toString();
@@ -925,26 +978,103 @@ export class GenBankSearchService {
     }
 
 
-
-    async findTaxonomyId(searchTerm) {
+    async searchTaxonomyDirect(searchTerm) {
         const uri = this.genBankQueries.buildTaxonomySearchUri(searchTerm);
         const response = await sendRequestToProxy({ externalUrl: uri });
-        if (response.esearchresult.count !== "0") {
-            return response.esearchresult.idlist[0];
+
+        if (response.esearchresult?.count !== "0") {
+            const summaryUri = this.genBankQueries.buildTaxonomicSummaryUri(response.esearchresult.idlist[0]);
+            const summaryResponse = await sendRequestToProxy({externalUrl: summaryUri});
+            return summaryResponse.result;
         }
         return null;
     }
 
-    async findTaxonomyIdFromVariant(searchTerm) {
-        const uri = this.genBankQueries.buildVariantSearchUri(searchTerm);
-        const response = await sendRequestToProxy({ externalUrl: uri });
+    getBestTaxIdMatch({taxonomyMatch, breedMatch, genomeMatch, searchTerm}) {
+        const matches = [];
 
-        if (!response.esearchresult.idlist.length) return null;
+        if (taxonomyMatch) {
+            const result = Object.values(taxonomyMatch)[0];
+            if (this.isRelevantTaxonomyMatch(result, searchTerm)) {
+                matches.push({taxId: result.taxid, score: 3, type: 'taxonomy'});
+            }
+        }
 
-        const summaryUri = this.genBankQueries.buildSequenceSummaryUri(response.esearchresult.idlist);
-        const summaryResponse = await sendRequestToProxy({ externalUrl: summaryUri });
+        if (breedMatch) {
+            const breedTaxId = this.getBestTaxIdFromBreedName(Object.values(breedMatch), searchTerm);
+            if (breedTaxId) matches.push({taxId: breedTaxId, score: 2, type: 'breed'});
+        }
 
-        return this.getBestTaxIdFromBreedName(Object.values(summaryResponse.result), searchTerm);
+        if (genomeMatch) {
+            const genomeTaxId = this.getBestTaxIdFromOrganism(Object.values(genomeMatch), searchTerm);
+            if (genomeTaxId) matches.push({taxId: genomeTaxId, score: 1, type: 'genome'});
+        }
+
+        const bestMatch = matches.sort((a, b) => b.score - a.score)[0];
+        return bestMatch?.taxId || null;
+    }
+
+    findTaxonomyMatch(taxId) {
+        // Check specific matches
+        for (const group of Object.values(animalGroups)) {
+            if (group.taxId === taxId) {
+                return {
+                    taxId: group.taxId,
+                    taxonomicGroup: this.TAXONOMIC_BASE_GROUPS[group.group].searchTerms,
+                    group: group.group,
+                    family: group.family,
+                    isSpecificMatch: true
+                };
+            }
+        }
+
+        for (const pattern of this.groupPatterns) {
+            if (pattern.taxId === taxId) {
+                return {
+                    taxId: pattern.taxId,
+                    taxonomicGroup: this.TAXONOMIC_BASE_GROUPS[pattern.group].searchTerms,
+                    group: pattern.group,
+                    family: pattern.family,
+                    isPatternMatch: true
+                };
+            }
+        }
+
+        return {
+            taxId: taxId,
+            taxonomicGroup: [],
+            group: "",
+            family: "",
+            isPatternMatch: false
+        }
+    }
+
+
+    isRelevantTaxonomyMatch(result, searchTerm) {
+        const searchTermLower = searchTerm.toLowerCase();
+        const scientificName = (result.scientificname || '').toLowerCase();
+        const commonName = (result.commonname || '').toLowerCase();
+
+        return scientificName.includes(searchTermLower) ||
+            commonName.includes(searchTermLower) ||
+            this.checkRelatedNames(searchTermLower);
+    }
+
+
+    checkRelatedNames(result, searchTerm) {
+        for (const group of Object.values(this.TAXONOMIC_MAPPING)) {
+            if (group.commonNames?.some(name => name.toLowerCase().includes(searchTerm))) {
+                return true;
+            }
+            if (group.generalCommonNames?.includes(searchTerm)) {
+                return true;
+            }
+        }
+        const animalGroup = animalGroups[searchTerm];
+        if (animalGroup) {
+            return true;
+        }
+        return this.groupPatterns.some(pattern => pattern.pattern.test(searchTerm));
     }
 
     processVariantResults(results, taxonomicGroup) {
@@ -1011,6 +1141,8 @@ export class GenBankSearchService {
             }
         }
 
+
+
         // 3. Check taxonomic group terms in title
         if (!variantName) {
             for (const term of taxonomicGroup) {
@@ -1027,7 +1159,16 @@ export class GenBankSearchService {
             }
         }
 
-        // 4. Check for population or geographic variants
+
+        // 4. use the organism as variant name if it's still null
+
+        if (!variantName || variantName === '' && organism.trim() !== '') {
+            variantName = organism;
+            variantType = 'species';
+            source = 'Scientific';
+        }
+
+        // 5. Check for population or geographic variants
         if (!variantName && subtype.includes('country')) {
             const countryIndex = subtype.indexOf('country');
             const locationName = subname[countryIndex];
@@ -1080,11 +1221,9 @@ export class GenBankSearchService {
         return /^[A-Z][a-zA-Z0-9\s-]+$/.test(name);
     }
 
-    hasPageData(result, page) {
-        const { pageSize = this.genBankQueries.DEFAULT_PAGE_SIZE } = result;
-        const startIndex = (page - 1) * pageSize;
-        return startIndex < result.suggestions.length ||
-            (result.isComplete && result.totalResults < startIndex + pageSize);
+    hasPageData(result, startIndex) {
+        const len = result.suggestions.length;
+        return startIndex < len;
     }
 
 
@@ -1217,32 +1356,6 @@ export class GenBankSearchService {
         });
     }
 
-
-    findTaxonomicInfo(searchTerm) {
-        searchTerm = searchTerm.toLowerCase().trim();
-
-        for (const [scientificName, data] of Object.entries(this.TAXONOMIC_MAPPING)) {
-            if (data.commonNames && data.commonNames.includes(searchTerm)) {
-                return {
-                    taxId: data.id,
-                    group: data.group,
-                    scientificName
-                };
-            }
-        }
-
-        for (const [group, data] of Object.entries(this.TAXONOMIC_MAPPING)) {
-            if (data.generalCommonNames && data.generalCommonNames.includes(searchTerm)) {
-                return {
-                    taxId: data.id,
-                    group: group,
-                    isGeneralMatch: true
-                };
-            }
-        }
-
-        return null;
-    }
 
 }
 

@@ -1,6 +1,6 @@
 import React, {useCallback, useState} from "react";
 import {getCleanSequence, getFastaInfoFromFile, hasMetadata, isFasta, parseMetadata} from "../functions/fasta.js";
-import {FILE_UPLOAD} from "./constants/modalConstants.js";
+import {FILE_UPLOAD} from "../constants/modalConstants.js";
 import {Info, Upload} from "lucide-react";
 import {getFile} from "../functions/file.js";
 

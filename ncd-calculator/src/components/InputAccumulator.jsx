@@ -1,5 +1,5 @@
 import {Dna, FileType2, Globe2, X} from 'lucide-react';
-import {FASTA, LANGUAGE} from "./constants/modalConstants.js";
+import {FASTA, LANGUAGE} from "../constants/modalConstants.js";
 
 export const InputAccumulator = ({
                                      MIN_ITEMS = 4,
