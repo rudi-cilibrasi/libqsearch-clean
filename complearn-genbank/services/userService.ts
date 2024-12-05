@@ -1,17 +1,17 @@
-import logger from "../configurations/logger.js";
-import UserMut from "../models/userMut.js";
-import UserHist from "../models/userHist.js";
-import { sequelize } from "../configurations/databaseConnection.js";
+import logger from "../configurations/logger";
+import {UserMut} from "../models/userMut";
+import {UserHist} from "../models/userHist";
+import { sequelize } from "../configurations/databaseConnection";
+import {Transaction} from "sequelize";
 
-async function upsertUser(profile) {
+async function upsertUser(profile: any) {
     const transaction = await sequelize.transaction();
     try {
         const newDate = "" + new Date();
         await upsertUserMut(profile, newDate, transaction);
-        const user = await insertUserHist(profile, newDate, transaction);
-
+        const user: UserHist = await insertUserHist(profile, newDate, transaction);
         await transaction.commit();
-        logger.info(`insertUserHist created with ID: ${user.id}`);
+        logger.info(`insertUserHist created with ID: ${user.user_login_id}`);
         return user;
     } catch (error) {
         await transaction.rollback();
@@ -19,8 +19,9 @@ async function upsertUser(profile) {
     }
 }
 
-async function upsertUserMut(profile, newDate = "" + new Date(), transaction) {
-    return await UserMut.upsert({
+async function upsertUserMut(profile: any, newDate = "" + new Date(), transaction: Transaction | undefined):
+        Promise<[UserMut, boolean | null]> {
+    const [user, created] = await UserMut.upsert({
         provider_name: profile.provider,
         user_login_id: profile.id,
         display_name: profile.displayName,
@@ -32,11 +33,12 @@ async function upsertUserMut(profile, newDate = "" + new Date(), transaction) {
         fields: ['provider_name', 'user_login_id', 'display_name', 'additional_info', 'updated_at'],
         transaction
     });
-
+    return [user, created];
 }
 
-async function insertUserHist(profile, newDate = "" + new Date(), transaction) {
-    const user = await UserHist.create({
+async function insertUserHist(profile: any, newDate = "" + new Date(), transaction: Transaction | undefined)
+        : Promise<UserHist> {
+    const user: UserHist = await UserHist.create({
         provider_name: profile.provider,
         user_login_id: profile.id,
         display_name: profile.displayName,
@@ -47,7 +49,7 @@ async function insertUserHist(profile, newDate = "" + new Date(), transaction) {
         transaction
     });
 
-    logger.info(`insertUserHist created with ID: ${user.id}`);
+    logger.info(`insertUserHist created with ID: ${user.user_login_id}`);
     return user;
 }
 

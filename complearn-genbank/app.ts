@@ -3,18 +3,18 @@ import passport from "passport";
 import cors from "cors";
 import session from "express-session";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { Strategy as GitHubStrategy } from "passport-github2";
-import ENV_LOADER from "./configurations/envLoader.js";
-import logger from "./configurations/logger.js";
+import { Strategy as GitHubStrategy, Profile } from "passport-github2";
+import ENV_LOADER from "./configurations/envLoader";
+import logger from "./configurations/logger";
 
 // routes
-import loginRoutes from "./routes/login.js";
-import externalRoutes from "./routes/external.js";
-import { upsertUser } from "./services/userService.js";
-import redisRoutes from "./routes/redis.js";
-import {requestLogger} from "./middleware/requestLogger.js";
+import loginRoutes from "./routes/login";
+import externalRoutes from "./routes/external";
+import { upsertUser } from "./services/userService";
+import redisRoutes from "./routes/redis";
+import {requestLogger} from "./middleware/requestLogger";
 
-const app = express();
+const app: express.Application = express();
 
 app.use(cors({ origin: ENV_LOADER.FRONTEND_BASE_URL, credentials: true }));
 
@@ -33,12 +33,13 @@ app.use(passport.session());
 app.use(express.json());
 app.use(requestLogger);
 
+type DoneCallback = (error: any, user?: any) => void;
 
 passport.use(new GitHubStrategy({
     clientID: ENV_LOADER.GITHUB_CLIENT_ID,
     clientSecret: ENV_LOADER.GITHUB_CLIENT_SECRET,
     callbackURL: `${ENV_LOADER.BASE_URL}/auth/github/callback`,
-}, async (accessToken, refreshToken, profile, done) => {
+}, async (accessToken: string, refreshToken: string, profile: Profile, done: DoneCallback) => {
     try {
         await upsertUser(profile);
         return done(null, profile);
@@ -52,7 +53,7 @@ passport.use(new GoogleStrategy({
     clientID: ENV_LOADER.GOOGLE_CLIENT_ID,
     clientSecret: ENV_LOADER.GOOGLE_CLIENT_SECRET,
     callbackURL: `${ENV_LOADER.BASE_URL}/auth/google/callback`,
-}, async (accessToken, refreshToken, profile, done) => {
+}, async (accessToken: string, refreshToken: string, profile: Profile, done: DoneCallback) => {
     try {
         await upsertUser(profile);
         return done(null, profile);
@@ -64,17 +65,17 @@ passport.use(new GoogleStrategy({
 
 // user = the profile object above strategy
 // After authentication is complete => serializeUser to store in the session, allowing the user to stay logged in
-passport.serializeUser((user, done) => done(null, user));
+passport.serializeUser((user: any, done) => done(null, user));
 
 // uses the stored session data from users' requests to fetch the full user object
-passport.deserializeUser((user, done) => done(null, user));
+passport.deserializeUser((user: any, done) => done(null, user));
 
 // mount routes with parent path
 app.use("/api/auth", loginRoutes(passport));
 app.use("/api/external", externalRoutes);
 app.use("/api/redis", redisRoutes);
 
-app.use((err, req, res, next) => {
+app.use((err: any, req: any, res: any, next: any) => {
     logger.error({
         requestId: req.requestId,
         level: 'error',
@@ -92,7 +93,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.use((req, res) => {
+app.use((req: any, res: any) => {
     res.status(404).json({
         message: "Page not found",
         requestId: req.requestId

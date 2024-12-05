@@ -1,10 +1,10 @@
-import logger from "../configurations/logger.js";
+import logger from "../configurations/logger";
 import crypto from 'crypto';
 
 const generateRequestId = () => {
     return 'req_' + crypto.randomBytes(4).toString('hex');
 }
-const sanitizeHeaders = (headers) => {
+const sanitizeHeaders = (headers: any) => {
     const sanitized = { ...headers };
     const sensitiveFields = ['authorization', 'cookie', 'password', 'token', 'api_key'];
     Object.entries(sanitized).forEach(([key, value]) => {
@@ -15,7 +15,7 @@ const sanitizeHeaders = (headers) => {
     return sanitized;
 };
 
-const sanitizeUrl = (url) => {
+const sanitizeUrl = (url: any) => {
     if (!url) return url;
     try {
         const urlObj = new URL(url);
@@ -30,7 +30,7 @@ const sanitizeUrl = (url) => {
     }
 };
 
-const handleResponseBody = (body, headers) => {
+const handleResponseBody = (body: any, headers: any) => {
     if (!body) return null;
     if (headers?.['content-type']?.includes('application/json')) {
         return typeof body === 'string' ? JSON.parse(body) : body;
@@ -40,11 +40,11 @@ const handleResponseBody = (body, headers) => {
     return body;
 };
 
-export const requestLogger = (req, res, next) => {
+export const requestLogger = (req: any, res: any, next: any) => {
     const requestId = generateRequestId();
     const startTime = process.hrtime();
 
-    const transaction = {
+    const transaction: any = {
         request: {
             timestamp: new Date().toISOString(),
             method: req.method,
@@ -60,22 +60,22 @@ export const requestLogger = (req, res, next) => {
     const originalJson = res.json;
     const originalEnd = res.end;
 
-    res.send = function(...args) {
+    res.send = function(...args: any[]) {
         completeTransaction(args[0]);
         return originalSend.call(this, ...args);
     };
 
-    res.json = function(...args) {
+    res.json = function(...args: any[]) {
         completeTransaction(args[0]);
         return originalJson.call(this, ...args);
     };
 
-    res.end = function(...args) {
+    res.end = function(...args: any[]) {
         completeTransaction(args[0]);
         return originalEnd.call(this, ...args);
     };
 
-    const completeTransaction = (body) => {
+    const completeTransaction = (body: any) => {
         if (transaction.response) return;
 
         const diff = process.hrtime(startTime);

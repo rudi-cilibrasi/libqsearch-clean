@@ -39,7 +39,7 @@ Register an oauth app for google: https://console.cloud.google.com/apis/credenti
     ├── .env
     ├── bin
     ├── routes            
-    ├── app.js   
+    ├── app.ts   
     ├── ......
 ```
 3. Create environment variables in .env file:

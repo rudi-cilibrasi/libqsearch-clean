@@ -1,6 +1,5 @@
 import 'dotenv/config'
-import path from "path";
-import logger from "./logger.js";
+import logger from "./logger";
 import {config} from "dotenv";
 
 const currentEnvironment = process.env.NODE_ENV;

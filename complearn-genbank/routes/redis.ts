@@ -1,10 +1,10 @@
-import redis from "redis";
+import { createClient } from "redis";
 import express from "express";
-import logger from "../configurations/logger.js";
-import ENV_LOADER from "../configurations/envLoader.js";
+import logger from "../configurations/logger";
+import ENV_LOADER from "../configurations/envLoader";
 
 const router = express.Router();
-const client = redis.createClient({
+const client = createClient({
     url: ENV_LOADER.REDIS_URL,
     password: ENV_LOADER.REDIS_PASSWORD
 });

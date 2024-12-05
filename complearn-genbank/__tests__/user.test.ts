@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
-import { upsertUserMut, insertUserHist, upsertUser } from "../services/userService.js";
-import UserMut from "../models/userMut.js";
-import UserHist from "../models/userHist.js";
-import { sequelize, syncSequelize } from "../configurations/databaseConnection.js";
+import {describe, it, expect, beforeAll, afterAll} from "@jest/globals";
+import {upsertUserMut, insertUserHist, upsertUser} from "../services/userService";
+import {UserMut} from "../models/userMut";
+import {UserHist} from "../models/userHist";
+import {sequelize, syncSequelize} from "../configurations/databaseConnection";
 
 beforeEach(async () => {
-    await sequelize.sync({ force: true }); // Drops and recreates tables
+    await sequelize.sync({ force: true });
 });
 
 afterAll(async () => {
@@ -21,7 +21,7 @@ describe('Test upsertUserMut function', () => {
             _json: {email: 'johndoe@example.com'},
         };
 
-        const result = await upsertUserMut(profile);
+        const result: [UserMut, boolean | null] = await upsertUserMut(profile, "" + new Date(), undefined);
 
         // Assert the returned result
         expect(result[0].provider_name).toBe('github');
@@ -35,7 +35,9 @@ describe('Test upsertUserMut function', () => {
         });
 
         expect(userMutRecord).not.toBeNull();
-        expect(userMutRecord.provider_name).toBe('github');
+        if (userMutRecord) {
+            expect(userMutRecord.provider_name).toBe('github');
+        }
     });
 
     it('should upsert a UserMut record successfully with utf-8', async () => {
@@ -46,7 +48,7 @@ describe('Test upsertUserMut function', () => {
             _json: {email: 'johndoe@example.com'},
         };
 
-        const result = await upsertUserMut(profile);
+        const result: [UserMut, boolean | null] = await upsertUserMut(profile, "" + new Date(), undefined);
 
         // Assert the returned result
         expect(result[0].provider_name).toBe('github');
@@ -60,8 +62,11 @@ describe('Test upsertUserMut function', () => {
         });
 
         expect(userMutRecord).not.toBeNull();
-        expect(userMutRecord.provider_name).toBe('github');
-        expect(userMutRecord.display_name).toBe('Hello, 世界 🌏');
+
+        if (userMutRecord) {
+            expect(userMutRecord.provider_name).toBe('github');
+            expect(userMutRecord.display_name).toBe('Hello, 世界 🌏');
+        }
     });
 
     it('should insert a UserHist record successfully', async () => {
@@ -72,7 +77,7 @@ describe('Test upsertUserMut function', () => {
             _json: {email: 'johndoe@example.com'},
         };
 
-        const result = await insertUserHist(profile);
+        const result = await insertUserHist(profile, "" + new Date(), undefined);
 
         // Assert the returned result
         expect(result.provider_name).toBe('github');
@@ -86,7 +91,10 @@ describe('Test upsertUserMut function', () => {
         });
 
         expect(userHistRecord).not.toBeNull();
-        expect(userHistRecord.provider_name).toBe('github');
+
+        if (userHistRecord) {
+            expect(userHistRecord.provider_name).toBe('github');
+        }
     });
 
     it('should insert new record with created_at and updated_at', async () => {
@@ -97,15 +105,20 @@ describe('Test upsertUserMut function', () => {
             displayName: 'John Doe',
             _json: {key: 'value'},
         };
-        await upsertUserMut(profile, newDate);
+        await upsertUserMut(profile, newDate, undefined);
 
-        const user = await UserMut.findOne({where: {user_login_id: '12345'}});
+        const user: UserMut | null = await UserMut.findOne({where: {user_login_id: '12345'}});
 
         expect(user).not.toBeNull();
-        expect(user.created_at).toEqual(newDate); // Ensure created_at is set
-        expect(user.updated_at).toEqual(newDate); // Ensure updated_at is set
 
-        const originalCreatedAt = (await UserMut.findOne({where: {user_login_id: '12345'}})).created_at;
+        if (user) {
+            expect(user.created_at).toEqual(newDate); // Ensure created_at is set
+            expect(user.updated_at).toEqual(newDate); // Ensure updated_at is set
+        }
+
+        const findUserAgain = await UserMut.findOne({where: {user_login_id: '12345'}});
+        expect(findUserAgain).not.toBeNull();
+
         const updatedDate = "" + new Date();
 
         let secondProfile = {
@@ -114,14 +127,21 @@ describe('Test upsertUserMut function', () => {
             displayName: 'John Doe Updated',
             _json: {key: 'new value'},
         };
-        await upsertUserMut(secondProfile, updatedDate);
+        await upsertUserMut(secondProfile, updatedDate, undefined);
 
         const userUpsertSecondTime = await UserMut.findOne({where: {user_login_id: '12345'}});
 
-        expect(userUpsertSecondTime.display_name).toBe('John Doe Updated');
-        expect(userUpsertSecondTime.additional_info).toEqual({key: 'new value'});
-        expect(userUpsertSecondTime.updated_at).toEqual(updatedDate); // Ensure updated_at is changed
-        expect(userUpsertSecondTime.created_at).toEqual(originalCreatedAt); // Ensure created_at is unchanged
+        expect(userUpsertSecondTime).not.toBeNull();
+
+        if (userUpsertSecondTime) {
+            expect(userUpsertSecondTime.display_name).toBe('John Doe Updated');
+            expect(userUpsertSecondTime.additional_info).toEqual({key: 'new value'});
+            expect(userUpsertSecondTime.updated_at).toEqual(updatedDate); // Ensure updated_at is changed
+
+            if (findUserAgain) {
+                expect(userUpsertSecondTime.created_at).toEqual(findUserAgain.created_at); // Ensure created_at is unchanged
+            }
+        }
 
     });
 
@@ -137,13 +157,20 @@ describe('Test upsertUserMut function', () => {
 
         // Verify if the user was inserted into UserMut table
         const userMut = await UserMut.findOne({where: {user_login_id: profile.id}});
+
         expect(userMut).not.toBeNull();
-        expect(userMut.provider_name).toBe(profile.provider);
+
+        if (userMut) {
+            expect(userMut.provider_name).toBe(profile.provider);
+        }
 
         // Verify if the user history was inserted into UserHist table
         const userHist = await UserHist.findOne({where: {user_login_id: profile.id}});
         expect(userHist).not.toBeNull();
-        expect(userHist.user_login_id).toBe(profile.id);
+
+        if (userHist) {
+            expect(userHist.user_login_id).toBe(profile.id);
+        }
     });
 
     it('should rollback transaction when there is an error in upsertUserMut', async () => {
