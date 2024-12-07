@@ -1,29 +1,16 @@
-import { CacheInterface } from "../cache/CacheInterface";
-import { MemoryCache } from "../cache/MemoryCache";
-import { LocalStorageCache } from "../cache/LocalStorageCache";
-import { RedisStorageCache } from "../cache/RedisStorageCache";
-import { GenBankQueries } from "./GenBankQueries";
-import { sendRequestToProxy } from "../functions/fetchProxy";
-import { LocalStorageKeys } from "../cache/LocalStorageKeyManager";
-import {
-  GROUP_PATTERNS,
-  GroupEntry,
-  TaxonomicGroupKey,
-} from "../constants/taxonomy.js";
-import {
-  TAXONOMIC_MAPPING,
-  TAXONOMIC_BASE_GROUPS,
-} from "../constants/taxonomy";
-import {
-  GenbankResult,
-  PaginatedResults,
-  PaginationMetadata,
-  Suggestion,
-  VariantResponse,
-} from "./genbank.js";
-import { TaxonomicInfo } from "./genbank";
-import { GenBankCacheEntry } from "./GenbankCacheEntry.js";
-import { ANIMAL_GROUPS } from "../constants/taxonomy";
+import {CacheInterface} from "../cache/CacheInterface";
+import {MemoryCache} from "../cache/MemoryCache";
+import {LocalStorageCache} from "../cache/LocalStorageCache";
+import {RedisStorageCache} from "../cache/RedisStorageCache";
+import {GenBankQueries} from "./GenBankQueries";
+import {sendRequestToProxy} from "../functions/fetchProxy";
+import {LocalStorageKeys} from "../cache/LocalStorageKeyManager";
+import {GROUP_PATTERNS, GroupEntry, TaxonomicGroupKey,} from "../constants/taxonomy.js";
+import {ANIMAL_GROUPS, TAXONOMIC_BASE_GROUPS, TAXONOMIC_MAPPING,} from "../constants/taxonomy";
+import {GenbankResult, PaginatedResults, PaginationMetadata, Suggestion, VariantResponse,} from "./genbank.js";
+import {TaxonomicInfo} from "./genbank";
+import {GenBankCacheEntry} from "./GenbankCacheEntry.js";
+
 
 export class GenBankSearchService {
   private readonly EMPTY_GENBANK_RESULT: GenbankResult = {
@@ -65,7 +52,7 @@ export class GenBankSearchService {
    * - First, check in the cache whether the search term has valid suggestions, if there are, then return
    * - At the same time, if there are still suggestions available for the search term on Genbank, then fetching them in the background.
    * and add them back to the cache.
-   * - If the desired page the the search term is not available, then starting fetching on Genbank and then populate all cache layers.
+   * - If the desired page the search term is not available, then starting fetching on Genbank and then populate all cache layers.
    * - We first detect the taxonomic group of the search term, and then finding the summary of relevant animals.
    *
    * - We have a global last page for each search term,
@@ -78,7 +65,8 @@ export class GenBankSearchService {
   async getSuggestions(
     searchTerm: string,
     page: number = 1,
-    startIndex: number
+    startIndex: number,
+    displayMode: 'commonName' | 'scientificName' | 'accession' = 'commonName'
   ): Promise<PaginatedResults> {
     if (!searchTerm?.trim())
       return {
@@ -97,15 +85,44 @@ export class GenBankSearchService {
         });
       }
       if (cachedData) {
-        return cachedData;
+        const sortedSuggestions: Suggestion[] = this.sortSuggestionsByDisplayMode(cachedData.suggestions, displayMode, searchTerm);
+        return {
+          ...cachedData,
+          suggestions: sortedSuggestions
+        }
       }
-      return await this.fetchData(searchTerm, page, startIndex);
+      const data: GenBankCacheEntry = await this.fetchData(searchTerm, page, startIndex);
+      await this.distributeToCaches(searchTerm, data);
+      const paginatedResult: PaginatedResults = this.paginateResults(data, page, startIndex);
+      const sortedSuggestions = this.sortSuggestionsByDisplayMode(paginatedResult.suggestions, displayMode, searchTerm);
+      return {
+        ...paginatedResult,
+        suggestions: sortedSuggestions
+      }
     } catch (error) {
       console.error("Error in getSuggestions:", error);
       return {
         suggestions: [],
       } as PaginatedResults;
     }
+  }
+
+
+  private sortSuggestionsByDisplayMode(suggestions: Suggestion[], displayMode: 'commonName' | 'scientificName' | 'accession', searchTerm: string): any {
+    const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+    return [...suggestions].sort((a: Suggestion, b: Suggestion): Suggestion[] => {
+      const aField = displayMode == 'commonName' ? a.primaryCommonName : displayMode == 'scientificName' ? a.scientificName : a.id;
+      const bField = displayMode == 'commonName' ? b.primaryCommonName : displayMode == 'scientificName' ? b.scientificName : b.id;
+      const aExact = aField.toLowerCase() === normalizedSearchTerm;
+      const bExact = bField.toLowerCase() === normalizedSearchTerm;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      const aStartWith = aField.toLowerCase().startsWith(normalizedSearchTerm);
+      const bStartWith = bField.toLowerCase().startsWith(normalizedSearchTerm);
+      if (aStartWith && !bStartWith) return -1;
+      if (!aStartWith && bStartWith) return 1;
+      return aField.localeCompare(bField);
+    });
   }
 
   private async getFromCacheHierarchy(
@@ -295,12 +312,11 @@ export class GenBankSearchService {
     searchTerm: string,
     page: number,
     startIndex: number
-  ): Promise<PaginatedResults> {
+  ): Promise<GenBankCacheEntry> {
     try {
       const data = await this.fetchAndMergeSuggestions(searchTerm, page);
       if (data) {
-        await this.distributeToCaches(searchTerm, data);
-        return this.paginateResults(data, page, startIndex);
+        return data;
       }
       return { suggestions: [] };
     } catch (error) {
@@ -660,16 +676,6 @@ export class GenBankSearchService {
     return summaryResponse.result;
   }
 
-  getBestTaxIdFromOrganism(results: any, searchTerm: string) {
-    searchTerm = searchTerm.toLowerCase();
-    for (const result of results) {
-      const organism = (result.organism || "").toLowerCase();
-      if (organism.includes(searchTerm)) {
-        return result.taxid;
-      }
-    }
-    return null;
-  }
 
   findExactMatch(searchTerm: string) {
     const exactMatch = Object.entries(TAXONOMIC_MAPPING).find(
@@ -745,17 +751,6 @@ export class GenBankSearchService {
     return result;
   }
 
-  isTaxIdInGroup(speciesTaxId: string, groupTaxId: string) {
-    speciesTaxId = speciesTaxId.toString();
-    groupTaxId = groupTaxId.toString();
-
-    // Direct match
-    if (speciesTaxId === groupTaxId) return true;
-
-    // Check if the species taxId falls under the group's taxonomy hierarchy
-    return speciesTaxId.startsWith(groupTaxId.slice(0, 2));
-  }
-
   createEmptyResult(): TaxonomicInfo {
     return {
       taxId: null,
@@ -785,12 +780,19 @@ export class GenBankSearchService {
     { taxonomyMatch, breedMatch }: { taxonomyMatch: any; breedMatch: any },
     searchTerm: string
   ) {
-    const matches = [];
+    const matches: Array<{
+      taxId: string;
+      score: number;
+      type: string;
+      isScientific: boolean;
+    }> = [];
 
+
+    const isScientificSearch = this.looksLikeScientificName(searchTerm);
     if (taxonomyMatch) {
       const result: any = Object.values(taxonomyMatch)[0];
       if (this.isRelevantTaxonomyMatch(result, searchTerm)) {
-        matches.push({ taxId: result?.taxid, score: 3, type: "taxonomy" });
+        matches.push({taxId: result?.taxid, score: 3, type: "taxonomy", isScientific: true});
       }
     }
 
@@ -800,10 +802,15 @@ export class GenBankSearchService {
         searchTerm
       );
       if (breedTaxId)
-        matches.push({ taxId: breedTaxId, score: 2, type: "breed" });
+        matches.push({taxId: breedTaxId, score: 2, type: "breed", isScientific: false});
     }
 
-    const bestMatch = matches.sort((a, b) => b.score - a.score)[0];
+    const bestMatch = matches.sort((a, b) => {
+      if (isScientificSearch && a.isScientific !== b.isScientific) {
+        return a.isScientific ? -1 : 1;
+      }
+      return b.score - a.score;
+    })[0];
     return bestMatch?.taxId || null;
   }
 
@@ -1179,5 +1186,15 @@ export class GenBankSearchService {
     ]).catch((error) => {
       console.error("Error updating local validation caches:", error);
     });
+  }
+
+  private looksLikeScientificName(searchTerm: string): boolean {
+    const normalizedTerm = searchTerm.trim();
+    // Check for typical scientific name patterns
+    const hasLatinFormat = /^[A-Z][a-z]+ [a-z]+/.test(normalizedTerm);
+    const wordCount = normalizedTerm.split(/\s+/).length;
+    const hasSpecialChars = /[0-9!@#$%^&*(),.?":{}|<>]/.test(normalizedTerm);
+
+    return hasLatinFormat && wordCount >= 2 && !hasSpecialChars;
   }
 }

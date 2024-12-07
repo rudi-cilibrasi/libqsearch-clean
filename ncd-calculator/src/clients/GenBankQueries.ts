@@ -41,7 +41,7 @@ export class GenBankQueries {
   }
 
   buildAdvancedVariantSearchUri(
-    searchTerm: any,
+    searchTerm: string,
     page = 1,
     pageSize = this.DEFAULT_PAGE_SIZE
   ) {

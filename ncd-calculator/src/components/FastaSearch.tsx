@@ -1,13 +1,14 @@
 import React, {useCallback, useState} from "react";
 import {getCleanSequence, isFasta} from "../functions/fasta.js";
 import {FileInfo, getFile} from "../functions/file.js";
-import {Eye, EyeOff} from "lucide-react";
+import {Database, FileText, PawPrint} from "lucide-react";
 import {SearchInput} from "./SearchInput.jsx";
 import {FASTA} from "../constants/modalConstants.js";
 import {FastaSearchSuggestion} from "./FastaSearchSuggestion.jsx";
 import {GenBankSearchService} from "../clients/GenBankSearchService.js";
 import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.js";
 import {SelectedItem} from "./InputAccumulator";
+import AutoLabelingToggle from "@/components/AutoLabelingToggle.tsx";
 
 interface FastaSearchProps {
   addItem(item: SelectedItem | any): void;
@@ -17,6 +18,13 @@ interface FastaSearchProps {
   getAllFastaSuggestionWithLastIndex(): void;
   getFastaSuggestionStartIndex(): void;
   setFastaSuggestionStartIndex(index: number): void;
+}
+
+interface ProjectionOption {
+  name: string;
+  label: string;
+  selected: boolean;
+  icon: any;
 }
 export const FastaSearch: React.FC<FastaSearchProps> = ({
   addItem,
@@ -30,15 +38,32 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
   const [apiKey, setApiKey] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [projections, setProjections] = useState({
-    Accession: true,
-    ScientificName: false,
-    FileName: false,
-    CommonName: true,
-  });
+  const [projections, setProjections] = useState<ProjectionOption[]>([
+    {
+      name: 'commonName',
+      label: 'Common Name',
+      icon: PawPrint,  // Add icons for each option
+      selected: true
+    },
+    {
+      name: 'scientificName',
+      label: 'Scientific Name',
+      icon: FileText,
+      selected: false
+    },
+    {
+      name: 'accession',
+      label: 'Accession ID',
+      icon: Database,
+      selected: false
+    },
+  ]);
   const [searchError, setSearchError] = useState(null);
   const genbankSearchService = new GenBankSearchService();
   const localStorageKeyManager = new LocalStorageKeyManager();
+  const [autoLabelingEnabled, setAutoLabelingEnabled] = useState(true);
+
+
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -115,15 +140,18 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     onSetApiKey(key);
   };
 
-  const toggleProjection = (key) => {
-    // Prevent toggling for locked fields (e.g., Accession)
-    if (key === "Accession") return;
-
-    setProjections((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  const toggleProjection = (selectedKey: string) => {
+    setProjections(prev => {
+      if (prev.find(p => p.name === selectedKey)?.selected) {
+        return prev;
+      }
+      return prev.map(projection => ({
+        ...projection,
+        selected: projection.name === selectedKey
+      }));
+    });
   };
+
 
   const handleSuggestionSelect = (suggestion) => {
     handleSearchTerm(suggestion.primaryCommonName);
@@ -144,6 +172,15 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     });
   };
 
+  const getSelectedDisplayMode = (): string => {
+    const selected: ProjectionOption[] = projections.filter((p) => p.selected);
+    if (selected.length === 0) return "accession";
+    return selected[0].name;
+  }
+
+
+
+
   return (
     <div className="p-4 h-full flex flex-col">
       {/* Fixed top section */}
@@ -163,7 +200,10 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
           <div className="text-red-500 text-sm mt-2 ml-2">{searchError}</div>
         )}
         <FastaSearchSuggestion
-          onSelectSearchTerm={onSelectSearchTerm}
+            autoLabelingEnabled={autoLabelingEnabled}
+            setSelectedItems={setSelectedItems}
+            selectedItems={selectedItems}
+            onSelectSearchTerm={onSelectSearchTerm}
           searchTerm={searchTerm}
           onSuggestionSelect={handleSuggestionSelect}
           className="mt-2"
@@ -176,6 +216,7 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
           }
           setFastaSuggestionStartIndex={setFastaSuggestionStartIndex}
           getFastaSuggestionStartIndex={getFastaSuggestionStartIndex}
+            displayMode={getSelectedDisplayMode()}
         />
       </div>
       <div className="mt-auto border-t border-gray-200 pt-4">
@@ -184,50 +225,50 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
             API Key
           </label>
           <input
-            type="text"
-            placeholder="Enter your API key"
-            value={apiKey}
-            onChange={(e) => handleApiKey(e.target.value)}
-            className="w-full py-3 px-4 border-2 border-gray-200 rounded-lg text-base
+              type="text"
+              placeholder="Enter your API key"
+              value={apiKey}
+              onChange={(e) => handleApiKey(e.target.value)}
+              className="w-full py-3 px-4 border-2 border-gray-200 rounded-lg text-base
                 bg-black text-white placeholder-gray-400"
           />
         </div>
 
+
         <div className="mb-4 mx-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Search Options
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(projections).map(([key, value]) => (
-              <button
-                key={key}
-                onClick={() => toggleProjection(key)}
-                disabled={key === "Accession"}
-                className={`
-                            flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm 
-                            transition-all duration-200 ease-in-out
-                            ${
-                              value
-                                ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200"
-                                : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
-                            }
-                            ${
-                              key === "Accession"
-                                ? "cursor-not-allowed"
-                                : "hover:bg-opacity-75"
-                            }
-                        `}
-              >
-                {value ? (
-                  <Eye className="w-4 h-4" />
-                ) : (
-                  <EyeOff className="w-4 h-4" />
-                )}
-                <span>{key.replace(/([A-Z])/g, " $1").trim()}</span>
-              </button>
-            ))}
+          <div className="flex justify-between items-center mb-1.5">
+            <label className="text-sm font-medium text-gray-700">
+              Display Mode
+            </label>
+            <AutoLabelingToggle
+                enabled={autoLabelingEnabled}
+                onToggle={() => setAutoLabelingEnabled(!autoLabelingEnabled)}
+            />
+          </div>
+          <div className="inline-flex bg-white rounded-lg p-1 gap-2 border border-gray-200">
+            {projections.map((projection) => {
+              const Icon = projection.icon;
+              return (
+                  <button
+                      key={projection.name}
+                      onClick={() => toggleProjection(projection.name)}
+                      className={`
+            flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium
+            transition-all duration-150 ease-in-out min-w-[100px]
+            ${projection.selected
+                          ? "bg-blue-100 text-blue-600 shadow-sm border border-blue-200"
+                          : "bg-gray-50 text-gray-600 hover:text-gray-800 hover:bg-gray-100"}
+          `}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${projection.selected ? 'text-blue-600' : 'text-gray-500'}`}/>
+                    <span>{projection.label}</span>
+                  </button>
+              );
+            })}
           </div>
         </div>
+
+
       </div>
     </div>
   );

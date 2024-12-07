@@ -1,7 +1,25 @@
-import React from 'react'
-import {useEffect, useState} from "react";
-import {ChevronRight, Info, PawPrint, Search, Tag} from "lucide-react";
-import {parseAccessionAndRemoveVersion} from "../cache/cache.ts";
+import { useEffect, useState } from "react";
+import { ChevronRight, Database, FileText, Info, PawPrint, Search, Tag } from "lucide-react";
+import { parseAccessionAndRemoveVersion } from "../cache/cache.ts";
+import { Suggestion } from "@/clients/genbank.ts";
+import { SelectedItem } from "./InputAccumulator";
+
+type DisplayMode = 'commonName' | 'scientificName' | 'accession';
+
+interface FastaSearchSuggestionProps {
+  searchTerm: string;
+  addItem: (item: any) => void;
+  type?: string;
+  className?: string;
+  setError: (error: any) => void;
+  genbankSearchService: any;
+  getAllFastaSuggestionWithLastIndex: () => any;
+  setFastaSuggestionStartIndex: (index: any) => void;
+  getFastaSuggestionStartIndex: (term: string) => any;
+  selectedItems: SelectedItem[];
+  displayMode?: DisplayMode;
+  autoLabelingEnabled?: boolean;
+}
 
 export const FastaSearchSuggestion = ({
                                         searchTerm,
@@ -12,14 +30,51 @@ export const FastaSearchSuggestion = ({
                                         genbankSearchService,
                                         getAllFastaSuggestionWithLastIndex,
                                         setFastaSuggestionStartIndex,
-                                        getFastaSuggestionStartIndex
-                                      }) => {
-  const [suggestions, setSuggestions] = useState([]);
+                                        getFastaSuggestionStartIndex,
+                                        selectedItems,
+                                        displayMode = 'scientificName',
+                                        autoLabelingEnabled = true,
+                                      }: FastaSearchSuggestionProps) => {
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [localPageCount, setLocalPageCount] = useState({});
   const [hasSearched, setHasSearched] = useState(false);
+  const [currentLabels, setCurrentLabels] = useState<Record<string, string>>({});
 
+  const generateLabel = (suggestion: Suggestion, displayMode: DisplayMode, autoLabelingEnabled: boolean, existingItems: SelectedItem[]) => {
+    let label = displayMode === 'commonName'
+        ? suggestion.primaryCommonName
+        : displayMode === 'scientificName'
+            ? suggestion.scientificName
+            : suggestion.id;
+
+    if (!autoLabelingEnabled) {
+      return label;
+    }
+
+    const isDuplicate = existingItems.some(item =>
+        item.label === label ||
+        (item.label && item.label.split(' (')[0] === label)
+    );
+
+    if (isDuplicate) {
+      if (displayMode === 'commonName') {
+        label = `${label} (${suggestion.scientificName})`;
+
+        const stillDuplicate = existingItems.some(item => item.label === label);
+        if (stillDuplicate) {
+          label = `${label} [${suggestion.id}]`;
+        }
+      } else if (displayMode === 'scientificName') {
+        label = `${label} [${suggestion.id}]`;
+      }
+    }
+
+    return label;
+  };
+
+  // Effect for fetching suggestions
   useEffect(() => {
     setError(null);
     const fetchSuggestions = async () => {
@@ -35,7 +90,7 @@ export const FastaSearchSuggestion = ({
       try {
         const count = getLastLocalPageCountObj(searchTerm) === null ? 0 : getLastLocalPageCountObj(searchTerm).count;
         const startIndex = getFastaSuggestionStartIndex(normalizedSearchTerm);
-        const suggestions = await genbankSearchService.getSuggestions(normalizedSearchTerm, count + 1, startIndex);
+        const suggestions = await genbankSearchService.getSuggestions(normalizedSearchTerm, count + 1, startIndex, displayMode);
         setSuggestions(suggestions.suggestions || []);
         setHasSearched(true);
 
@@ -44,7 +99,7 @@ export const FastaSearchSuggestion = ({
           setFastaSuggestionStartIndex({
             ...getAllFastaSuggestionWithLastIndex(),
             [normalizedSearchTerm]: parseInt(startIndex) + suggestions.suggestions.length
-          })
+          });
         }
       } catch (err) {
         console.error("Error fetching suggestions:", err);
@@ -58,12 +113,23 @@ export const FastaSearchSuggestion = ({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const getLastLocalPageCountObj = (searchTerm) => {
-    const obj = localPageCount[searchTerm]
-    return obj || null;
-  }
+  // Effect for updating labels when autoLabelingEnabled or displayMode changes
+  useEffect(() => {
+    if (suggestions.length > 0) {
+      const newLabels = suggestions.reduce((acc, suggestion) => {
+        acc[suggestion.id] = generateLabel(suggestion, displayMode, autoLabelingEnabled, selectedItems);
+        return acc;
+      }, {} as Record<string, string>);
+      setCurrentLabels(newLabels);
+    }
+  }, [autoLabelingEnabled, displayMode, suggestions, selectedItems]);
 
-  const setLastLocalPageCountObj = (searchTerm, count) => {
+  const getLastLocalPageCountObj = (searchTerm: string) => {
+    const obj = localPageCount[searchTerm];
+    return obj || null;
+  };
+
+  const setLastLocalPageCountObj = (searchTerm: string, count: number) => {
     setLocalPageCount({
       ...localPageCount,
       [searchTerm]: {
@@ -71,24 +137,39 @@ export const FastaSearchSuggestion = ({
         timestamp: Date.now()
       }
     });
-  }
+  };
 
-  const handleSuggestionSelect = (suggestion) => {
+  const handleSuggestionSelect = (suggestion: Suggestion) => {
+    const label = currentLabels[suggestion.id] || generateLabel(suggestion, displayMode, autoLabelingEnabled, selectedItems);
+
     const input = {
       type: type,
       content: "",
-      label: suggestion.primaryCommonName,
+      label: label,
       id: parseAccessionAndRemoveVersion(suggestion.id),
-      searchTerm: suggestion.primaryCommonName.trim().toLowerCase(),
+      searchTerm: suggestion[getPrimaryField(displayMode)].trim().toLowerCase(),
     };
     addItem(input);
     setSelectedIds(prev => new Set([...prev, suggestion.id]));
-    setSuggestions(current =>
-        current.filter(s => s.id !== suggestion.id)
-    );
+    setSuggestions(current => current.filter(s => s.id !== suggestion.id));
   };
 
-  // If there's no search term, don't show anything
+  const getPrimaryField = (mode: DisplayMode) => {
+    switch (mode) {
+      case 'commonName': return 'primaryCommonName';
+      case 'scientificName': return 'scientificName';
+      case 'accession': return 'id';
+    }
+  };
+
+  const getIcon = (mode: DisplayMode) => {
+    switch (mode) {
+      case 'commonName': return <PawPrint className="h-4 w-4 text-blue-500" />;
+      case 'scientificName': return <FileText className="h-4 w-4 text-green-500" />;
+      case 'accession': return <Database className="h-4 w-4 text-purple-500" />;
+    }
+  };
+
   if (!searchTerm?.trim()) return null;
 
   return (
@@ -99,6 +180,11 @@ export const FastaSearchSuggestion = ({
               <div className="flex items-center gap-2 text-sm text-gray-700 px-2">
                 <Search className="h-4 w-4"/>
                 <span>Suggestions</span>
+                <span className="text-xs text-gray-500">
+                ({displayMode === 'commonName' ? 'Common Names' :
+                    displayMode === 'scientificName' ? 'Scientific Names' :
+                        'Accession Numbers'})
+              </span>
               </div>
             </div>
             <div>
@@ -115,10 +201,10 @@ export const FastaSearchSuggestion = ({
                       >
                         <div className="flex justify-between items-center group">
                           <div className="flex items-center gap-2">
-                            <PawPrint className="h-4 w-4 text-blue-500"/>
+                            {getIcon(displayMode)}
                             <span className="font-medium text-gray-900">
-                                                {suggestion.primaryCommonName}
-                                            </span>
+                        {currentLabels[suggestion.id] || generateLabel(suggestion, displayMode, autoLabelingEnabled, selectedItems)}
+                      </span>
                           </div>
                           <div className="flex items-center gap-2 text-gray-700">
                             <Tag className="h-4 w-4"/>
@@ -129,16 +215,19 @@ export const FastaSearchSuggestion = ({
 
                         <div className="flex items-center gap-2 text-sm text-gray-600 italic ml-6 mt-1">
                           <Info className="h-3 w-3"/>
-                          <span>{suggestion.scientificName}</span>
+                          <span>
+                      {displayMode === 'commonName' ? suggestion.scientificName :
+                          displayMode === 'scientificName' ? suggestion.primaryCommonName :
+                              `${suggestion.primaryCommonName} (${suggestion.scientificName})`}
+                    </span>
                         </div>
 
-                        {suggestion.additionalCommonNames?.length > 0 && (
+                        {suggestion.additionalCommonNames?.length > 0 && displayMode !== 'accession' && (
                             <div className="flex gap-2 text-xs text-gray-600 mt-1 ml-6">
                               <Tag className="h-3 w-3"/>
                               <span>
-                                                Also known as:{" "}
-                                {suggestion.additionalCommonNames.join(", ")}
-                                            </span>
+                        Also known as: {suggestion.additionalCommonNames.join(", ")}
+                      </span>
                             </div>
                         )}
                       </div>

@@ -17,14 +17,14 @@ interface Suggestion {
 export class GenBankCacheEntry {
   suggestions: Suggestion[];
   isValid?: boolean;
-  isComplete: boolean;
-  globalLastPage: number;
-  lastPage: number;
-  pageSize: number;
-  totalResults: number;
-  taxonomicGroup: string[] | null;
-  taxId: string | null;
-  metadata: GenBankMetadata;
+  isComplete?: boolean;
+  globalLastPage?: number;
+  lastPage?: number;
+  pageSize?: number;
+  totalResults?: number;
+  taxonomicGroup?: string[] | null;
+  taxId?: string | null;
+  metadata?: GenBankMetadata;
 
   constructor(data: Partial<GenBankCacheEntry> = {}) {
     this.suggestions = data.suggestions || [];

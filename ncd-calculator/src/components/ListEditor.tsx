@@ -80,9 +80,9 @@ const ListEditor: React.FC<ListEditorProps> = ({
   const [fastaSuggestionStartIndex, setFastaSuggestionStartIndex] =
     React.useState<Record<string, number>>({});
   const [projections, setProjections] = React.useState<ProjectionsType>({
-    Accession: true,
-    ScientificName: false,
-    CommonName: true,
+    accession: true,
+    scientific: false,
+    common: true,
     FileName: false,
   });
 
