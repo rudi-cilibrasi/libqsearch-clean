@@ -62,6 +62,10 @@ passport.use(new GoogleStrategy({
         return done(error);
     }
 }));
+// mount routes with parent path
+app.use("/api/auth", loginRoutes(passport));
+app.use("/api/external", externalRoutes);
+app.use("/api/redis", redisRoutes);
 
 // user = the profile object above strategy
 // After authentication is complete => serializeUser to store in the session, allowing the user to stay logged in
@@ -70,10 +74,7 @@ passport.serializeUser((user: any, done) => done(null, user));
 // uses the stored session data from users' requests to fetch the full user object
 passport.deserializeUser((user: any, done) => done(null, user));
 
-// mount routes with parent path
-app.use("/api/auth", loginRoutes(passport));
-app.use("/api/external", externalRoutes);
-app.use("/api/redis", redisRoutes);
+
 
 app.use((err: any, req: any, res: any, next: any) => {
     logger.error({

@@ -2,6 +2,7 @@
   "name": "backend-nodejs",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "rm -rf dist && npx tsc && node ./dist/bin/www.js",

@@ -6,7 +6,7 @@ import ENV_LOADER from "../configurations/envLoader";
 const router = express.Router();
 const client = createClient({
     url: ENV_LOADER.REDIS_URL,
-    password: ENV_LOADER.REDIS_PASSWORD
+    password: process.env.REDIS_PASSWORD,
 });
 
 const connectToRedis = async () => {
