@@ -3,6 +3,7 @@ import {upsertUserMut, insertUserHist, upsertUser} from "../services/userService
 import {UserMut} from "../models/userMut";
 import {UserHist} from "../models/userHist";
 import {sequelize, syncSequelize} from "../configurations/databaseConnection";
+import {ExtendedGithubProfile} from "../models/extendedGithubProfile";
 
 beforeEach(async () => {
     await sequelize.sync({ force: true });
@@ -14,10 +15,11 @@ afterAll(async () => {
 
 describe('Test upsertUserMut function', () => {
     it('should upsert a UserMut record successfully', async () => {
-        const profile = {
+        const profile: ExtendedGithubProfile = {
             provider: 'github',
             id: '12345',
             displayName: 'John Doe',
+            profileUrl: 'https://github.com/johndoe',
             _json: {email: 'johndoe@example.com'},
         };
 
@@ -27,7 +29,7 @@ describe('Test upsertUserMut function', () => {
         expect(result[0].provider_name).toBe('github');
         expect(result[0].user_login_id).toBe('12345');
         expect(result[0].display_name).toBe('John Doe');
-        expect(result[0].additional_info.email).toBe('johndoe@example.com');
+        expect((result[0].additional_info as {email: string}).email).toBe('johndoe@example.com');
 
         // Optionally, check if the record is inserted/updated in the database
         const userMutRecord = await UserMut.findOne({
@@ -41,10 +43,11 @@ describe('Test upsertUserMut function', () => {
     });
 
     it('should upsert a UserMut record successfully with utf-8', async () => {
-        const profile = {
+        const profile: ExtendedGithubProfile = {
             provider: 'github',
             id: '12345',
             displayName: 'Hello, 世界 🌏',
+            profileUrl: 'https://github.com/johndoe',
             _json: {email: 'johndoe@example.com'},
         };
 
@@ -54,7 +57,7 @@ describe('Test upsertUserMut function', () => {
         expect(result[0].provider_name).toBe('github');
         expect(result[0].user_login_id).toBe('12345');
         expect(result[0].display_name).toBe('Hello, 世界 🌏');
-        expect(result[0].additional_info.email).toBe('johndoe@example.com');
+        expect((result[0].additional_info as {email: string}).email).toBe('johndoe@example.com');
 
         // Optionally, check if the record is inserted/updated in the database
         const userMutRecord = await UserMut.findOne({
@@ -70,10 +73,11 @@ describe('Test upsertUserMut function', () => {
     });
 
     it('should insert a UserHist record successfully', async () => {
-        const profile = {
+        const profile: ExtendedGithubProfile = {
             provider: 'github',
             id: '12345',
             displayName: 'John Doe',
+            profileUrl: 'https://github.com/johndoe',
             _json: {email: 'johndoe@example.com'},
         };
 
@@ -83,7 +87,7 @@ describe('Test upsertUserMut function', () => {
         expect(result.provider_name).toBe('github');
         expect(result.user_login_id).toBe('12345');
         expect(result.display_name).toBe('John Doe');
-        expect(result.additional_info.email).toBe('johndoe@example.com');
+        expect((result.additional_info as {email: string}).email).toBe('johndoe@example.com');
 
         // Check if the record was inserted into the UserHist table
         const userHistRecord = await UserHist.findOne({
@@ -99,7 +103,8 @@ describe('Test upsertUserMut function', () => {
 
     it('should insert new record with created_at and updated_at', async () => {
         const newDate = "" + new Date();
-        let profile = {
+        let profile: ExtendedGithubProfile = {
+            profileUrl: 'https://github.com/johndoe',
             provider: 'github',
             id: '12345',
             displayName: 'John Doe',
@@ -121,8 +126,9 @@ describe('Test upsertUserMut function', () => {
 
         const updatedDate = "" + new Date();
 
-        let secondProfile = {
+        let secondProfile: ExtendedGithubProfile = {
             provider: 'github',
+            profileUrl: 'https://github.com/johndoe',
             id: '12345',
             displayName: 'John Doe Updated',
             _json: {key: 'new value'},
@@ -146,7 +152,8 @@ describe('Test upsertUserMut function', () => {
     });
 
     it('should commit transaction when everything is successful', async () => {
-        const profile = {
+        const profile: ExtendedGithubProfile = {
+            profileUrl: 'https://github.com/johndoe',
             provider: 'github',
             id: '12345',
             displayName: 'John Doe',
@@ -175,7 +182,8 @@ describe('Test upsertUserMut function', () => {
 
     it('should rollback transaction when there is an error in upsertUserMut', async () => {
         // Simulate an error in upsertUserMut
-        const profile = {
+        const profile: ExtendedGithubProfile = {
+            profileUrl: 'https://github.com/johndoe',
             provider: 'github',
             id: '12345',
             displayName: 'John Doe',

@@ -3,8 +3,11 @@ import {UserMut} from "../models/userMut";
 import {UserHist} from "../models/userHist";
 import { sequelize } from "../configurations/databaseConnection";
 import {Transaction} from "sequelize";
+import {Profile as GoogleProfile} from "passport-google-oauth20";
+import {ExtendedGithubProfile} from "../models/extendedGithubProfile";
+import {Profile as GithubProfile} from "passport-github2";
 
-async function upsertUser(profile: any) {
+async function upsertUser(profile: GoogleProfile | ExtendedGithubProfile) {
     const transaction = await sequelize.transaction();
     try {
         const newDate = "" + new Date();
@@ -19,7 +22,7 @@ async function upsertUser(profile: any) {
     }
 }
 
-async function upsertUserMut(profile: any, newDate = "" + new Date(), transaction: Transaction | undefined):
+async function upsertUserMut(profile: GoogleProfile | ExtendedGithubProfile, newDate = "" + new Date(), transaction: Transaction | undefined):
         Promise<[UserMut, boolean | null]> {
     const [user, created] = await UserMut.upsert({
         provider_name: profile.provider,
@@ -36,7 +39,7 @@ async function upsertUserMut(profile: any, newDate = "" + new Date(), transactio
     return [user, created];
 }
 
-async function insertUserHist(profile: any, newDate = "" + new Date(), transaction: Transaction | undefined)
+async function insertUserHist(profile: GoogleProfile | ExtendedGithubProfile, newDate = "" + new Date(), transaction: Transaction | undefined)
         : Promise<UserHist> {
     const user: UserHist = await UserHist.create({
         provider_name: profile.provider,

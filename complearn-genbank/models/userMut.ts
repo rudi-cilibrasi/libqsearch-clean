@@ -20,7 +20,7 @@ class UserMut extends Model<UserMutAttributes, UserMutCreationAttributes> implem
     public provider_name!: string;
     public user_login_id!: string;
     public display_name!: string;
-    public additional_info!: any | null;
+    public additional_info!: object | null;
     public created_at!: string;
     public updated_at!: string;
 }
