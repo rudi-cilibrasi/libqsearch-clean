@@ -1,8 +1,9 @@
 import ENV_LOADER from "../configurations/envLoader";
 import logger from "../configurations/logger";
-import { Router } from "express";
+import { Router, Request, Response } from "express";
+import { PassportStatic } from "passport";
 
-const login = (passport: any) => {
+const login = (passport: PassportStatic) => {
     const router = Router();
 
     // redirect the user to authentication page
@@ -21,19 +22,24 @@ const login = (passport: any) => {
             res.redirect(`${ENV_LOADER.FRONTEND_BASE_URL}`);
         });
 
-    router.get("/profile", (req: any, res: any) => {
-        res.send(`Welcome ${req.user.displayName}`);
+    router.get("/profile", (req: Request, res: Response) => {
+        const user = req.user as { displayName: string } | undefined;
+        if (user) {
+            res.send(`Welcome ${user.displayName}`);
+        }
     });
 
-    router.get('/user-info', (req: any, res: any) => {
+    router.get('/user-info', (req: Request, res: Response) => {
         if (req.isAuthenticated()) {
             let userName = "";
 
-            if (req.user) {
-                if (req.user.username) {
-                    userName = req.user.username
-                } else if (req.user.displayName) {
-                    userName = req.user.displayName;
+            const user = req.user as { displayName: string, username: string } | undefined;
+
+            if (user) {
+                if (user.username) {
+                    userName = user.username
+                } else if (user.displayName) {
+                    userName = user.displayName;
                 }
 
                 if (userName) {

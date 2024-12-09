@@ -1,10 +1,12 @@
 import logger from "../configurations/logger";
 import crypto from 'crypto';
+import {Request, Response, NextFunction} from 'express';
+import {IncomingHttpHeaders, OutgoingHttpHeaders} from "http";
 
 const generateRequestId = () => {
     return 'req_' + crypto.randomBytes(4).toString('hex');
 }
-const sanitizeHeaders = (headers: any) => {
+const sanitizeHeaders = (headers: IncomingHttpHeaders | OutgoingHttpHeaders) => {
     const sanitized = { ...headers };
     const sensitiveFields = ['authorization', 'cookie', 'password', 'token', 'api_key'];
     Object.entries(sanitized).forEach(([key, value]) => {
@@ -15,7 +17,7 @@ const sanitizeHeaders = (headers: any) => {
     return sanitized;
 };
 
-const sanitizeUrl = (url: any) => {
+const sanitizeUrl = (url: string) => {
     if (!url) return url;
     try {
         const urlObj = new URL(url);
@@ -30,7 +32,7 @@ const sanitizeUrl = (url: any) => {
     }
 };
 
-const handleResponseBody = (body: any, headers: any) => {
+const handleResponseBody = (body: any, headers: OutgoingHttpHeaders) => {
     if (!body) return null;
     if (headers?.['content-type']?.includes('application/json')) {
         return typeof body === 'string' ? JSON.parse(body) : body;
@@ -40,7 +42,7 @@ const handleResponseBody = (body: any, headers: any) => {
     return body;
 };
 
-export const requestLogger = (req: any, res: any, next: any) => {
+export const requestLogger = (req: Request, res: any, next: NextFunction) => {
     const requestId = generateRequestId();
     const startTime = process.hrtime();
 
