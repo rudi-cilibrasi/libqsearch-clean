@@ -10,7 +10,7 @@ import {
     SuggestionCacheEntry,
     SuggestionDetailsCache,
     SuggestionsResponse,
-} from "@/clients/genbank.ts";
+} from "@/services/genbank.ts";
 import {MemoryCache} from "@/cache/MemoryCache.ts";
 import {LocalStorageCache} from "@/cache/LocalStorageCache.ts";
 import {RedisStorageCache} from "@/cache/RedisStorageCache.ts";

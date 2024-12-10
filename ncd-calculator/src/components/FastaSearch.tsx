@@ -5,7 +5,7 @@ import {Database, FileText, PawPrint} from "lucide-react";
 import {SearchInput} from "./SearchInput.jsx";
 import {FASTA} from "../constants/modalConstants.js";
 import {FastaSearchSuggestion} from "./FastaSearchSuggestion.jsx";
-import {GenBankSearchService} from "../clients/GenBankSearchService.ts";
+import {GenBankSearchService} from "@/services/GenBankSearchService.ts";
 import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.js";
 import {SelectedItem} from "./InputAccumulator";
 import AutoLabelingToggle from "@/components/AutoLabelingToggle.tsx";
@@ -60,7 +60,8 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
   ]);
   const [searchError, setSearchError] = useState(null);
   const genbankSearchService = new GenBankSearchService();
-  const localStorageKeyManager = new LocalStorageKeyManager();
+  const localStorageKeyManager = LocalStorageKeyManager.getInstance();
+
   const [autoLabelingEnabled, setAutoLabelingEnabled] = useState(true);
 
 

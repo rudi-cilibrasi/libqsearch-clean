@@ -1,5 +1,5 @@
 // Base interfaces for the cache system
-import {CACHE_NAMES} from "@/clients/genbank.ts";
+import {CACHE_NAMES} from "@/services/genbank.ts";
 
 export interface CacheOptions {
   ttl?: number;

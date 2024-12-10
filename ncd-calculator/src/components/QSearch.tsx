@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { workerCode } from "../workers/ncdWorker";
-import { initCache } from "../cache/cache.ts";
 
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
 import { MatrixTree } from "./MatrixTree.tsx";
 import { Loader } from "lucide-react";
 import ListEditor from "./ListEditor.tsx";
 import Header from "./Header.jsx";
+import { workerCode as gzipWorkerCode } from "../workers/ncdWorker";
+import { lzmaWorkerCode } from "../workers/lzmaWorker"; // Our new LZMA worker
 import { LocalStorageKeyManager } from "../cache/LocalStorageKeyManager.ts";
+import {CompressionService} from "@/services/CompressionService.ts";
 
 export const QSearch = () => {
   const [ncdMatrix, setNcdMatrix] = useState([]);
@@ -25,11 +26,73 @@ export const QSearch = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [isSeaarchDisabled, setIsSearchDisabled] = useState(false);
   const [confirmedSearchTerm, setConfirmedSearchTerm] = useState("");
-  const storageKeyManager = new LocalStorageKeyManager();
+  const storageKeyManager = LocalStorageKeyManager.getInstance();
+
+
+  const [currentCompressor, setCurrentCompressor] = useState("gzip");
+  const [compressionInfo, setCompressionInfo] = useState<{
+    algorithm: string;
+    reason: string;
+  } | null>(null);
+
+
+  const initializeWorker = (algorithm: string) => {
+    // First, clean up existing worker
+    if (ncdWorker) {
+      ncdWorker.terminate();
+    }
+    let workerCode;
+    switch (algorithm) {
+      case "lzma":
+        workerCode = lzmaWorkerCode;
+        break;
+      default:
+        workerCode = gzipWorkerCode;
+    }
+    console.log(`Initializing ${algorithm} worker`);
+
+    const blob = new Blob([workerCode], { type: "application/javascript" });
+    const workerURL = URL.createObjectURL(blob);
+    const worker = new Worker(workerURL);
+    worker.onmessage = handleWorkerMessage;
+    worker.onerror = (error) => {
+      console.error('Worker error:', error);
+      setErrorMsg(`Worker error: ${error.message}`);
+      setIsLoading(false);
+    };
+
+    setNcdWorker(worker);
+    setCurrentCompressor(algorithm);
+  };
+
+
+  const handleWorkerMessage = (e: MessageEvent) => {
+    const message = e.data;
+    console.log("Worker message received:", message); // Better logging
+
+    if (message.type === "progress") {
+      console.log(`Progress: ${JSON.stringify(message)}`); // Log progress
+    } else if (message.type === "result") {
+      if (!message || !message.labels?.length || !message.ncdMatrix?.length) {
+        setErrorMsg("Invalid result format received");
+        resetDisplay();
+      } else {
+        console.log("Valid result received, displaying matrix"); // Log success
+        displayNcdMatrix(message);
+      }
+      setExecutionTime((prev) => performance.now() - prev);
+      setIsLoading(false); // Make sure to stop loading
+    } else if (message.type === "error") {
+      console.error("Worker error:", message.message); // Log errors
+      setErrorMsg(`Compression error: ${message.message}`);
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    storageKeyManager.checkVersion();
-    runNCDWorker();
+    storageKeyManager.initialize();
+    initializeWorker('gzip'); // Initialize with default gzip instead
+    // runNCDWorker();
     qSearchWorkerRef.current = new QSearchWorker();
     if (qSearchWorkerRef.current) {
       qSearchWorkerRef.current.onmessage = handleQsearchMessage;
@@ -117,32 +180,32 @@ export const QSearch = () => {
     });
   };
 
-  const runNCDWorker = () => {
-    const blob = new Blob([workerCode], { type: "application/javascript" });
-    const workerURL = URL.createObjectURL(blob);
-    const worker = new Worker(workerURL);
-    worker.onmessage = function (e) {
-      const message = e.data;
-      console.log("receive worker message: " + JSON.stringify(message));
-      if (message.type === "progress") {
-      } else if (message.type === "result") {
-        if (
-          !message ||
-          message.labels.length === 0 ||
-          message.ncdMatrix.length === 0
-        ) {
-          setErrorMsg("no result");
-          resetDisplay();
-        } else {
-          displayNcdMatrix(message);
-        }
-        setExecutionTime((prev) => {
-          return performance.now() - prev;
-        });
-      }
-    };
-    setNcdWorker(worker);
-  };
+  // const runNCDWorker = () => {
+  //   const blob = new Blob([workerCode], { type: "application/javascript" });
+  //   const workerURL = URL.createObjectURL(blob);
+  //   const worker = new Worker(workerURL);
+  //   worker.onmessage = function (e) {
+  //     const message = e.data;
+  //     console.log("receive worker message: " + JSON.stringify(message));
+  //     if (message.type === "progress") {
+  //     } else if (message.type === "result") {
+  //       if (
+  //         !message ||
+  //         message.labels.length === 0 ||
+  //         message.ncdMatrix.length === 0
+  //       ) {
+  //         setErrorMsg("no result");
+  //         resetDisplay();
+  //       } else {
+  //         displayNcdMatrix(message);
+  //       }
+  //       setExecutionTime((prev) => {
+  //         return performance.now() - prev;
+  //       });
+  //     }
+  //   };
+  //   setNcdWorker(worker);
+  // };
 
   interface ProjectedInput {
     accessions: string[];
@@ -172,16 +235,65 @@ export const QSearch = () => {
     contents: string[];
     labels: string[];
   }
+
   const onNcdInput = async (ncdInput: NCDInput) => {
-    if (!ncdInput || ncdInput.labels.length === 0) {
+    if (!ncdInput?.contents?.length || !ncdInput?.labels?.length) {
+      setErrorMsg("Invalid input data");
       setIsLoading(false);
       setIsSearchDisabled(false);
       return;
     }
-    if (ncdWorker) {
-      ncdWorker.postMessage(ncdInput);
+
+    try {
+      console.log("Processing input:", {
+        contentCount: ncdInput.contents.length,
+        labelCount: ncdInput.labels.length
+      });
+
+      const contentSizes = ncdInput.contents.map(content =>
+          new TextEncoder().encode(content).length
+      );
+
+      console.log("Content sizes:", contentSizes); // Debug log
+
+      const sortedSizes = [...contentSizes].sort((a, b) => b - a);
+      const compressionDecision = CompressionService.needsAdvancedCompression(
+          sortedSizes[0],
+          sortedSizes[1]
+      );
+
+      console.log("Compression decision:", compressionDecision); // Debug log
+
+      setCompressionInfo({
+        algorithm: compressionDecision.recommendedAlgo,
+        reason: compressionDecision.reason
+      });
+
+      if (currentCompressor !== compressionDecision.recommendedAlgo) {
+        initializeWorker(compressionDecision.recommendedAlgo);
+      }
+
+      if (ncdWorker) {
+        setIsLoading(true);
+        console.log("Sending data to worker"); // Debug log
+        ncdWorker.postMessage(ncdInput);
+      } else {
+        throw new Error("Worker not initialized");
+      }
+    } catch (error) {
+      console.error("Error in onNcdInput:", error);
+      setErrorMsg(`Error processing input: ${error.message}`);
+      setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (ncdWorker) {
+        ncdWorker.terminate();
+      }
+    };
+  }, [ncdWorker]);
 
   const resetSearchResult = (message: string) => {
     setErrorMsg(message);
@@ -249,7 +361,7 @@ export const QSearch = () => {
           >
             <Loader className="animate-spin" size={20} />
             <span>
-              {isLoading ? "Computing result..." : "Processing results..."}
+              Computing result using {currentCompressor.toUpperCase()}...
             </span>
           </div>
         )}

@@ -1,4 +1,4 @@
-import { GroupPattern } from "@/clients/genbank";
+import { GroupPattern } from "@/services/genbank";
 export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
   // MAMMALS (40674)
   "felis catus": {

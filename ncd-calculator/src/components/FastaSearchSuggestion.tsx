@@ -9,9 +9,9 @@ import {
   Tag,
 } from "lucide-react";
 import { parseAccessionAndRemoveVersion } from "../cache/cache.ts";
-import { PaginatedResults, Suggestion } from "@/clients/genbank.ts";
+import { PaginatedResults, Suggestion } from "@/services/genbank.ts";
 import { SelectedItem } from "./InputAccumulator";
-import { GenBankSearchService } from "@/clients/GenBankSearchService.ts";
+import { GenBankSearchService } from "@/services/GenBankSearchService.ts";
 
 type DisplayMode = "common" | "scientific" | "accession";
 

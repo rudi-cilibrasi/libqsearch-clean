@@ -1,6 +1,6 @@
 import React from "react";
 import { Search } from "lucide-react";
-import {GenBankSearchService} from "@/clients/GenBankSearchService.ts";
+import {GenBankSearchService} from "@/services/GenBankSearchService.ts";
 
 
 interface SearchInputProps {

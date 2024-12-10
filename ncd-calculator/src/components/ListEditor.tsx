@@ -77,7 +77,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
     selectedItems.length < MIN_ITEMS ||
     (searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
   const isClearDisabled = selectedItems.length === 0;
-  const localStorageManager = new LocalStorageKeyManager();
+  const localStorageManager = LocalStorageKeyManager.getInstance();
 
   const sendNcdInput = async (): Promise<void> => {
     if (selectedItems && selectedItems.length > 8 && !authenticated) {
