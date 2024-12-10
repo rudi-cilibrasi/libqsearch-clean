@@ -1,12 +1,12 @@
 import { createClient } from "redis";
-import express from "express";
-import logger from "../configurations/logger";
-import ENV_LOADER from "../configurations/envLoader";
+import express, { Request, Response, Router } from "express";
+import logger from "../configurations/logger.js";
+import ENV_LOADER from "../configurations/envLoader.js";
 
-const router = express.Router();
+const router: Router = express.Router();
 const client = createClient({
     url: ENV_LOADER.REDIS_URL,
-    password: process.env.REDIS_PASSWORD,
+    password: process.env.VITE_REDIS_PASSWORD,
 });
 
 const connectToRedis = async () => {
@@ -22,55 +22,126 @@ connectToRedis();
 
 logger.info('Redis routes being registered');
 
-router.post("/get", async (req, res) => {
-    try {
-        const { key } = req.body;
-        const value = await client.get(key);
-        res.json({ value });
-    } catch (error) {
-        logger.error('Redis get error:', error);
-        res.status(500).json({ error: 'Redis operation failed' });
+interface RedisGetRequest {
+    key: string;
+}
+
+interface RedisSetRequest {
+    key: string;
+    value: string | object;
+}
+
+interface RedisIncrRequest {
+    key: string;
+}
+
+interface RedisDelRequest {
+    key: string;
+}
+
+// Use Router type for route handlers
+router.post(
+    "/set",
+    (req: Request<{}, any, RedisSetRequest>, res: Response) => {
+        return new Promise<void>(async (resolve) => {
+            try {
+                const { key, value } = req.body;
+                if (!key || value === undefined) {
+                    res.status(400).json({ error: 'Key and value are required' });
+                    return resolve();
+                }
+
+                const stringValue = typeof value === 'object' ? JSON.stringify(value) : value;
+                await client.set(key, stringValue);
+                res.json({ success: true });
+                resolve();
+            } catch (error) {
+                console.error('Redis set error:', error);
+                res.status(500).json({
+                    error: 'Redis operation failed',
+                    details: error instanceof Error ? error.message : 'Unknown error'
+                });
+                resolve();
+            }
+        });
     }
-});
+);
 
+router.post(
+    "/get",
+    (req: Request<{}, any, RedisGetRequest>, res: Response) => {
+        return new Promise<void>(async (resolve) => {
+            try {
+                const { key } = req.body;
+                if (!key) {
+                    res.status(400).json({ error: 'Key is required' });
+                    return resolve();
+                }
 
-router.post("/set", async (req, res) => {
-    try {
-        const { key, value, ttl } = req.body;
-        if (ttl) {
-            await client.setEx(key, ttl, value);
-        } else {
-            await client.set(key, value);
-        }
-        res.json({ success: true });
-    } catch (error) {
-        logger.error('Redis set error:', error);
-        res.status(500).json({ error: 'Redis operation failed' });
+                const value = await client.get(key);
+                try {
+                    const parsedValue = value ? JSON.parse(value) : null;
+                    res.json({ value: parsedValue });
+                } catch {
+                    res.json({ value });
+                }
+                resolve();
+            } catch (error) {
+                console.error('Redis get error:', error);
+                res.status(500).json({
+                    error: 'Redis operation failed',
+                    details: error instanceof Error ? error.message : 'Unknown error'
+                });
+                resolve();
+            }
+        });
     }
-});
+);
 
+router.post(
+    "/incr",
+    (req: Request<{}, any, RedisIncrRequest>, res: Response) => {
+        return new Promise<void>(async (resolve) => {
+            try {
+                const { key } = req.body;
+                if (!key) {
+                    res.status(400).json({ error: 'Key is required' });
+                    return resolve();
+                }
 
-router.post("/incr", async (req, res) => {
-    try {
-        const { key } = req.body;
-        const value = await client.incr(key);
-        res.json({ value });
-    } catch (error) {
-        logger.error('Redis increment error:', error);
-        res.status(500).json({ error: 'Redis operation failed' });
+                const value = await client.incr(key);
+                res.json({ value });
+                resolve();
+            } catch (error) {
+                logger.error('Redis increment error:', error);
+                res.status(500).json({ error: 'Redis operation failed' });
+                resolve();
+            }
+        });
     }
-});
+);
 
+router.post(
+    "/del",
+    (req: Request<{}, any, RedisDelRequest>, res: Response) => {
+        return new Promise<void>(async (resolve) => {
+            try {
+                const { key } = req.body;
+                if (!key) {
+                    res.status(400).json({ error: 'Key is required' });
+                    return resolve();
+                }
 
-router.post("/del", async (req, res) => {
-    try {
-        const { key } = req.body;
-        await client.del(key);
-        res.json({ success: true });
-    } catch (error) {
-        logger.error('Redis delete error:', error);
-        res.status(500).json({ error: 'Redis operation failed' });
+                await client.del(key);
+                res.json({ success: true });
+                resolve();
+            } catch (error) {
+                logger.error('Redis delete error:', error);
+                res.status(500).json({ error: 'Redis operation failed' });
+                resolve();
+            }
+        });
     }
-});
+);
 
 export default router;

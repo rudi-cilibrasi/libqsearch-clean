@@ -1,28 +1,34 @@
-import {CacheInterface} from "../cache/CacheInterface";
-import {MemoryCache} from "../cache/MemoryCache";
-import {LocalStorageCache} from "../cache/LocalStorageCache";
-import {RedisStorageCache} from "../cache/RedisStorageCache";
-import {GenBankQueries} from "./GenBankQueries";
-import {sendRequestToProxy} from "../functions/fetchProxy";
-import {LocalStorageKeys} from "../cache/LocalStorageKeyManager";
-import {GROUP_PATTERNS, GroupEntry, TaxonomicGroupKey,} from "../constants/taxonomy.js";
-import {ANIMAL_GROUPS, TAXONOMIC_BASE_GROUPS, TAXONOMIC_MAPPING,} from "../constants/taxonomy";
-import {GenbankResult, PaginatedResults, PaginationMetadata, Suggestion, VariantResponse,} from "./genbank.js";
-import {TaxonomicInfo} from "./genbank";
-import {GenBankCacheEntry} from "./GenbankCacheEntry.js";
-
+import { GenBankQueries } from "./GenBankQueries";
+import { sendRequestToProxy } from "../functions/fetchProxy";
+import {
+  GROUP_PATTERNS,
+  GroupEntry,
+  TaxonomicGroupKey,
+} from "../constants/taxonomy.js";
+import {
+  ANIMAL_GROUPS,
+  TAXONOMIC_BASE_GROUPS,
+  TAXONOMIC_MAPPING,
+} from "../constants/taxonomy";
+import {
+  AccessionId,
+  CommonNameSearch,
+  createAccessionSearch,
+  createCommonNameSearch,
+  createScientificNameSearch,
+  PaginatedResults,
+  Suggestion,
+  SuggestionAndDetailResponse,
+  SuggestionCacheEntry,
+  SuggestionsResponse,
+  VariantResponse,
+} from "./genbank.js";
+import { TaxonomicInfo } from "./genbank";
+import { GenbankCache } from "@/cache/GenbankCache.js";
+import { ScientificNameSearch } from "./genbank";
 
 export class GenBankSearchService {
-  private readonly EMPTY_GENBANK_RESULT: GenbankResult = {
-    accessionId: null,
-    title: null,
-    isValid: false,
-    type: "FASTA",
-  };
-
-  private readonly memoryCache: CacheInterface<GenBankCacheEntry>;
-  private readonly localStorageCache: CacheInterface<GenBankCacheEntry>;
-  private readonly redisCache: CacheInterface<GenBankCacheEntry>;
+  private readonly genbankCache: GenbankCache;
   private readonly genBankQueries: GenBankQueries;
   private readonly taxonomyCache: Map<
     string,
@@ -31,18 +37,7 @@ export class GenBankSearchService {
   private readonly CACHE_TTL: number = 30 * 60 * 1000;
 
   constructor() {
-    this.memoryCache = new CacheInterface(new MemoryCache(), {
-      ttl: 30 * 60 * 1000,
-    });
-
-    this.localStorageCache = new CacheInterface(new LocalStorageCache(), {
-      ttl: 24 * 60 * 60 * 1000,
-    });
-
-    this.redisCache = new CacheInterface(
-      new RedisStorageCache(import.meta.env.VITE_REDIS_ENDPOINT),
-      { ttl: 7 * 24 * 60 * 60 * 1000 }
-    );
+    this.genbankCache = new GenbankCache();
     this.genBankQueries = new GenBankQueries(import.meta.env.VITE_NCBI_API_KEY);
     this.taxonomyCache = new Map();
   }
@@ -66,387 +61,175 @@ export class GenBankSearchService {
     searchTerm: string,
     page: number = 1,
     startIndex: number,
-    displayMode: 'commonName' | 'scientificName' | 'accession' = 'commonName'
+    displayMode: "common" | "scientific" | "accession" = "common"
   ): Promise<PaginatedResults> {
-    if (!searchTerm?.trim())
+    if (!searchTerm?.trim()) {
+      return { suggestions: [] };
+    }
+
+    try {
+      const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+      const mode = displayMode as "common" | "scientific" | "accession";
+      const typedSearchTerm =
+        displayMode === "accession"
+          ? createAccessionSearch(normalizedSearchTerm)
+          : displayMode === "scientific"
+          ? createScientificNameSearch(normalizedSearchTerm)
+          : createCommonNameSearch(normalizedSearchTerm);
+      const cachedResult = await this.genbankCache.getSuggestions(
+        mode,
+        typedSearchTerm,
+        startIndex
+      );
+      if (cachedResult && this.hasCachedSuggestions(cachedResult)) {
+        const isComplete = cachedResult.suggestions.metadata
+          ?.isComplete as boolean;
+        const lastUpdated = cachedResult.suggestions.metadata?.lastUpdated || 0;
+        const globalLastPage =
+          cachedResult.suggestions.metadata?.globalLastPage || 0;
+        const paginatedResult: PaginatedResults = {
+          suggestions: Object.values(cachedResult.details),
+          metadata: {
+            currentPage: page,
+            totalSuggestions: cachedResult.suggestions.accessionIds.length,
+            lastUpdated,
+            globalLastPage,
+            isComplete: isComplete,
+          },
+        };
+        // Only trigger background fetch if:
+        // 1. No isComplete flag
+        // 2. Cache is not too fresh (to avoid hammering the API)
+        if (!isComplete && Date.now() - lastUpdated > 60 * 1000) {
+          this.fetchMoreSuggestionsInBackground(typedSearchTerm, mode);
+        }
+        return paginatedResult;
+      }
+      const newSuggestionsResponse = await this.fetchSuggestionsFromGenbank(
+        mode,
+        typedSearchTerm,
+        page
+      );
+      const mergedResult = await this.genbankCache.mergeSuggestionsAndGet(
+        mode,
+        typedSearchTerm,
+        newSuggestionsResponse
+      );
+
+      return {
+        suggestions: Object.values(mergedResult.details),
+        metadata: {
+          currentPage: page,
+          totalSuggestions: mergedResult.suggestions.accessionIds.length,
+          lastUpdated:
+            mergedResult.suggestions.metadata?.lastUpdated || Date.now(),
+          globalLastPage:
+            mergedResult.suggestions.metadata?.globalLastPage || page,
+          isComplete:
+            (mergedResult.suggestions.metadata?.isComplete as boolean) || false,
+        },
+      };
+    } catch (error) {
+      console.error("Error in getSuggestions:", error);
+      return { suggestions: [] };
+    }
+  }
+
+  private hasCachedSuggestions(suggestions: SuggestionAndDetailResponse): boolean {
+    return suggestions.suggestions.accessionIds.length != 0;
+  }
+
+  private async fetchMoreSuggestionsInBackground(
+    searchTerm: CommonNameSearch | ScientificNameSearch | AccessionId,
+    mode: "common" | "scientific" | "accession"
+  ) {
+    try {
+      const cache: SuggestionAndDetailResponse =
+        await this.genbankCache.getAllSuggestionsAndDetailsForTerm(
+          mode,
+          searchTerm
+        );
+      const suggestions: SuggestionCacheEntry = cache.suggestions;
+      if (!suggestions || suggestions.metadata?.isComplete) {
+        return;
+      }
+      const nextPage = (suggestions?.metadata?.globalLastPage || 0) + 1;
+      this.fetchAndMergeSuggestions(mode, searchTerm, nextPage);
+    } catch (error) {
+      console.error(
+        `Error fetching more suggestions for ${mode}:${searchTerm}`,
+        error
+      );
+    }
+  }
+
+  async fetchSuggestionsFromGenbank(
+    mode: "common" | "scientific" | "accession",
+    term: AccessionId | ScientificNameSearch | CommonNameSearch,
+    page: number
+  ): Promise<SuggestionsResponse> {
+    try {
+      const searchTerm = this.getQueryFromTermType(mode, term);
+      const variantResponse = await this.getVariantsResponseFromSearchTerm(
+        searchTerm,
+        page
+      );
+      if (!variantResponse || !variantResponse.result) {
+        return {
+          suggestions: [],
+        };
+      }
+      const newSuggestions: Suggestion[] = this.processVariantResults(
+        Object.values(variantResponse.result),
+        variantResponse.taxonomicGroup
+      );
+      return {
+        suggestions: newSuggestions,
+        metadata: {
+          totalSuggestions: newSuggestions.length,
+          globalLastPage: page,
+          lastUpdated: Date.now(),
+          currentPage: page,
+          isComplete: variantResponse.isComplete,
+        },
+      };
+    } catch (error) {
+      console.error(
+        `Error while fetching new suggestions for: ${term as string}`,
+        error
+      );
       return {
         suggestions: [],
       };
-
-    try {
-      const cachedData = await this.getFromCacheHierarchy(
-        searchTerm,
-        page,
-        startIndex
-      );
-      if (!cachedData || !cachedData?.metadata?.isComplete) {
-        Promise.resolve().then(() => {
-          this.triggerBackgroundTasks(searchTerm);
-        });
-      }
-      if (cachedData) {
-        const sortedSuggestions: Suggestion[] = this.sortSuggestionsByDisplayMode(cachedData.suggestions, displayMode, searchTerm);
-        return {
-          ...cachedData,
-          suggestions: sortedSuggestions
-        }
-      }
-      const data: GenBankCacheEntry = await this.fetchData(searchTerm, page, startIndex);
-      await this.distributeToCaches(searchTerm, data);
-      const paginatedResult: PaginatedResults = this.paginateResults(data, page, startIndex);
-      const sortedSuggestions = this.sortSuggestionsByDisplayMode(paginatedResult.suggestions, displayMode, searchTerm);
-      return {
-        ...paginatedResult,
-        suggestions: sortedSuggestions
-      }
-    } catch (error) {
-      console.error("Error in getSuggestions:", error);
-      return {
-        suggestions: [],
-      } as PaginatedResults;
     }
   }
 
+  getQueryFromTermType = (
+    mode: "common" | "scientific" | "accession",
+    term: AccessionId | ScientificNameSearch | CommonNameSearch
+  ): string => {
+    return term as string;
+  };
 
-  private sortSuggestionsByDisplayMode(suggestions: Suggestion[], displayMode: 'commonName' | 'scientificName' | 'accession', searchTerm: string): any {
-    const normalizedSearchTerm = searchTerm.trim().toLowerCase();
-    return [...suggestions].sort((a: Suggestion, b: Suggestion): Suggestion[] => {
-      const aField = displayMode == 'commonName' ? a.primaryCommonName : displayMode == 'scientificName' ? a.scientificName : a.id;
-      const bField = displayMode == 'commonName' ? b.primaryCommonName : displayMode == 'scientificName' ? b.scientificName : b.id;
-      const aExact = aField.toLowerCase() === normalizedSearchTerm;
-      const bExact = bField.toLowerCase() === normalizedSearchTerm;
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
-      const aStartWith = aField.toLowerCase().startsWith(normalizedSearchTerm);
-      const bStartWith = bField.toLowerCase().startsWith(normalizedSearchTerm);
-      if (aStartWith && !bStartWith) return -1;
-      if (!aStartWith && bStartWith) return 1;
-      return aField.localeCompare(bField);
-    });
-  }
-
-  private async getFromCacheHierarchy(
-    searchTerm: string,
-    page: number,
-    startIndex: number
-  ): Promise<PaginatedResults | null> {
-    // Check memory cache
-    const memCache = await this.memoryCache.getCacheEntry(
-      LocalStorageKeys.SUGGESTIONS(),
-      searchTerm
-    );
-    if (memCache && this.hasPageData(memCache, startIndex)) {
-      const result = this.paginateResults(memCache, page, startIndex);
-      if (result.suggestions.length > 0) {
-        return result;
-      }
-    }
-
-    // Check localStorage
-    const localCache = await this.localStorageCache.getCacheEntry(
-      LocalStorageKeys.SUGGESTIONS(),
-      searchTerm
-    );
-    if (localCache && this.hasPageData(localCache, startIndex)) {
-      await this.memoryCache.setCacheEntry(
-        LocalStorageKeys.SUGGESTIONS(),
-        searchTerm,
-        localCache
-      );
-      const result = this.paginateResults(localCache, page, startIndex);
-      if (result.suggestions.length > 0) {
-        return result;
-      }
-    }
-
-    // Check Redis
-    const redisCache = await this.redisCache.getCacheEntry(
-      LocalStorageKeys.SUGGESTIONS(),
-      searchTerm
-    );
-    if (redisCache && this.hasPageData(redisCache, startIndex)) {
-      await this.distributeToCaches(searchTerm, redisCache);
-      const result = this.paginateResults(redisCache, page, startIndex);
-      if (result.suggestions.length > 0) {
-        return result;
-      }
-    }
-    return null;
-  }
-
-  private async triggerBackgroundTasks(searchTerm: string): Promise<void> {
-    Promise.all([
-      this.updateAccessMetrics(searchTerm),
-      this.checkAndFetchNewData(searchTerm),
-    ]).catch((error) => {
-      console.error("Background task error:", error);
-    });
-  }
-
-  async updateAccessMetrics(searchTerm: string) {
-    const redisCache = await this.redisCache.getCacheEntry(
-      LocalStorageKeys.SUGGESTIONS(),
-      searchTerm
-    );
-    if (!redisCache) return;
-
-    const updatedCache = {
-      ...redisCache,
-      metadata: {
-        ...redisCache.metadata,
-        accessCount: (redisCache.metadata?.accessCount || 0) + 1,
-        lastAccessed: Date.now(),
-      },
-    };
-
-    await this.redisCache.setCacheEntry(
-      LocalStorageKeys.SUGGESTIONS(),
+  async fetchAndMergeSuggestions(
+    mode: "common" | "scientific" | "accession",
+    searchTerm: CommonNameSearch | ScientificNameSearch | AccessionId,
+    page: number
+  ): Promise<SuggestionAndDetailResponse> {
+    const newSuggestionsResponse: SuggestionsResponse =
+      await this.fetchSuggestionsFromGenbank(mode, searchTerm, page);
+    return this.genbankCache.mergeSuggestionsAndGet(
+      mode,
       searchTerm,
-      updatedCache
-    );
-  }
-
-  private async checkAndFetchNewData(searchTerm: string): Promise<void> {
-    const shouldFetch = await this.shouldFetchMoreData(searchTerm);
-    if (!shouldFetch) return;
-
-    const redisCache = await this.redisCache.getCacheEntry(
-      LocalStorageKeys.SUGGESTIONS(),
-      searchTerm
-    );
-
-    if (!redisCache) return;
-
-    const nextPage = (redisCache.globalLastPage || 0) + 1;
-
-    try {
-      const variantResponse = await this.getVariantsResponse(
-        searchTerm,
-        redisCache.taxId || "",
-        redisCache.taxonomicGroup || [],
-        nextPage
-      );
-
-      const newSuggestions = this.processVariantResults(
-        Object.values(variantResponse.result),
-        redisCache.taxonomicGroup || []
-      );
-
-      const newCacheData = new GenBankCacheEntry({
-        suggestions: newSuggestions,
-        isComplete:
-          parseInt(variantResponse.retstart.toString()) +
-            newSuggestions.length >=
-          parseInt(variantResponse.count.toString()),
-        lastPage: variantResponse.nextPage || 0,
-        globalLastPage: nextPage,
-        pageSize: this.genBankQueries.DEFAULT_PAGE_SIZE,
-        totalResults: parseInt(variantResponse.count.toString()),
-        taxonomicGroup: redisCache.taxonomicGroup,
-        taxId: redisCache.taxId,
-        metadata: {
-          lastFetched: Date.now(),
-          lastFetchedPage: nextPage,
-        },
-      });
-
-      const mergedSuggestions = this.mergeSuggestions(
-        redisCache.suggestions,
-        newCacheData.suggestions
-      );
-
-      const mergedData = new GenBankCacheEntry({
-        suggestions: mergedSuggestions,
-        isComplete: redisCache.isComplete || newCacheData.isComplete,
-        lastPage: Math.max(redisCache.lastPage, newCacheData.lastPage),
-        globalLastPage: Math.max(
-          redisCache.globalLastPage,
-          newCacheData.globalLastPage
-        ),
-        pageSize: newCacheData.pageSize,
-        totalResults: Math.max(
-          redisCache.totalResults,
-          newCacheData.totalResults
-        ),
-        taxonomicGroup: newCacheData.taxonomicGroup,
-        taxId: newCacheData.taxId,
-        metadata: {
-          ...redisCache.metadata,
-          lastFetched: Date.now(),
-          lastFetchedPage: nextPage,
-        },
-      });
-
-      await this.distributeToCaches(searchTerm, mergedData);
-    } catch (error) {
-      console.error("Error fetching new data:", error);
-    }
-  }
-
-  mergeSuggestions(
-    existingSuggestions: Suggestion[],
-    newSuggestions: Suggestion[]
-  ) {
-    const seenSuggestions = new Map();
-    for (let i = 0; i < existingSuggestions.length; i++) {
-      seenSuggestions.set(existingSuggestions[i].id, existingSuggestions[i]);
-    }
-    const equalAny = (name: string, names: string[]): boolean => {
-      for (let i = 0; i < names.length; i++) {
-        if (names[i] === name) return true;
-      }
-      return false;
-    };
-    const uniqueNewSuggestions: Suggestion[] = newSuggestions.filter(
-      (s) =>
-        !seenSuggestions.has(s.id) &&
-        !equalAny(
-          s.primaryCommonName,
-          Array.from(seenSuggestions.values()).map((v) => v.primaryCommonName)
-        )
-    );
-    return [...existingSuggestions, ...uniqueNewSuggestions];
-  }
-
-  async fetchData(
-    searchTerm: string,
-    page: number,
-    startIndex: number
-  ): Promise<GenBankCacheEntry> {
-    try {
-      const data = await this.fetchAndMergeSuggestions(searchTerm, page);
-      if (data) {
-        return data;
-      }
-      return { suggestions: [] };
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      return { suggestions: [] };
-    }
-  }
-
-  async fetchAndMergeSuggestions(searchTerm: string, page: number) {
-    const existingCache: GenBankCacheEntry | null =
-      await this.redisCache.getCacheEntry(
-        LocalStorageKeys.SUGGESTIONS(),
-        searchTerm
-      );
-    const variantResponse = await this.getVariantsResponseFromSearchTerm(
-      searchTerm,
-    );
-    const newSuggestions = this.processVariantResults(
-      Object.values(variantResponse.result),
-      variantResponse.taxonomicGroup
-    );
-
-    const mergedSuggestions = existingCache
-      ? this.mergeSuggestions(existingCache.suggestions, newSuggestions)
-      : newSuggestions;
-
-    return new GenBankCacheEntry({
-      suggestions: mergedSuggestions,
-      isComplete:
-        variantResponse.retstart + newSuggestions.length >=
-        variantResponse.count,
-      lastPage: Math.max(
-        existingCache?.lastPage || 0,
-        variantResponse.nextPage || 0
-      ),
-      globalLastPage: Math.max(existingCache?.globalLastPage || 0, page),
-      pageSize: this.genBankQueries.DEFAULT_PAGE_SIZE,
-      totalResults: variantResponse.count,
-      taxonomicGroup: variantResponse.taxonomicGroup,
-      taxId: variantResponse.taxId,
-      metadata: {
-        lastFetched: Date.now(),
-        lastFetchedPage: page,
-        ...existingCache?.metadata,
-      },
-    });
-  }
-
-  async distributeToCaches(searchTerm: string, mergedData: GenBankCacheEntry) {
-    await Promise.all([
-      this.memoryCache.setCacheEntry(
-        LocalStorageKeys.SUGGESTIONS(),
-        searchTerm,
-        mergedData
-      ),
-      this.localStorageCache.setCacheEntry(
-        LocalStorageKeys.SUGGESTIONS(),
-        searchTerm,
-        mergedData
-      ),
-      this.redisCache.setCacheEntry(
-        LocalStorageKeys.SUGGESTIONS(),
-        searchTerm,
-        mergedData
-      ),
-    ]);
-  }
-
-  private paginateResults(
-    cacheEntry: GenBankCacheEntry,
-    page: number,
-    startIndex: number
-  ): PaginatedResults {
-    const pageSize =
-      cacheEntry.pageSize ?? this.genBankQueries.DEFAULT_PAGE_SIZE;
-    const start = startIndex;
-    const end = Math.min(start + pageSize, cacheEntry.suggestions.length);
-    const paginatedSuggestions = cacheEntry.suggestions.slice(start, end);
-
-    const metadata: PaginationMetadata = {
-      currentPage: page,
-      totalPages: Math.ceil(cacheEntry.suggestions.length / pageSize),
-      hasMore: !cacheEntry.isComplete || end < cacheEntry.suggestions.length,
-      totalSuggestions: cacheEntry.suggestions.length,
-      lastPage: cacheEntry.lastPage,
-      globalLastPage: cacheEntry.globalLastPage,
-      isComplete: cacheEntry.isComplete,
-      isPartialPage: paginatedSuggestions.length < pageSize,
-      taxonomicGroup: cacheEntry.taxonomicGroup,
-      taxId: cacheEntry.taxId,
-      lastFetched: cacheEntry.metadata.lastFetched,
-      lastFetchedPage: (cacheEntry.metadata?.lastFetchedPage as number) || 0,
-    };
-
-    return {
-      suggestions: paginatedSuggestions,
-      metadata,
-    };
-  }
-
-  async shouldFetchMoreData(searchTerm: string): Promise<boolean> {
-    const redisCache = await this.redisCache.getCacheEntry(
-      LocalStorageKeys.SUGGESTIONS(),
-      searchTerm
-    );
-    if (!redisCache || redisCache.isComplete) return false;
-    const accessCount = redisCache.metadata?.accessCount || 0;
-    const lastFetched = redisCache.metadata?.lastFetched || 0;
-    const hoursSinceLastFetch = (Date.now() - lastFetched) / (1000 * 60 * 60);
-    // Fetch if:
-    // 1. High frequency term (accessed more than threshold)
-    // 2. Not fetched recently (to avoid hammering the API)
-    // 3. Has more pages to fetch
-    return (
-      accessCount >= 3 &&
-      hoursSinceLastFetch >= 1 &&
-      redisCache.globalLastPage < 5
+      newSuggestionsResponse
     );
   }
 
   private async getVariantsResponseFromSearchTerm(
     searchTerm: string,
+    page: number
   ): Promise<VariantResponse> {
     try {
-      const localCache = await this.localStorageCache.getCacheEntry(
-        LocalStorageKeys.SUGGESTIONS(),
-        searchTerm
-      );
-      const nextPage = localCache ? localCache.globalLastPage + 1 : 1;
-
       // Step 1: Try direct taxonomy lookup
       let taxonomicInfo = await this.getTaxonomicGroupInfo(searchTerm);
 
@@ -470,7 +253,9 @@ export class GenBankSearchService {
             if (pattern.pattern.test(searchTerm)) {
               taxonomicInfo = {
                 taxId: pattern.taxId,
-                taxonomicGroup: TAXONOMIC_BASE_GROUPS[pattern.group as TaxonomicGroupKey].searchTerms || [],
+                taxonomicGroup:
+                  TAXONOMIC_BASE_GROUPS[pattern.group as TaxonomicGroupKey]
+                    .searchTerms || [],
                 group: pattern.group,
                 scientificName: pattern.family,
                 searchContext: "pattern" as const,
@@ -480,17 +265,16 @@ export class GenBankSearchService {
           }
         }
       }
-
       // Step 3: Get variants using the best available taxonomy info
       const variantResponse = await this.getVariantsResponse(
         searchTerm,
-        taxonomicInfo.taxId || '',
+        taxonomicInfo.taxId || "",
         taxonomicInfo.taxonomicGroup,
-        nextPage
+        page
       );
 
       return {
-        nextPage,
+        nextPage: page,
         taxId: taxonomicInfo.taxId,
         taxonomicGroup: taxonomicInfo.taxonomicGroup,
         scientificName: taxonomicInfo.scientificName,
@@ -641,21 +425,56 @@ export class GenBankSearchService {
 
   async findTaxonomyId(searchTerm: string) {
     try {
-      // Run all search strategies in parallel
-      const [taxonomyResult, breedResult] = await Promise.all([
-        this.searchTaxonomyDirect(searchTerm),
-        this.searchVariantBreeds(searchTerm),
-      ]);
+      const isAccession = this.isAccessionFormat(searchTerm);
+      if (isAccession) {
+        return await this.searchTaxonomyByAccession(searchTerm);
+      } else {
+        const [taxonomyResult, breedResult] = await Promise.all([
+          this.searchTaxonomyDirect(searchTerm),
+          this.searchVariantBreeds(searchTerm),
+        ]);
 
-      return this.getBestTaxIdMatch(
-        {
-          taxonomyMatch: taxonomyResult,
-          breedMatch: breedResult,
-        },
-        searchTerm
-      );
+        return this.getBestTaxIdMatch(
+            {
+              taxonomyMatch: taxonomyResult,
+              breedMatch: breedResult,
+            },
+            searchTerm
+        );
+      }
     } catch (error) {
       console.error("Error in findTaxonomyId:", error);
+      return null;
+    }
+  }
+
+  private isAccessionFormat(searchTerm: string): boolean {
+    const accessionPatterns = [
+      /^[A-Za-z]{1,2}\d{5,6}(\.\d+)?$/,
+      /^[A-Za-z]{2}_\d{6,}(\.\d+)?$/,
+      /^[A-Za-z]{3}\d{5}(\.\d+)?$/,
+      /^[A-Za-z]{4}\d{8}(\.\d+)?$/,
+      /^[A-Za-z]{6}\d{9,}(\.\d+)?$/
+    ];
+
+    return accessionPatterns.some(pattern => pattern.test(searchTerm));
+  }
+
+  private async searchTaxonomyByAccession(accessionId: string) {
+    try {
+      const uri = this.genBankQueries.buildSequenceSummaryUri([accessionId]);
+      const response = await sendRequestToProxy({ externalUrl: uri });
+
+      if (!response?.result || Object.values(response?.result).length === 0) {
+        return null;
+      }
+      const taxId = Object.values(response.result)[0]?.taxid || null;
+      if (!taxId) {
+        return null;
+      }
+      return taxId;
+    } catch (error) {
+      console.error("Error in searchTaxonomyByAccession:", error);
       return null;
     }
   }
@@ -675,7 +494,6 @@ export class GenBankSearchService {
 
     return summaryResponse.result;
   }
-
 
   findExactMatch(searchTerm: string) {
     const exactMatch = Object.entries(TAXONOMIC_MAPPING).find(
@@ -787,12 +605,16 @@ export class GenBankSearchService {
       isScientific: boolean;
     }> = [];
 
-
     const isScientificSearch = this.looksLikeScientificName(searchTerm);
     if (taxonomyMatch) {
       const result: any = Object.values(taxonomyMatch)[0];
       if (this.isRelevantTaxonomyMatch(result, searchTerm)) {
-        matches.push({taxId: result?.taxid, score: 3, type: "taxonomy", isScientific: true});
+        matches.push({
+          taxId: result?.taxid,
+          score: 3,
+          type: "taxonomy",
+          isScientific: true,
+        });
       }
     }
 
@@ -802,7 +624,12 @@ export class GenBankSearchService {
         searchTerm
       );
       if (breedTaxId)
-        matches.push({taxId: breedTaxId, score: 2, type: "breed", isScientific: false});
+        matches.push({
+          taxId: breedTaxId,
+          score: 2,
+          type: "breed",
+          isScientific: false,
+        });
     }
 
     const bestMatch = matches.sort((a, b) => {
@@ -887,7 +714,10 @@ export class GenBankSearchService {
     return GROUP_PATTERNS.some((pattern) => pattern.pattern.test(searchTerm));
   }
 
-  processVariantResults(results: any[], taxonomicGroup: string[]) {
+  processVariantResults(
+    results: any[],
+    taxonomicGroup: string[]
+  ): Suggestion[] {
     const uniqueVariants = new Map();
 
     Object.values(results).forEach((result) => {
@@ -897,20 +727,16 @@ export class GenBankSearchService {
       const variantInfo = this.extractVariantInfo(result, taxonomicGroup);
 
       if (variantInfo.name && this.isValidVariantName(variantInfo.name)) {
-        const variantKey = variantInfo.name.toLowerCase();
-        if (!uniqueVariants.has(variantKey)) {
-          uniqueVariants.set(variantKey, {
-            id: result.accessionversion || result.uid,
-            scientificName: organism,
-            primaryCommonName: variantInfo.name,
-            additionalCommonNames: variantInfo.additionalNames || [],
-            type: variantInfo.type,
-            source: variantInfo.source,
-          });
-        }
+        uniqueVariants.set(result.accessionversion || result.id, {
+          id: result.accessionversion || result.uid,
+          scientificName: organism,
+          primaryCommonName: variantInfo.name,
+          additionalCommonNames: variantInfo.additionalNames || [],
+          type: variantInfo.type,
+          source: variantInfo.source,
+        });
       }
     });
-
     return Array.from(uniqueVariants.values()).slice(0, 5);
   }
 
@@ -928,7 +754,10 @@ export class GenBankSearchService {
     let additionalNames: any[] = [];
 
     // 1. Check strain field first
-    if (strain && this.isValidVariantName(this.cleanVariantName(strain) || '')) {
+    if (
+      strain &&
+      this.isValidVariantName(this.cleanVariantName(strain) || "")
+    ) {
       variantName = this.cleanVariantName(strain);
       variantType = "Strain";
       source = "strain";
@@ -942,7 +771,7 @@ export class GenBankSearchService {
 
         if (
           ["strain", "breed", "variety", "subspecies"].includes(type) &&
-          this.isValidVariantName(this.cleanVariantName(name) || '')
+          this.isValidVariantName(this.cleanVariantName(name) || "")
         ) {
           variantName = this.cleanVariantName(name);
           variantType = type.charAt(0).toUpperCase() + type.slice(1);
@@ -959,7 +788,7 @@ export class GenBankSearchService {
           new RegExp(`${term}\\s+([^,\\s](?:[^,]*[^,\\s])?)`, "i")
         );
         if (match && match[1]) {
-          const cleaned = this.cleanVariantName(match[1]) || '';
+          const cleaned = this.cleanVariantName(match[1]) || "";
           if (this.isValidVariantName(cleaned)) {
             variantName = cleaned;
             variantType = term.charAt(0).toUpperCase() + term.slice(1);
@@ -984,7 +813,7 @@ export class GenBankSearchService {
       const locationName = subname[countryIndex];
       if (
         locationName &&
-        this.isValidVariantName(this.cleanVariantName(locationName) || '')
+        this.isValidVariantName(this.cleanVariantName(locationName) || "")
       ) {
         variantName = this.cleanVariantName(locationName);
         variantType = "Geographic Variant";
@@ -1055,11 +884,6 @@ export class GenBankSearchService {
     return /^[A-Z][a-zA-Z0-9\s-]+$/.test(name);
   }
 
-  hasPageData(result: GenBankCacheEntry, startIndex: number) {
-    const len = result.suggestions.length;
-    return startIndex < len;
-  }
-
   getBestTaxIdFromBreedName(summaryResults: any[], breedName: string) {
     for (let i = 0; i < summaryResults.length; i++) {
       if (!summaryResults[i].subtype || !summaryResults[i].subname) {
@@ -1111,81 +935,37 @@ export class GenBankSearchService {
     return Math.round(similarityScore);
   }
 
-  async hasGenbankRecordForSearchTerm(searchTerm: string) {
-    if (!searchTerm?.trim()) return this.EMPTY_GENBANK_RESULT;
-    try {
-      const cachedResult = await this.getValidationFromCache(searchTerm);
-      if (cachedResult) {
-        return cachedResult;
-      }
-      const requestUri =
-        this.genBankQueries.buildGenbankRecordCheckUri(searchTerm);
-      const response = await sendRequestToProxy({
-        externalUrl: requestUri,
-      });
-      const result = {
-        accessionId: response.esearchresult.idlist?.[0] || null,
-        title: searchTerm,
-        isValid: response.esearchresult.count !== "0",
-        type: "FASTA",
-      };
-      return result.isValid;
-    } catch (error) {
-      console.error("Error checking GenBank record:", error);
-      return this.EMPTY_GENBANK_RESULT;
-    }
-  }
-
-  async getValidationFromCache(searchTerm: string) {
-    const memCache = await this.memoryCache.getCacheEntry(
-      LocalStorageKeys.GENBANK_RECORD_VALIDATION(),
-      searchTerm
+  async hasAnyValidCacheEntry(searchTerm: string): Promise<boolean> {
+    const accessionId = createAccessionSearch(searchTerm);
+    const commonNameSearch = createCommonNameSearch(searchTerm);
+    const ScientificNameSearch = createScientificNameSearch(searchTerm);
+    const accessionCache = await this.genbankCache.getSuggestions(
+      "accession",
+      accessionId,
+      0
     );
-    if (memCache?.isValid) return memCache;
-    const localCache = await this.localStorageCache.getCacheEntry(
-      LocalStorageKeys.GENBANK_RECORD_VALIDATION(),
-      searchTerm
-    );
-    if (localCache?.isValid) {
-      await this.memoryCache.setCacheEntry(
-        LocalStorageKeys.GENBANK_RECORD_VALIDATION(),
-        searchTerm,
-        localCache
-      );
-      return localCache;
+    if (accessionCache && accessionCache.suggestions.accessionIds.length > 0) {
+      return true;
     }
-    const redisCache = await this.redisCache.getCacheEntry(
-      LocalStorageKeys.GENBANK_RECORD_VALIDATION(),
-      searchTerm
+    const commonNameCache = await this.genbankCache.getSuggestions(
+      "common",
+      commonNameSearch,
+      0
     );
-    if (redisCache?.isValid) {
-      await this.updateValidationLocalCaches(searchTerm, redisCache);
-      return redisCache;
+    if (
+      commonNameCache &&
+      commonNameCache.suggestions.accessionIds.length > 0
+    ) {
+      return true;
     }
+    const scientificNameCache = await this.genbankCache.getSuggestions(
+      "scientific",
+      ScientificNameSearch,
+      0
+    );
+    return !!(scientificNameCache &&
+        scientificNameCache.suggestions.accessionIds.length > 0);
 
-    return null;
-  }
-
-  async updateValidationLocalCaches(
-    searchTerm: string,
-    data: GenBankCacheEntry
-  ) {
-    if (!data.isValid) return;
-
-    await Promise.all([
-      this.memoryCache.setCacheEntry(
-        LocalStorageKeys.GENBANK_RECORD_VALIDATION(),
-        searchTerm,
-        data
-      ),
-      this.localStorageCache.setCacheEntry(
-        LocalStorageKeys.GENBANK_RECORD_VALIDATION(),
-        searchTerm,
-        data
-      ),
-    ]).catch((error) => {
-      console.error("Error updating local validation caches:", error);
-    });
   }
 
   private looksLikeScientificName(searchTerm: string): boolean {
@@ -1196,5 +976,25 @@ export class GenBankSearchService {
     const hasSpecialChars = /[0-9!@#$%^&*(),.?":{}|<>]/.test(normalizedTerm);
 
     return hasLatinFormat && wordCount >= 2 && !hasSpecialChars;
+  }
+
+
+  async hasGenbankRecordForSearchTerm(searchTerm: string) {
+    if (!searchTerm?.trim()) return false;
+    try {
+      const cachedResult = await this.hasAnyValidCacheEntry(searchTerm);
+      if (cachedResult) {
+        return cachedResult;
+      }
+      const requestUri =
+          this.genBankQueries.buildGenbankRecordCheckUri(searchTerm);
+      const response = await sendRequestToProxy({
+        externalUrl: requestUri,
+      });
+      return response.esearchresult.count !== "0";
+    } catch (error) {
+      console.error("Error checking GenBank record:", error);
+      return false;
+    }
   }
 }

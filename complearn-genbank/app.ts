@@ -4,16 +4,16 @@ import cors from "cors";
 import session from "express-session";
 import {Strategy as GoogleStrategy, Profile as GoogleProfile} from "passport-google-oauth20";
 import {Strategy as GitHubStrategy, Profile as GithubProfile} from "passport-github2";
-import ENV_LOADER from "./configurations/envLoader";
-import logger from "./configurations/logger";
+import ENV_LOADER from "./configurations/envLoader.js";
+import logger from "./configurations/logger.js";
 
 // routes
-import loginRoutes from "./routes/login";
-import externalRoutes from "./routes/external";
-import {upsertUser} from "./services/userService";
-import redisRoutes from "./routes/redis";
-import {requestLogger} from "./middleware/requestLogger";
-import {ExtendedGithubProfile} from "./models/extendedGithubProfile";
+import loginRoutes from "./routes/login.js";
+import externalRoutes from "./routes/external.js";
+import {upsertUser} from "./services/userService.js";
+import redisRoutes from "./routes/redis.js";
+import {requestLogger} from "./middleware/requestLogger.js";
+import {ExtendedGithubProfile} from "./models/extendedGithubProfile.js";
 import {Request, Response, NextFunction} from 'express';
 
 const app: express.Application = express();

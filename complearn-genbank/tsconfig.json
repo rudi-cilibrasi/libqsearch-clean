@@ -1,30 +1,26 @@
 {
   "compilerOptions": {
-    // defines the module system that TypeScript will use when transpiling your TypeScript code to JavaScript.
-    "module": "commonjs",
-    // version of output JavaScript
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "target": "ES2020",
-    // controls how the compiler resolves modules when using import
-    "moduleResolution": "node",
     "rootDir": "./",
-    "types": [
-      "jest"
-    ],
-    "allowJs": true,
     "outDir": "dist",
+    "types": ["node", "jest"],
+    "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "typeRoots": [
-      "./node_modules/@types",
-      "./types"  // Make sure your custom types folder is included here
-    ]
+    "sourceMap": true
   },
   "include": [
-    "./**/*.ts",    // Include all your TypeScript files
-    "./types/*.d.ts"  // Explicitly include the types folder
+    "**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }

@@ -10,7 +10,8 @@ const logger: Logger = createLogger({
             const baseLine = `${timestamp} [${level.toUpperCase()}] [${requestId}] ${message}`;
             if (transaction) {
                 const prettyJson = JSON.stringify(transaction, null, 2);
-                return `${baseLine}\n${prettyJson}`;
+                return `${baseLine}
+${prettyJson}`;
             }
 
             return baseLine;

@@ -1,5 +1,5 @@
 const STORAGE_VERSION_NAME = "complearn_storage_version";
-const STORAGE_VERSION = 8;
+const STORAGE_VERSION = 9;
 
 type StorageKeyFunction = () => string;
 

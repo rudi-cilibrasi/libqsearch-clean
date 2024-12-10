@@ -1,3 +1,5 @@
+import { BaseCacheMetadata } from "@/cache/CacheInterface.ts";
+
 export interface TaxonomicMapping {
   id: string;
   group: string;
@@ -5,7 +7,6 @@ export interface TaxonomicMapping {
   searchTerms?: string[];
   generalCommonNames?: string[];
 }
-
 
 export interface AnimalGroup {
   genus?: string;
@@ -107,21 +108,74 @@ export interface ESummaryResult {
   commonname?: string;
 }
 export interface PaginationMetadata {
-  currentPage: number;
-  totalPages: number;
-  hasMore: boolean;
+  currentPage?: number;
   totalSuggestions: number;
-  lastPage: number;
   globalLastPage: number;
-  isComplete: boolean;
-  isPartialPage: boolean;
-  taxonomicGroup: string[] | null;
-  taxId: string | null;
-  lastFetched: number;
-  lastFetchedPage: number;
+  lastUpdated: number;
+  isComplete?: boolean;
 }
 
 export interface PaginatedResults {
   suggestions: Suggestion[];
   metadata?: PaginationMetadata;
+}
+
+export type SearchMode = "common" | "scientific" | "accession";
+
+export type CommonNameSearch = string & { __commonNameSearchTag: void };
+export type ScientificNameSearch = string & { __scientificNameSearchTag: void };
+export type AccessionId = string & { __accessionSearchTag: void };
+
+export const createCommonNameSearch = (searchTerm: string): CommonNameSearch =>
+  searchTerm as CommonNameSearch;
+export const createScientificNameSearch = (
+  searchTerm: string
+): ScientificNameSearch => searchTerm as ScientificNameSearch;
+export const createAccessionSearch = (searchTerm: string): AccessionId =>
+  searchTerm as AccessionId;
+
+export const createCommonSearchCacheKey = (searchTerm: string) =>
+  `search:common:${searchTerm}`;
+export const createScientificSearchCacheKey = (searchTerm: string) =>
+  `search:scientific:${searchTerm}`;
+export const createAccessionSearchCacheKey = (searchTerm: string) =>
+  `search:accession:${searchTerm}`;
+
+export const CACHE_NAMES = {
+  SUGGESTIONS: "fasta_suggestions",
+  SUGGESTION_DETAILS: "fasta_suggestion_details",
+  ACCESSION_SEQUENCE: "fasta_accession_sequence",
+} as const;
+
+export interface SuggestionsCache {
+  [key: string]: SuggestionCacheEntry;
+}
+
+export interface SuggestionDetailsCache {
+  [accessionId: string]: Suggestion;
+}
+
+export interface AccessionSequenceCache {
+  [accessionId: string]: string;
+}
+
+export interface SuggestionCacheEntry {
+  accessionIds: (AccessionId | "end")[];
+  metadata?: BaseCacheMetadata;
+}
+
+export interface CacheTypes {
+  [CACHE_NAMES.SUGGESTIONS]: SuggestionsCache;
+  [CACHE_NAMES.SUGGESTION_DETAILS]: SuggestionDetailsCache;
+  [CACHE_NAMES.ACCESSION_SEQUENCE]: AccessionSequenceCache;
+}
+
+export interface SuggestionsResponse {
+  suggestions: Suggestion[];
+  metadata?: PaginationMetadata;
+}
+
+export interface SuggestionAndDetailResponse {
+  suggestions: SuggestionCacheEntry;
+  details: SuggestionDetailsCache;
 }

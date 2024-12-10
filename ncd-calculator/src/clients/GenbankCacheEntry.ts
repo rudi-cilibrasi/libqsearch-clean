@@ -41,3 +41,8 @@ export class GenBankCacheEntry {
     };
   }
 }
+
+
+export class GenbankSuggestionCacheEntry {
+
+}

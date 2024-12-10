@@ -1,6 +1,6 @@
 import { Sequelize } from "sequelize";
-import ENV_LOADER from "./envLoader";
-import logger from "./logger";
+import ENV_LOADER from "./envLoader.js";
+import logger from "./logger.js";
 
 const sequelizeNormal = new Sequelize(
     ENV_LOADER.MYSQL_DATABASE,
