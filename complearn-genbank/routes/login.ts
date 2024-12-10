@@ -1,5 +1,5 @@
-import ENV_LOADER from "../configurations/envLoader.js";
-import logger from "../configurations/logger.js";
+import ENV_LOADER from "../configurations/envLoader";
+import logger from "../configurations/logger";
 import { Router, Request, Response } from "express";
 import { PassportStatic } from "passport";
 

@@ -1,7 +1,7 @@
-import logger from "../configurations/logger.js";
-import {UserMut} from "../models/userMut.js";
-import {UserHist} from "../models/userHist.js";
-import { sequelize } from "../configurations/databaseConnection.js";
+import logger from "../configurations/logger";
+import {UserMut} from "../models/userMut";
+import {UserHist} from "../models/userHist";
+import { sequelize } from "../configurations/databaseConnection";
 import {Transaction} from "sequelize";
 import {Profile as GoogleProfile} from "passport-google-oauth20";
 import {ExtendedGithubProfile} from "../models/extendedGithubProfile";

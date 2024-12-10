@@ -5,7 +5,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc",
     "start": "node ./dist/bin/www.js",
-    "dev": "ts-node --esm ./bin/www.ts",
+    "dev": "ts-node ./bin/www.ts",
     "test": "jest"
   },
   "jest": {

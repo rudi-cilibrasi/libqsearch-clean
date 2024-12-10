@@ -1,7 +1,7 @@
-import app from "../app.js";
+import app from "../app";
 import http from "http";
-import logger from "../configurations/logger.js";
-import { syncSequelize } from "../configurations/databaseConnection.js";
+import logger from "../configurations/logger";
+import { syncSequelize } from "../configurations/databaseConnection";
 
 const port = normalizePort(process.env.PORT || '3001');
 app.set('port', port);

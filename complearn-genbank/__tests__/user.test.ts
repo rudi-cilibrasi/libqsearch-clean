@@ -1,9 +1,9 @@
 import {describe, it, expect, beforeAll, afterAll} from "@jest/globals";
-import {upsertUserMut, insertUserHist, upsertUser} from "../services/userService.js";
-import {UserMut} from "../models/userMut.js";
-import {UserHist} from "../models/userHist.js";
-import {sequelize, syncSequelize} from "../configurations/databaseConnection.js";
-import {ExtendedGithubProfile} from "../models/extendedGithubProfile.js";
+import {upsertUserMut, insertUserHist, upsertUser} from "../services/userService";
+import {UserMut} from "../models/userMut";
+import {UserHist} from "../models/userHist";
+import {sequelize, syncSequelize} from "../configurations/databaseConnection";
+import {ExtendedGithubProfile} from "../models/extendedGithubProfile";
 
 beforeEach(async () => {
     await sequelize.sync({ force: true });

@@ -1,4 +1,4 @@
-import logger from "../configurations/logger.js";
+import logger from "../configurations/logger";
 import crypto from 'crypto';
 import {Request, Response, NextFunction} from 'express';
 import {IncomingHttpHeaders, OutgoingHttpHeaders} from "http";

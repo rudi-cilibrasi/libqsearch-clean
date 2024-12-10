@@ -1,7 +1,7 @@
 import { createClient } from "redis";
 import express, { Request, Response, Router } from "express";
-import logger from "../configurations/logger.js";
-import ENV_LOADER from "../configurations/envLoader.js";
+import logger from "../configurations/logger";
+import ENV_LOADER from "../configurations/envLoader";
 
 const router: Router = express.Router();
 const client = createClient({

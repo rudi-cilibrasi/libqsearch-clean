@@ -1,5 +1,5 @@
 import {DataTypes, Model, Optional, Sequelize} from 'sequelize';
-import {sequelize} from "../configurations/databaseConnection.js";
+import {sequelize} from "../configurations/databaseConnection";
 
 // Define the attributes of the UserMut model
 interface UserMutAttributes {

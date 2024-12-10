@@ -1,7 +1,7 @@
 import express from "express";
 import axios from "axios";
-import ENV_LOADER from "../configurations/envLoader.js";
-import logger from "../configurations/logger.js";
+import ENV_LOADER from "../configurations/envLoader";
+import logger from "../configurations/logger";
 import { Request, Response } from "express";
 
 const router = express.Router();

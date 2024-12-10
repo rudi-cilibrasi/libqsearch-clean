@@ -1,5 +1,5 @@
 import {DataTypes, Model, Optional, Sequelize} from 'sequelize';
-import {sequelize} from "../configurations/databaseConnection.js";
+import {sequelize} from "../configurations/databaseConnection";
 
 interface UserHistAttributes {
     provider_name: string;
