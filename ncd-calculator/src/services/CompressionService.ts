@@ -34,33 +34,4 @@ export class CompressionService {
             return new Worker(URL.createObjectURL(blob));
         }
     }
-
-    static async processFiles(
-        contents: string[],
-        labels: string[],
-        onProgress?: (i: number, j: number, value: number) => void
-    ): Promise<number[][]> {
-        return new Promise((resolve, reject) => {
-            const worker = this.createWorker(contents);
-
-            worker.onmessage = (e) => {
-                if (e.data.type === 'error') {
-                    reject(new Error(e.data.message));
-                    worker.terminate();
-                } else if (e.data.type === 'progress' && onProgress) {
-                    onProgress(e.data.i, e.data.j, e.data.value);
-                } else if (e.data.type === 'result') {
-                    resolve(e.data.ncdMatrix);
-                    worker.terminate();
-                }
-            };
-
-            worker.onerror = (error) => {
-                reject(error);
-                worker.terminate();
-            };
-
-            worker.postMessage({ labels, contents });
-        });
-    }
 }
