@@ -12,11 +12,6 @@ const server = http.createServer(app);
 syncSequelize();
 
 /**
- * Listen on provided port, on all network interfaces.
- */
-server.listen(port);
-
-/**
  * Normalize a port into a number, string, or false.
  */
 function normalizePort(val: string) {
@@ -71,5 +66,3 @@ function onListening() {
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
-
-export default server;
