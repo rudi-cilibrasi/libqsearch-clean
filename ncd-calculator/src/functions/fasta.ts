@@ -61,8 +61,6 @@ export const parseFasta = (content: string): FastaMetadata[] => {
   };
   let currentSequence = "";
   lines.forEach((line) => {
-    const trimmedLine = line.trim();
-    if (!trimmedLine) return; // skip empty line
     if (line.startsWith(">")) {
       if (currentSequence) {
         sequences.push({
@@ -78,9 +76,10 @@ export const parseFasta = (content: string): FastaMetadata[] => {
         ...parseMetadata(line)
       };
     } else {
-      currentSequence += trimmedLine;
+      currentSequence += line.trim();
     }
   });
+
   if (currentSequence) {
     sequences.push({
       ...currentHeader,
@@ -89,7 +88,6 @@ export const parseFasta = (content: string): FastaMetadata[] => {
   }
   return sequences;
 };
-
 export const parseMetadata = (content: string): FastaMetadata | {} => {
   if (!hasMetadata(content)) {
     return { };
