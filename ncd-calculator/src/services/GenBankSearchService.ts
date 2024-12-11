@@ -38,7 +38,7 @@ export class GenBankSearchService {
 
   constructor() {
     this.genbankCache = new GenbankCache();
-    this.genBankQueries = new GenBankQueries(import.meta.env.VITE_NCBI_API_KEY);
+    this.genBankQueries = new GenBankQueries(import.meta.env.VITE_NCBI_API_KEY || '');
     this.taxonomyCache = new Map();
   }
 
@@ -377,7 +377,12 @@ export class GenBankSearchService {
         return this.cacheAndReturn(normalizedSearchTerm, taxonomicInfo);
       }
 
-      // 3. Check group patterns for specific families
+      // 3. Check exact matches in TAXONOMIC_MAPPING
+      const exactMatch = this.findExactMatch(normalizedSearchTerm);
+      if (exactMatch)
+        return this.cacheAndReturn(normalizedSearchTerm, exactMatch);
+
+      // 4. Check group patterns for specific families
       for (const pattern of GROUP_PATTERNS) {
         if (pattern.pattern.test(normalizedSearchTerm)) {
           const taxonomicInfo: TaxonomicInfo = {
@@ -392,11 +397,6 @@ export class GenBankSearchService {
           return this.cacheAndReturn(normalizedSearchTerm, taxonomicInfo);
         }
       }
-
-      // 4. Check exact matches in TAXONOMIC_MAPPING
-      const exactMatch = this.findExactMatch(normalizedSearchTerm);
-      if (exactMatch)
-        return this.cacheAndReturn(normalizedSearchTerm, exactMatch);
 
       // 5. Check common names
       const commonNameMatch = this.findCommonNameMatch(normalizedSearchTerm);
@@ -479,20 +479,24 @@ export class GenBankSearchService {
     }
   }
 
-  async searchVariantBreeds(searchTerm: string) {
-    const uri = this.genBankQueries.buildAdvancedVariantSearchUri(searchTerm);
-    const response = await sendRequestToProxy({ externalUrl: uri });
+  async searchVariantBreeds(searchTerm: string): Promise<any | null> {
+    try {
+      const uri = this.genBankQueries.buildAdvancedVariantSearchUri(searchTerm);
+      const response = await sendRequestToProxy({externalUrl: uri});
 
-    if (!response.esearchresult?.idlist?.length) return null;
+      if (!response.esearchresult?.idlist?.length) return null;
 
-    const summaryUri = this.genBankQueries.buildSequenceSummaryUri(
-      response.esearchresult.idlist
-    );
-    const summaryResponse = await sendRequestToProxy({
-      externalUrl: summaryUri,
-    });
-
-    return summaryResponse.result;
+      const summaryUri = this.genBankQueries.buildSequenceSummaryUri(
+          response.esearchresult.idlist
+      );
+      const summaryResponse = await sendRequestToProxy({
+        externalUrl: summaryUri,
+      });
+      return summaryResponse.result || null;
+    } catch (error) {
+      console.error("Error while search variant breeds:", error);
+      return null;
+    }
   }
 
   findExactMatch(searchTerm: string) {
@@ -578,20 +582,25 @@ export class GenBankSearchService {
     };
   }
 
-  async searchTaxonomyDirect(searchTerm: string) {
-    const uri = this.genBankQueries.buildTaxonomySearchUri(searchTerm);
-    const response = await sendRequestToProxy({ externalUrl: uri });
+  async searchTaxonomyDirect(searchTerm: string): Promise<any | null> {
+    try {
+      const uri = this.genBankQueries.buildTaxonomySearchUri(searchTerm);
+      const response = await sendRequestToProxy({externalUrl: uri});
 
-    if (response.esearchresult?.count !== "0") {
-      const summaryUri = this.genBankQueries.buildTaxonomicSummaryUri(
-        response.esearchresult.idlist[0]
-      );
-      const summaryResponse = await sendRequestToProxy({
-        externalUrl: summaryUri,
-      });
-      return summaryResponse.result;
+      if (response.esearchresult?.count !== "0") {
+        const summaryUri = this.genBankQueries.buildTaxonomicSummaryUri(
+            response.esearchresult.idlist[0]
+        );
+        const summaryResponse = await sendRequestToProxy({
+          externalUrl: summaryUri,
+        });
+        return summaryResponse.result || null;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      return null;
     }
-    return null;
   }
 
   getBestTaxIdMatch(
