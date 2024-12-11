@@ -1,1 +1,1 @@
-docker-compose --profile redis --profile app up -d
+docker-compose --profile redis --profile app up -d --build
