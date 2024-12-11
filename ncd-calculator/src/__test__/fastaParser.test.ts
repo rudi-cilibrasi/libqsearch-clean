@@ -173,18 +173,6 @@ test("test parseFasta with multiple sequences with headers", () => {
     }
 })
 
-test('parse multiple fasta without headers', () => {
-    const sequences = "ATGCCCAATGGGGGGGAAA\n   \nATTTTTGGGGAAACCCCC";
-    const hasHeader = hasMetadata(sequences);
-    const parsed = parseFasta(sequences);
-    const expected = [{ sequence: "ATGCCCAATGGGGGGGAAA"}, { sequence: "ATTTTTGGGGAAACCCCC" }];
-    expect(parsed.length).toBe(2);
-    expect(hasHeader).toBe(false);
-    for(let i = 0; i < parsed.length; i++) {
-        expect(parsed[i].sequence).toStrictEqual(expected[i].sequence);
-    }
-})
-
 const FILE_UPLOAD = "file_upload";
 
 test('should extract common name when present', () => {

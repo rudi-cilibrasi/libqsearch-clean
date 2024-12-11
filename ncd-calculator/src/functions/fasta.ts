@@ -48,69 +48,46 @@ export const parseMultipleMetadata = (content: string): FastaMetadata[] => {
 };
 
 export const parseFasta = (content: string): FastaMetadata[] => {
-  if (!content || content.trim() === "") {
+  if (!content?.trim()) {
     return [];
   }
+
   const lines = content.split("\n");
-  const isHeadless = !hasMetadata(content);
-  if (isHeadless) {
-    let sequences: FastaMetadata[] = [];
-    let currentSequence = "";
-    lines.forEach((line) => {
-      if (line.trim() === "") {
-        if (currentSequence) {
-          sequences.push({
-            sequence: currentSequence,
-            accession: "",
-            scientificName: "",
-            commonName: "",
-          });
-          currentSequence = "";
-        }
-      } else {
-        currentSequence += line.trim();
+  const sequences: FastaMetadata[] = [];
+  let currentHeader: FastaMetadata = {
+    accession: "",
+    scientificName: "",
+    commonName: "",
+  };
+  let currentSequence = "";
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) return; // skip empty line
+    if (line.startsWith(">")) {
+      if (currentSequence) {
+        sequences.push({
+          ...currentHeader,
+          sequence: currentSequence,
+        });
       }
-    });
-    if (currentSequence) {
-      sequences.push({
-        sequence: currentSequence,
+      currentSequence = "";
+      currentHeader = {
         accession: "",
         scientificName: "",
         commonName: "",
-      });
+        ...parseMetadata(line)
+      };
+    } else {
+      currentSequence += trimmedLine;
     }
-    return sequences;
-  } else {
-    let header: FastaMetadata = {
-      accession: "",
-      scientificName: "",
-      commonName: "",
-    };
-    let currentSequence = "";
-    let sequences: FastaMetadata[] = [];
-    lines.forEach((line) => {
-      if (line.startsWith(">") || line.trim() === "") {
-        if (header && currentSequence) {
-          sequences.push({
-            ...header,
-            sequence: currentSequence,
-          });
-          header = { accession: "", scientificName: "", commonName: "" };
-          currentSequence = "";
-        }
-        header = parseMetadata(line);
-      } else {
-        currentSequence += line.trim();
-      }
+  });
+  if (currentSequence) {
+    sequences.push({
+      ...currentHeader,
+      sequence: currentSequence,
     });
-    if (header && currentSequence) {
-      sequences.push({
-        ...header,
-        sequence: currentSequence,
-      });
-    }
-    return sequences;
   }
+  return sequences;
 };
 
 export const parseMetadata = (content: string): FastaMetadata | {} => {
