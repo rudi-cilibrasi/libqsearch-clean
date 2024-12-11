@@ -54,9 +54,9 @@ export const InputAccumulator: React.FC<InputAccumulatorProps> = ({
     return (
         <div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-200">
-                {!authenticated && items.length > 8 && (
+                {!authenticated && items.length > 16 && (
                     <p className="text-sm text-red-500">
-                        Please log in to increase your item selection limit (maximum 8).
+                        Please log in to increase your item selection limit (maximum 16).
                     </p>
                 )}
                 <h3 className="text-lg font-bold text-gray-900">
