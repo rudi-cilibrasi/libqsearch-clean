@@ -49,7 +49,8 @@ const login = (passport: PassportStatic) => {
 
             logger.info(`${userName} authenticated successfully`);
         } else {
-            res.status(401).json({message: 'User not authenticated'});
+            logger.info('User is not authenticated');
+            res.json({userName: null});
         }
     });
 
