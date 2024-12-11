@@ -1,85 +1,86 @@
-import { GroupPattern } from "@/services/genbank";
+import {GroupPattern} from "@/services/genbank";
+
 export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
   // MAMMALS (40674)
   "felis catus": {
     id: "9685",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["cat", "kitten", "kitty", "domestic cat"],
   },
   "canis lupus familiaris": {
     id: "9615",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["dog", "puppy", "domestic dog"],
   },
   "equus caballus": {
     id: "9796",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["horse", "pony", "mare", "stallion"],
   },
   "bos taurus": {
     id: "9913",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["cow", "cattle", "bull", "calf"],
   },
-  "sus scrofa domesticus": {
-    id: "9825",
-    group: "MAMMAL",
+  "sus scrofa": {
+    id: "9823",
+    group: "MAMMALS",
     commonNames: ["pig", "swine", "hog", "domestic pig"],
   },
   "ovis aries": {
     id: "9940",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["sheep", "lamb", "ram", "ewe"],
   },
   "capra hircus": {
     id: "9925",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["goat", "domestic goat", "kid"],
   },
   "oryctolagus cuniculus": {
     id: "9986",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["rabbit", "bunny", "domestic rabbit"],
   },
 
   // Lab Animals
   "mus musculus": {
     id: "10090",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["mouse", "lab mouse", "house mouse"],
   },
   "rattus norvegicus": {
     id: "10116",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["rat", "lab rat", "brown rat"],
   },
 
   // Primates
   "pan troglodytes": {
     id: "9598",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["chimpanzee", "chimp"],
   },
   "gorilla gorilla": {
     id: "9593",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["gorilla", "western gorilla"],
   },
   "pongo abelii": {
     id: "9601",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["orangutan", "sumatran orangutan"],
   },
 
   // Marine Mammals
   "tursiops truncatus": {
     id: "9739",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["dolphin", "bottlenose dolphin"],
   },
   "orcinus orca": {
     id: "9733",
-    group: "MAMMAL",
+    group: "MAMMALS",
     commonNames: ["orca", "killer whale"],
   },
 
@@ -132,29 +133,42 @@ export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
   // BIRDS (8782)
   "gallus gallus": {
     id: "9031",
-    group: "BIRD",
+    group: "BIRDS",
     commonNames: ["chicken", "rooster", "hen"],
   },
   "meleagris gallopavo": {
     id: "9103",
-    group: "BIRD",
+    group: "BIRDS",
     commonNames: ["turkey", "wild turkey"],
   },
   "anas platyrhynchos": {
     id: "8839",
-    group: "BIRD",
+    group: "BIRDS",
     commonNames: ["duck", "mallard", "mallard duck"],
   },
   "columba livia": {
     id: "8932",
-    group: "BIRD",
+    group: "BIRDS",
     commonNames: ["pigeon", "dove", "rock dove"],
   },
+
+  "panthera tigris": {
+    id: "9694",
+    group: "MAMMALS",
+    commonNames: ["tiger", "bengal tiger", "siberian tiger"],
+  },
+
+  "balaenoptera": {
+    id: "9771",
+    group: "MAMMALS",
+    commonNames: ["whale", "blue whale", "great blue whale"],
+  },
+
 
   // Group level mappings for general searches
   MAMMAL: {
     id: "40674",
-    group: "MAMMAL",
+    group: "MAMMALS",
     searchTerms: ["breed", "strain", "subspecies"],
     generalCommonNames: [
       "mammal",
@@ -192,7 +206,7 @@ export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
   },
   BIRD: {
     id: "8782",
-    group: "BIRD",
+    group: "BIRDS",
     searchTerms: ["breed", "strain", "subspecies"],
     generalCommonNames: [
       "bird",
@@ -211,7 +225,7 @@ export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
   },
   REPTILE: {
     id: "8504",
-    group: "REPTILE",
+    group: "REPTILES",
     searchTerms: ["strain", "subspecies", "population"],
     generalCommonNames: [
       "reptile",
@@ -229,7 +243,7 @@ export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
   },
   AMPHIBIAN: {
     id: "8292",
-    group: "AMPHIBIAN",
+    group: "AMPHIBIANS",
     searchTerms: ["strain", "population", "subspecies"],
     generalCommonNames: [
       "amphibian",
@@ -242,7 +256,7 @@ export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
   },
   INSECT: {
     id: "50557",
-    group: "INSECT",
+    group: "INSECTS",
     searchTerms: ["strain", "variety", "ecotype"],
     generalCommonNames: [
       "insect",
@@ -336,24 +350,32 @@ interface AnimalGroup {
 
 // This type represents all possible animal keys
 type AnimalKey =
-  | "cat"
-  | "tiger"
-  | "lion"
-  | "leopard"
-  | "dog"
-  | "wolf"
-  | "fox"
-  | "crocodile"
-  | "alligator"
-  | "snake"
-  | "chicken"
-  | "duck"
-  | "eagle"
-  | "dolphin"
-  | "whale"
-  | "gorilla"
-  | "chimpanzee"
-  | "bear";
+    | "cat"
+    | "tiger"
+    | "lion"
+    | "leopard"
+    | "dog"
+    | "wolf"
+    | "fox"
+    | "crocodile"
+    | "alligator"
+    | "snake"
+    | "chicken"
+    | "duck"
+    | "eagle"
+    | "dolphin"
+    | "whale"
+    | "gorilla"
+    | "chimpanzee"
+    | "bear"
+    | "horse"
+    | "cow"
+    | "pig"
+    | "sheep"
+    | "goat"
+    | "rabbit"
+    | "mouse"
+    | "rat";
 
 export const ANIMAL_GROUPS: Record<AnimalKey, AnimalGroup> = {
   cat: {
@@ -649,6 +671,152 @@ export const ANIMAL_GROUPS: Record<AnimalKey, AnimalGroup> = {
       "sloth bear",
     ],
   },
+  horse: {
+    genus: "Equus",
+    family: "Equidae",
+    taxId: "9796",
+    group: "MAMMALS",
+    searchTerms: ["breed", "strain", "subspecies"],
+    includes: [
+      "arabian horse",
+      "thoroughbred",
+      "quarter horse",
+      "andalusian",
+      "friesian",
+      "appaloosa",
+      "morgan horse",
+      "paint horse",
+      "clydesdale",
+      "shire horse"
+    ]
+  },
+  cow: {
+    genus: "Bos",
+    family: "Bovidae",
+    taxId: "9913",
+    group: "MAMMALS",
+    searchTerms: ["breed", "strain", "subspecies"],
+    includes: [
+      "holstein",
+      "angus",
+      "hereford",
+      "jersey cow",
+      "charolais",
+      "limousin",
+      "brahman",
+      "simmental",
+      "guernsey",
+      "brown swiss"
+    ]
+  },
+  pig: {
+    genus: "Sus",
+    family: "Suidae",
+    taxId: "9823",
+    group: "MAMMALS",
+    searchTerms: ["breed", "strain", "subspecies"],
+    includes: [
+      "yorkshire pig",
+      "duroc",
+      "hampshire pig",
+      "berkshire pig",
+      "landrace pig",
+      "pietrain",
+      "large white pig",
+      "spotted pig",
+      "tamworth pig"
+    ]
+  },
+  sheep: {
+    genus: "Ovis",
+    family: "Bovidae",
+    taxId: "9940",
+    group: "MAMMALS",
+    searchTerms: ["breed", "strain", "subspecies"],
+    includes: [
+      "merino sheep",
+      "suffolk sheep",
+      "dorper",
+      "romney sheep",
+      "dorset sheep",
+      "hampshire sheep",
+      "texel sheep",
+      "jacob sheep",
+      "lincoln sheep"
+    ]
+  },
+  goat: {
+    genus: "Capra",
+    family: "Bovidae",
+    taxId: "9925",
+    group: "MAMMALS",
+    searchTerms: ["breed", "strain", "subspecies"],
+    includes: [
+      "nubian goat",
+      "alpine goat",
+      "saanen goat",
+      "boer goat",
+      "angora goat",
+      "pygmy goat",
+      "nigerian dwarf goat",
+      "lamancha goat",
+      "toggenburg goat"
+    ]
+  },
+  rabbit: {
+    genus: "Oryctolagus",
+    family: "Leporidae",
+    taxId: "9986",
+    group: "MAMMALS",
+    searchTerms: ["breed", "strain", "subspecies"],
+    includes: [
+      "holland lop",
+      "netherland dwarf",
+      "mini rex",
+      "lionhead rabbit",
+      "flemish giant",
+      "dutch rabbit",
+      "new zealand white",
+      "angora rabbit",
+      "rex rabbit"
+    ]
+  },
+  mouse: {
+    genus: "Mus",
+    family: "Muridae",
+    taxId: "10090",
+    group: "MAMMALS",
+    searchTerms: ["strain", "subspecies", "laboratory"],
+    includes: [
+      "c57bl/6",
+      "balb/c",
+      "swiss webster",
+      "cd-1 mouse",
+      "black 6 mouse",
+      "nude mouse",
+      "transgenic mouse",
+      "knockout mouse",
+      "lab mouse"
+    ]
+  },
+  rat: {
+    genus: "Rattus",
+    family: "Muridae",
+    taxId: "10116",
+    group: "MAMMALS",
+    searchTerms: ["strain", "subspecies", "laboratory"],
+    includes: [
+      "sprague dawley",
+      "wistar rat",
+      "long evans",
+      "fischer 344",
+      "brown norway",
+      "lewis rat",
+      "laboratory rat",
+      "wild type rat",
+      "zucker rat"
+    ]
+  }
 };
 
 export type AnimalGroupData =

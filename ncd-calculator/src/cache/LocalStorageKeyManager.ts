@@ -1,5 +1,5 @@
 const STORAGE_VERSION_NAME = "complearn_storage_version";
-const STORAGE_VERSION = 13;
+const STORAGE_VERSION = 15;
 const LOG_PREFIX = "[Storage Manager]";
 
 type StorageKeyFunction = () => string;

@@ -69,7 +69,12 @@ export const FastaSearchSuggestion = ({
     if (!autoLabelingEnabled) {
       return label;
     }
-
+    if (!existingItems) {
+      existingItems = [];
+    }
+    if(!Array.isArray(existingItems)) {
+      existingItems = Object.values(existingItems);
+    }
     const isDuplicate = existingItems.some(
       (item) =>
         item.label === label ||
