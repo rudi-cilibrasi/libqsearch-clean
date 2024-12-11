@@ -71,6 +71,9 @@ export class GenBankQueries {
     return getUri(this.baseUrl, "esearch.fcgi", params);
   }
 
+
+
+
   buildOptimizedQuery(
     searchTerm: string,
     taxonomicGroup: string[],

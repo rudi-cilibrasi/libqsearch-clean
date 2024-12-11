@@ -1,12 +1,9 @@
 version: '3.8'
 services:
-
   redis:
     image: redis:alpine
     container_name: complearn_redis
-    command: >
-      --requirepass ${VITE_REDIS_PASSWORD}
-      --appendonly yes
+    command: redis-server --requirepass "${VITE_REDIS_PASSWORD}" --appendonly yes
     volumes:
       - redis_data:/data
     ports:
@@ -90,7 +87,7 @@ services:
     container_name: complearn_api
     restart: unless-stopped
     volumes:
-      - /var/log/complearn_api:/var/log/complearn_api
+      - complearn_logs:/var/log/complearn_api
     env_file:
       - ./complearn-genbank/.env.production
     environment:
@@ -113,11 +110,9 @@ services:
 volumes:
   redis_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /cache/redis
   mysql_data:
+    driver: local
+  complearn_logs:
     driver: local
 
 networks:

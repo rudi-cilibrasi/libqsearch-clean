@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React from "react";
 import { Dna, FileType2, Globe2 } from "lucide-react";
 import { getTranslationResponse } from "../functions/udhr";
 import { InputAccumulator } from "./InputAccumulator";
@@ -16,13 +16,6 @@ import {
 } from "../cache/LocalStorageKeyManager";
 import { getFastaSequences } from "../functions/getPublicGenbank";
 import { FASTA, FILE_UPLOAD, LANGUAGE } from "../constants/modalConstants";
-
-interface ProjectionsType {
-  Accession: boolean;
-  ScientificName: boolean;
-  CommonName: boolean;
-  FileName: boolean;
-}
 
 interface SelectedItem {
   type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD;
@@ -79,19 +72,12 @@ const ListEditor: React.FC<ListEditorProps> = ({
   const [isDragging, setIsDragging] = React.useState<boolean>(false);
   const [fastaSuggestionStartIndex, setFastaSuggestionStartIndex] =
     React.useState<Record<string, number>>({});
-  const [projections, setProjections] = React.useState<ProjectionsType>({
-    accession: true,
-    scientific: false,
-    common: true,
-    FileName: false,
-  });
-
   const MIN_ITEMS = 4;
   const isSearchDisabled =
     selectedItems.length < MIN_ITEMS ||
     (searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
   const isClearDisabled = selectedItems.length === 0;
-  const localStorageManager = new LocalStorageKeyManager();
+  const localStorageManager = LocalStorageKeyManager.getInstance();
 
   const sendNcdInput = async (): Promise<void> => {
     if (selectedItems && selectedItems.length > 8 && !authenticated) {
@@ -162,7 +148,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
     const fastaNcdInput = getCachedFastaContent(fastaItems);
     const needComputeFastaList = await computeFastaNcdInput(
       fastaItems.filter((item) => !item.content || item.content.trim() === ""),
-      projections,
       apiKey
     );
     const mergedFastaInput = [
@@ -273,7 +258,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 
   const computeFastaNcdInput = async (
     fastaItems: SelectedItem[],
-    projectionOptions: ProjectionsType,
     apiKey: string
   ): Promise<SelectedItem[]> => {
     if (!isValidInput(fastaItems)) return [];

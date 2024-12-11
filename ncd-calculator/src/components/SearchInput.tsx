@@ -1,9 +1,7 @@
 import React from "react";
 import { Search } from "lucide-react";
+import {GenBankSearchService} from "@/services/GenBankSearchService.ts";
 
-interface GenbankSearchService {
-  hasGenbankRecordForSearchTerm: (term: string) => Promise<boolean>;
-}
 
 interface SearchInputProps {
   type: "fasta" | "language" | "file";
@@ -11,7 +9,7 @@ interface SearchInputProps {
   searchTerm: string;
   handleSearchTerm: (term: string) => void;
   setSearchError?: (error: string) => void;
-  genbankSearchService?: GenbankSearchService;
+  genbankSearchService?: GenBankSearchService;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({

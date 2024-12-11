@@ -5,7 +5,7 @@ import {Database, FileText, PawPrint} from "lucide-react";
 import {SearchInput} from "./SearchInput.jsx";
 import {FASTA} from "../constants/modalConstants.js";
 import {FastaSearchSuggestion} from "./FastaSearchSuggestion.jsx";
-import {GenBankSearchService} from "../clients/GenBankSearchService.js";
+import {GenBankSearchService} from "@/services/GenBankSearchService.ts";
 import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.js";
 import {SelectedItem} from "./InputAccumulator";
 import AutoLabelingToggle from "@/components/AutoLabelingToggle.tsx";
@@ -40,13 +40,13 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [projections, setProjections] = useState<ProjectionOption[]>([
     {
-      name: 'commonName',
+      name: 'common',
       label: 'Common Name',
       icon: PawPrint,  // Add icons for each option
       selected: true
     },
     {
-      name: 'scientificName',
+      name: 'scientific',
       label: 'Scientific Name',
       icon: FileText,
       selected: false
@@ -60,7 +60,8 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
   ]);
   const [searchError, setSearchError] = useState(null);
   const genbankSearchService = new GenBankSearchService();
-  const localStorageKeyManager = new LocalStorageKeyManager();
+  const localStorageKeyManager = LocalStorageKeyManager.getInstance();
+
   const [autoLabelingEnabled, setAutoLabelingEnabled] = useState(true);
 
 
@@ -200,10 +201,10 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
           <div className="text-red-500 text-sm mt-2 ml-2">{searchError}</div>
         )}
         <FastaSearchSuggestion
-            autoLabelingEnabled={autoLabelingEnabled}
-            setSelectedItems={setSelectedItems}
-            selectedItems={selectedItems}
-            onSelectSearchTerm={onSelectSearchTerm}
+          autoLabelingEnabled={autoLabelingEnabled}
+          setSelectedItems={setSelectedItems}
+          selectedItems={selectedItems}
+          onSelectSearchTerm={onSelectSearchTerm}
           searchTerm={searchTerm}
           onSuggestionSelect={handleSuggestionSelect}
           className="mt-2"
@@ -211,12 +212,10 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
           genbankSearchService={genbankSearchService}
           setError={setSearchError}
           localStorageKeyManager={localStorageKeyManager}
-          getAllFastaSuggestionWithLastIndex={
-            getAllFastaSuggestionWithLastIndex
-          }
+          getAllFastaSuggestionWithLastIndex={getAllFastaSuggestionWithLastIndex}
           setFastaSuggestionStartIndex={setFastaSuggestionStartIndex}
           getFastaSuggestionStartIndex={getFastaSuggestionStartIndex}
-            displayMode={getSelectedDisplayMode()}
+          displayMode={getSelectedDisplayMode()}
         />
       </div>
       <div className="mt-auto border-t border-gray-200 pt-4">

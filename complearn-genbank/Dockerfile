@@ -1,17 +1,27 @@
+# Build stage
+FROM node:18-alpine as builder
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+RUN npm run build
+
 FROM node:18-alpine
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
+RUN npm install --omit=dev
 
-# Install dependencies
-RUN npm install
+COPY --from=builder /app/dist ./dist
 
-# Copy source code
-COPY . .
+RUN mkdir -p /var/log/complearn_api
 
-RUN if [ -d "./dist" ]; then rm -rf ./dist; fi && \
-    npx tsc # compile typescript to javascript
+ENV NODE_ENV=production
+ENV PORT=3001
 
 EXPOSE 3001
 CMD ["node", "./dist/bin/www.js"]

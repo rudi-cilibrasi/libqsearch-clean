@@ -3,8 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "tsc",
-    "start": "rm -rf dist && npx tsc && node ./dist/bin/www.js",
+    "build": "rm -rf dist && tsc",
+    "start": "node ./dist/bin/www.js",
+    "dev": "ts-node ./bin/www.ts",
     "test": "jest"
   },
   "jest": {
@@ -13,8 +14,16 @@
     },
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
-    "moduleFileExtensions": ["ts", "js", "json", "node"]
+    "testMatch": [
+      "**/__tests__/**/*.ts",
+      "**/?(*.)+(spec|test).ts"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "json",
+      "node"
+    ]
   },
   "dependencies": {
     "axios": "^1.7.7",
