@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Database, Languages, ChevronRight, Info, ExternalLink } from 'lucide-react';
 import Header from './Header';
@@ -7,7 +6,7 @@ const LandingPage = ({ openLogin, setOpenLogin, setAuthenticated }) => {
     const navigate = useNavigate();
 
     const navigateToCalculator = (analysisType) => {
-        navigate(`/calculator?type=${analysisType}`);
+        navigate(`/calculator?searchMode=${analysisType}`);
     };
 
     const FeatureCard = ({ icon: Icon, title, description, analysisType, comingSoon = false }) => (
@@ -63,7 +62,7 @@ const LandingPage = ({ openLogin, setOpenLogin, setAuthenticated }) => {
                         icon={Database}
                         title="Genetic Analysis"
                         description="Compare genetic sequences using FASTA format to understand evolutionary relationships and similarities between species."
-                        analysisType="genetic"
+                        analysisType="fasta"
                     />
 
                     <FeatureCard
@@ -77,7 +76,7 @@ const LandingPage = ({ openLogin, setOpenLogin, setAuthenticated }) => {
                         icon={Upload}
                         title="Custom Analysis"
                         description="Upload your own files to find hidden patterns and relationships in any type of data."
-                        analysisType="custom"
+                        analysisType="file_upload"
                     />
                 </div>
 

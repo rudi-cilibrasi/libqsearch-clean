@@ -1,21 +1,14 @@
-import React from "react";
-import { Dna, FileType2, Globe2 } from "lucide-react";
-import { getTranslationResponse } from "../functions/udhr";
-import { InputAccumulator } from "./InputAccumulator";
-import { Language } from "./Language";
-import {
-  cacheTranslation,
-  getTranslationCache,
-  useStorageState,
-} from "../cache/cache.ts";
-import { FastaSearch } from "./FastaSearch";
-import { FileUpload } from "./FileUpload";
-import {
-  LocalStorageKeyManager,
-  LocalStorageKeys,
-} from "../cache/LocalStorageKeyManager";
-import { getFastaSequences } from "../functions/getPublicGenbank";
-import { FASTA, FILE_UPLOAD, LANGUAGE } from "../constants/modalConstants";
+import React, {useEffect} from "react";
+import {Dna, FileType2, Globe2} from "lucide-react";
+import {getTranslationResponse} from "../functions/udhr";
+import {InputAccumulator} from "./InputAccumulator";
+import {Language} from "./Language";
+import {cacheTranslation, getTranslationCache, useStorageState,} from "../cache/cache.ts";
+import {FastaSearch} from "./FastaSearch";
+import {FileUpload} from "./FileUpload";
+import {LocalStorageKeyManager, LocalStorageKeys,} from "../cache/LocalStorageKeyManager";
+import {getFastaSequences} from "../functions/getPublicGenbank";
+import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 
 interface SelectedItem {
   type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD;
@@ -47,6 +40,8 @@ interface ListEditorProps {
   resetDisplay: () => void;
   setOpenLogin: (open: boolean) => void;
   authenticated: boolean;
+  initialSearchMode?: string | null;
+
 }
 
 const ListEditor: React.FC<ListEditorProps> = ({
@@ -56,11 +51,11 @@ const ListEditor: React.FC<ListEditorProps> = ({
   setIsLoading,
   resetDisplay,
   setOpenLogin,
-  authenticated,
+                                                 authenticated, initialSearchMode
 }) => {
   const [searchMode, setSearchMode] = useStorageState<
     typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD
-  >("searchMode", FASTA);
+  >("searchMode", initialSearchMode || FASTA);
   const [searchTerm, setSearchTerm] = React.useState<string>("");
   const [selectedItems, setSelectedItems] = useStorageState<SelectedItem[]>(
     "selectedItems",
@@ -78,6 +73,12 @@ const ListEditor: React.FC<ListEditorProps> = ({
     (searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
   const isClearDisabled = selectedItems.length === 0;
   const localStorageManager = LocalStorageKeyManager.getInstance();
+
+  useEffect(() => {
+    if (initialSearchMode) {
+      setSearchMode(initialSearchMode as typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD);
+    }
+  }, [initialSearchMode]);
 
   const sendNcdInput = async (): Promise<void> => {
     if (selectedItems && selectedItems.length > 8 && !authenticated) {

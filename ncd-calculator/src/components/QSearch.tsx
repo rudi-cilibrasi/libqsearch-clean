@@ -1,14 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {useEffect, useRef, useState} from "react";
 
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
-import { MatrixTree } from "./MatrixTree.tsx";
-import { Loader } from "lucide-react";
+import {MatrixTree} from "./MatrixTree.tsx";
+import {Loader} from "lucide-react";
 import ListEditor from "./ListEditor.tsx";
 import Header from "./Header.jsx";
-import { workerCode as gzipWorkerCode } from "../workers/ncdWorker";
-import { lzmaWorkerCode } from "../workers/lzmaWorker"; // Our new LZMA worker
-import { LocalStorageKeyManager } from "../cache/LocalStorageKeyManager.ts";
+import {workerCode as gzipWorkerCode} from "../workers/ncdWorker";
+import {lzmaWorkerCode} from "../workers/lzmaWorker"; // Our new LZMA worker
+import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.ts";
 import {CompressionService} from "@/services/CompressionService.ts";
+import {useSearchParams} from "react-router-dom";
 
 export const QSearch = () => {
   const [ncdMatrix, setNcdMatrix] = useState([]);
@@ -26,6 +27,7 @@ export const QSearch = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [isSeaarchDisabled, setIsSearchDisabled] = useState(false);
   const [confirmedSearchTerm, setConfirmedSearchTerm] = useState("");
+  const [searchParams] = useSearchParams();
   const storageKeyManager = LocalStorageKeyManager.getInstance();
 
 
@@ -89,7 +91,14 @@ export const QSearch = () => {
     }
   };
 
+
   useEffect(() => {
+    const searchMode = searchParams.get('searchMode');
+    if (searchMode) {
+      // Store the search mode in localStorage to maintain state
+      localStorage.setItem('searchMode', searchMode);
+    }
+
     storageKeyManager.initialize();
     initializeWorker('gzip'); // Initialize with default gzip instead
     // runNCDWorker();
@@ -97,7 +106,7 @@ export const QSearch = () => {
     if (qSearchWorkerRef.current) {
       qSearchWorkerRef.current.onmessage = handleQsearchMessage;
     }
-  }, []);
+  }, [searchParams]);
 
   const handleParsedFileContent = (parsedData: ParsedData) => {
     if (parsedData.valid) {
@@ -350,6 +359,7 @@ export const QSearch = () => {
           resetDisplay={resetDisplay}
           setOpenLogin={setOpenLogin}
           authenticated={authenticated}
+          initialSearchMode={searchParams.get('searchMode')}
         />
         {isLoading && (
           <div

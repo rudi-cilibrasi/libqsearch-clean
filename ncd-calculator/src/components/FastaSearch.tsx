@@ -219,19 +219,6 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
         />
       </div>
       <div className="mt-auto border-t border-gray-200 pt-4">
-        <div className="mb-4 mx-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            API Key
-          </label>
-          <input
-              type="text"
-              placeholder="Enter your API key"
-              value={apiKey}
-              onChange={(e) => handleApiKey(e.target.value)}
-              className="w-full py-3 px-4 border-2 border-gray-200 rounded-lg text-base
-                bg-black text-white placeholder-gray-400"
-          />
-        </div>
 
 
         <div className="mb-4 mx-6">

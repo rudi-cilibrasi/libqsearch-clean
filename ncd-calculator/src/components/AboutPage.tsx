@@ -1,89 +1,101 @@
 import { FC } from 'react';
-import {useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { ChevronLeft, ExternalLink, Users } from 'lucide-react';
 
-type AboutPageProps = {};
-
-const About: FC<AboutPageProps> = (): JSX.Element => {
+const About: FC = (): JSX.Element => {
     const navigate = useNavigate();
 
     const handleGoBack = (): void => {
         navigate('/');
     };
 
+    const TeamMember = ({ name, link }: { name: string; link: string }) => (
+        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition-all duration-300">
+            <a
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between text-gray-200 hover:text-blue-400 transition-colors"
+            >
+                <span className="text-lg font-medium">{name}</span>
+                <ExternalLink className="h-5 w-5" />
+            </a>
+        </div>
+    );
+
     return (
-        <div className="min-h-screen w-[60vw] bg-gray-100 text-gray-800">
+        <div className="    text-gray-200">
             {/* Header Section */}
-            <header className="bg-blue-700 text-white py-8 text-center">
-                <h1 className="text-4xl font-bold">About Us</h1>
-                <p className="mt-2 text-lg">Learn more about who we are and what we do</p>
+            <header className="w-full px-6 py-16 text-center">
+                <div className="max-w-4xl mx-auto">
+                    <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+                        About NCD Calculator
+                    </h1>
+                    <p className="text-xl text-gray-400">
+                        Built by researchers and developers dedicated to advancing the field of
+                        information theory and compression-based similarity analysis.
+                    </p>
+                </div>
             </header>
 
             {/* Main Content */}
-            <main className="py-10 px-4 sm:px-10 lg:px-20">
-                <section>
-                    <h2 className="text-2xl font-semibold mb-4">Our Team</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div className="bg-white shadow-md rounded-lg p-6 text-center">
-                            <a href="https://cilibrar.com/" target="_blank" rel="noopener noreferrer">
-                                <h3 className="text-lg font-semibold">Rudi Cilibrasi</h3>
-                            </a>
-                        </div>
+            <main className="px-6 py-8">
+                {/* Team Section */}
+                <section className="max-w-7xl mx-auto mb-16">
+                    <div className="flex items-center gap-3 mb-8">
+                        <Users className="h-6 w-6 text-blue-400" />
+                        <h2 className="text-2xl font-semibold">Our Team</h2>
+                    </div>
 
-                        <div className="bg-white shadow-md rounded-lg p-6 text-center">
-                            <a href="https://homepages.cwi.nl/~paulv/" target="_blank" rel="noopener noreferrer">
-                                <h3 className="text-lg font-semibold">Paul Vitanyi</h3>
-                            </a>
-                        </div>
-
-                        <div className="bg-white shadow-md rounded-lg p-6 text-center">
-                            <a href="https://cs.uwaterloo.ca/computer-science/contacts/ming-li" target="_blank"
-                               rel="noopener noreferrer">
-                                <h3 className="text-lg font-semibold">Ming Li</h3>
-                            </a>
-                        </div>
-
-                        <div className="bg-white shadow-md rounded-lg p-6 text-center">
-                            <a href="https://www.uva.nl/en/profile/r/o/s.derooij/s.de-rooij.html" target="_blank"
-                               rel="noopener noreferrer">
-                                <h3 className="text-lg font-semibold">Steven de Rooij</h3>
-                            </a>
-                        </div>
-
-                        <div className="bg-white shadow-md rounded-lg p-6 text-center">
-                            <a href="https://www.h2i.sg/h2i-cto-maarten-keijzer-broadening-the-use-of-ai-ml-in-water-management-to-make-an-impact/"
-                               target="_blank" rel="noopener noreferrer">
-                                <h3 className="text-lg font-semibold">Maarten Keijzer</h3>
-                            </a>
-                        </div>
-
-                        <div className="bg-white shadow-md rounded-lg p-6 text-center">
-                            <a href="https://dev.to/joyhughes" target="_blank" rel="noopener noreferrer">
-                                <h3 className="text-lg font-semibold">Joy Hughes</h3>
-                            </a>
-                        </div>
-
-                        <div className="bg-white shadow-md rounded-lg p-6 text-center">
-                            <a href="https://github.com/namvdo" target="_blank" rel="noopener noreferrer">
-                                <h3 className="text-lg font-semibold">Nam V. Do</h3>
-                            </a>
-                        </div>
-
-                        <div className="bg-white shadow-md rounded-lg p-6 text-center">
-                            <a href="https://github.com/Sonnpm197" target="_blank" rel="noopener noreferrer">
-                                <h3 className="text-lg font-semibold">Shawn Nguyen</h3>
-                            </a>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <TeamMember
+                            name="Rudi Cilibrasi"
+                            link="https://cilibrar.com/"
+                        />
+                        <TeamMember
+                            name="Paul Vitanyi"
+                            link="https://homepages.cwi.nl/~paulv/"
+                        />
+                        <TeamMember
+                            name="Ming Li"
+                            link="https://cs.uwaterloo.ca/computer-science/contacts/ming-li"
+                        />
+                        <TeamMember
+                            name="Steven de Rooij"
+                            link="https://www.uva.nl/en/profile/r/o/s.derooij/s.de-rooij.html"
+                        />
+                        <TeamMember
+                            name="Maarten Keijzer"
+                            link="https://www.h2i.sg/h2i-cto-maarten-keijzer-broadening-the-use-of-ai-ml-in-water-management-to-make-an-impact/"
+                        />
+                        <TeamMember
+                            name="Joy Hughes"
+                            link="https://dev.to/joyhughes"
+                        />
+                        <TeamMember
+                            name="Nam V. Do"
+                            link="https://github.com/namvdo"
+                        />
+                        <TeamMember
+                            name="Shawn Nguyen"
+                            link="https://github.com/Sonnpm197"
+                        />
                     </div>
                 </section>
-            </main>
 
-            <button
-                onClick={handleGoBack}
-                className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                Back to Home page
-            </button>
+                {/* Research Foundation Section */}
+                <section className="max-w-4xl mx-auto">
+                    {/* Back Button */}
+                    <button
+                        onClick={handleGoBack}
+                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        <ChevronLeft className="h-5 w-5" />
+                        Back to Home
+                    </button>
+                </section>
+            </main>
         </div>
     );
 };
-
 export default About;

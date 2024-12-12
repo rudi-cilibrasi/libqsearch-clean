@@ -76,7 +76,7 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="flex justify-between items-center px-10 py-4 text-white">
       <div className="text-4xl font-bold">NCD Calculator</div>
-      <div className="flex justify-between items-center">
+      <div className="flex justify-right items-center">
         <a href="/about" className="text-white pr-10 text-lg">
           About Us
         </a>
