@@ -17,6 +17,11 @@ interface SelectedItem {
   id: string;
 }
 
+
+export interface SearchMode {
+  searchMode: string;
+}
+
 interface FastaSequenceResponse {
   accessions: string[];
   contents: string[];
@@ -40,7 +45,7 @@ interface ListEditorProps {
   resetDisplay: () => void;
   setOpenLogin: (open: boolean) => void;
   authenticated: boolean;
-  initialSearchMode?: string | null;
+  initialSearchMode?: SearchMode | null;
 
 }
 
@@ -53,9 +58,10 @@ const ListEditor: React.FC<ListEditorProps> = ({
   setOpenLogin,
                                                  authenticated, initialSearchMode
 }) => {
-  const [searchMode, setSearchMode] = useStorageState<
-    typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD
-  >("searchMode", initialSearchMode || FASTA);
+  const searchModeObj = {
+    searchMode: FASTA
+  }
+  const [searchMode, setSearchMode] = useStorageState<SearchMode>("searchMode", initialSearchMode && Object.keys(initialSearchMode).length !== 0 ? initialSearchMode : searchModeObj);
   const [searchTerm, setSearchTerm] = React.useState<string>("");
   const [selectedItems, setSelectedItems] = useStorageState<SelectedItem[]>(
     "selectedItems",
@@ -70,13 +76,13 @@ const ListEditor: React.FC<ListEditorProps> = ({
   const MIN_ITEMS = 4;
   const isSearchDisabled =
     selectedItems.length < MIN_ITEMS ||
-    (searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
+    (searchMode.searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
   const isClearDisabled = selectedItems.length === 0;
   const localStorageManager = LocalStorageKeyManager.getInstance();
 
   useEffect(() => {
     if (initialSearchMode) {
-      setSearchMode(initialSearchMode as typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD);
+      setSearchMode(initialSearchMode);
     }
   }, [initialSearchMode]);
 
@@ -353,9 +359,9 @@ const ListEditor: React.FC<ListEditorProps> = ({
   };
 
   const renderModal = (
-    mode: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD
+    mode: SearchMode
   ) => {
-    switch (mode) {
+    switch (mode.searchMode) {
       case FASTA:
         return (
           <FastaSearch
@@ -390,14 +396,17 @@ const ListEditor: React.FC<ListEditorProps> = ({
     }
   };
 
+
   return (
     <div className="p-6 w-full max-w-6xl mx-auto">
       <div className="flex gap-4 mb-6">
         <button
-          onClick={() => setSearchMode(FASTA)}
+          onClick={() => setSearchMode({
+            searchMode: FASTA
+          })}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
-                          searchMode === FASTA
+                          searchMode.searchMode === FASTA
                             ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
                             : "bg-gray-100 text-gray-600 border-2 border-transparent"
                         }`}
@@ -406,10 +415,12 @@ const ListEditor: React.FC<ListEditorProps> = ({
           <span>FASTA Search</span>
         </button>
         <button
-          onClick={() => setSearchMode(LANGUAGE)}
+          onClick={() => setSearchMode({
+            searchMode: LANGUAGE
+          })}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
-                          searchMode === LANGUAGE
+                          searchMode.searchMode === LANGUAGE
                             ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
                             : "bg-gray-100 text-gray-600 border-2 border-transparent"
                         }`}
@@ -418,10 +429,12 @@ const ListEditor: React.FC<ListEditorProps> = ({
           <span>Language Analysis</span>
         </button>
         <button
-          onClick={() => setSearchMode(FILE_UPLOAD)}
+          onClick={() => setSearchMode({
+            searchMode: FILE_UPLOAD
+          })}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
-                          searchMode === FILE_UPLOAD
+                          searchMode.searchMode === FILE_UPLOAD
                             ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
                             : "bg-gray-100 text-gray-600 border-2 border-transparent"
                         }`}
@@ -467,7 +480,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
                             : "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
                         }`}
         >
-          Calculate NCD Matrix
+          Calculate
         </button>
       </div>
     </div>
