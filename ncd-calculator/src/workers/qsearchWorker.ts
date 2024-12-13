@@ -45,7 +45,7 @@ type WorkerMessage =
   | QSearchErrorMessage;
 
 // Import the Emscripten module
-import Module from "../wasm/qsearch";
+import Module from "../wasm/qsearch.ts";
 import { getTreeInput } from "../functions/qSearchTree";
 
 let qsearchModule: EmscriptenModule | null = null;

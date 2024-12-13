@@ -1,15 +1,15 @@
 import React, {useEffect, useRef, useState} from "react";
 
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
+import {workerCode as gzipWorkerCode} from "../workers/gzipWorker.ts";
 import {MatrixTree} from "./MatrixTree.tsx";
 import {Loader} from "lucide-react";
-import ListEditor from "./ListEditor.tsx";
+import ListEditor, {SearchMode} from "./ListEditor.tsx";
 import Header from "./Header.jsx";
-import {workerCode as gzipWorkerCode} from "../workers/ncdWorker";
-import {lzmaWorkerCode} from "../workers/lzmaWorker"; // Our new LZMA worker
 import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.ts";
 import {CompressionService} from "@/services/CompressionService.ts";
 import {useSearchParams} from "react-router-dom";
+import {lzmaWorkerCode} from "@/workers/lzmaWorker.ts";
 
 export const QSearch = () => {
   const [ncdMatrix, setNcdMatrix] = useState([]);
@@ -31,6 +31,14 @@ export const QSearch = () => {
   const storageKeyManager = LocalStorageKeyManager.getInstance();
 
 
+  const getSearchModeParamAsObj = (): SearchMode => {
+    const mode = searchParams.get("searchMode");
+    return {
+      searchMode: mode
+    } as SearchMode
+  }
+
+
   const [currentCompressor, setCurrentCompressor] = useState("gzip");
   const [compressionInfo, setCompressionInfo] = useState<{
     algorithm: string;
@@ -38,7 +46,7 @@ export const QSearch = () => {
   } | null>(null);
 
 
-  const initializeWorker = (algorithm: string) => {
+  const initializeWorker = (algorithm: string): Worker => {
     // First, clean up existing worker
     if (ncdWorker) {
       ncdWorker.terminate();
@@ -65,27 +73,94 @@ export const QSearch = () => {
 
     setNcdWorker(worker);
     setCurrentCompressor(algorithm);
+    return worker;
+  };
+
+
+  useEffect(() => {
+    const searchMode = searchParams.get('searchMode');
+    if (searchMode) {
+      localStorage.setItem('searchMode', searchMode);
+    }
+
+    storageKeyManager.initialize();
+    initializeWorker('gzip'); // Initialize with default gzip instead
+    qSearchWorkerRef.current = new QSearchWorker();
+    if (qSearchWorkerRef.current) {
+      qSearchWorkerRef.current.onmessage = handleQsearchMessage;
+    }
+  }, [searchParams]);
+
+
+  const onNcdInput = async (ncdInput: NCDInput) => {
+    if (!ncdInput?.contents?.length || !ncdInput?.labels?.length) {
+      setErrorMsg("Invalid input data");
+      setIsLoading(false);
+      setIsSearchDisabled(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log("Processing input:", {
+        contentCount: ncdInput.contents.length,
+        labelCount: ncdInput.labels.length
+      });
+
+      const contentSizes = ncdInput.contents.map(content =>
+          new TextEncoder().encode(content).length
+      );
+
+      console.log("Content sizes:", contentSizes); // Debug log
+
+      const sortedSizes = [...contentSizes].sort((a, b) => b - a);
+      const compressionDecision = CompressionService.needsAdvancedCompression(
+          sortedSizes[0],
+          sortedSizes[1]
+      );
+
+      console.log("Compression decision:", compressionDecision); // Debug log
+
+      setCompressionInfo({
+        algorithm: compressionDecision.recommendedAlgo,
+        reason: compressionDecision.reason
+      });
+
+
+      if (currentCompressor !== compressionDecision.recommendedAlgo) {
+        const worker = initializeWorker(compressionDecision.recommendedAlgo);
+        worker.postMessage(ncdInput);
+      } else if (ncdWorker) {
+        ncdWorker.postMessage(ncdInput);
+      } else {
+        throw new Error("Worker not initialized");
+      }
+    } catch (error) {
+      console.error("Error in onNcdInput:", error);
+      setErrorMsg(`Error processing input: ${error.message}`);
+      setIsLoading(false);
+    }
   };
 
 
   const handleWorkerMessage = (e: MessageEvent) => {
     const message = e.data;
-    console.log("Worker message received:", message); // Better logging
+    console.log("Worker message received:", message);
 
     if (message.type === "progress") {
-      console.log(`Progress: ${JSON.stringify(message)}`); // Log progress
+      console.log(`Progress: ${JSON.stringify(message)}`);
     } else if (message.type === "result") {
       if (!message || !message.labels?.length || !message.ncdMatrix?.length) {
         setErrorMsg("Invalid result format received");
         resetDisplay();
       } else {
-        console.log("Valid result received, displaying matrix"); // Log success
+        console.log("Valid result received, displaying matrix");
         displayNcdMatrix(message);
       }
       setExecutionTime((prev) => performance.now() - prev);
-      setIsLoading(false); // Make sure to stop loading
+      setIsLoading(false);
     } else if (message.type === "error") {
-      console.error("Worker error:", message.message); // Log errors
+      console.error("Worker error:", message.message);
       setErrorMsg(`Compression error: ${message.message}`);
       setIsLoading(false);
     }
@@ -93,19 +168,36 @@ export const QSearch = () => {
 
 
   useEffect(() => {
+    let isMounted = true;
     const searchMode = searchParams.get('searchMode');
     if (searchMode) {
-      // Store the search mode in localStorage to maintain state
       localStorage.setItem('searchMode', searchMode);
     }
-
     storageKeyManager.initialize();
-    initializeWorker('gzip'); // Initialize with default gzip instead
-    // runNCDWorker();
-    qSearchWorkerRef.current = new QSearchWorker();
-    if (qSearchWorkerRef.current) {
-      qSearchWorkerRef.current.onmessage = handleQsearchMessage;
+    if (!ncdWorker) {
+      try {
+        initializeWorker('gzip');
+
+        if (!isMounted) return;
+
+        qSearchWorkerRef.current = new QSearchWorker();
+        if (qSearchWorkerRef.current) {
+          qSearchWorkerRef.current.onmessage = handleQsearchMessage;
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Worker initialization error:', error);
+        setErrorMsg('Failed to initialize worker');
+      }
     }
+    return () => {
+      if (ncdWorker) {
+        ncdWorker.terminate();
+      }
+      if (qSearchWorkerRef.current) {
+        qSearchWorkerRef.current.terminate();
+      }
+    };
   }, [searchParams]);
 
   const handleParsedFileContent = (parsedData: ParsedData) => {
@@ -189,33 +281,6 @@ export const QSearch = () => {
     });
   };
 
-  // const runNCDWorker = () => {
-  //   const blob = new Blob([workerCode], { type: "application/javascript" });
-  //   const workerURL = URL.createObjectURL(blob);
-  //   const worker = new Worker(workerURL);
-  //   worker.onmessage = function (e) {
-  //     const message = e.data;
-  //     console.log("receive worker message: " + JSON.stringify(message));
-  //     if (message.type === "progress") {
-  //     } else if (message.type === "result") {
-  //       if (
-  //         !message ||
-  //         message.labels.length === 0 ||
-  //         message.ncdMatrix.length === 0
-  //       ) {
-  //         setErrorMsg("no result");
-  //         resetDisplay();
-  //       } else {
-  //         displayNcdMatrix(message);
-  //       }
-  //       setExecutionTime((prev) => {
-  //         return performance.now() - prev;
-  //       });
-  //     }
-  //   };
-  //   setNcdWorker(worker);
-  // };
-
   interface ProjectedInput {
     accessions: string[];
     displayLabels: string[];
@@ -244,57 +309,6 @@ export const QSearch = () => {
     contents: string[];
     labels: string[];
   }
-
-  const onNcdInput = async (ncdInput: NCDInput) => {
-    if (!ncdInput?.contents?.length || !ncdInput?.labels?.length) {
-      setErrorMsg("Invalid input data");
-      setIsLoading(false);
-      setIsSearchDisabled(false);
-      return;
-    }
-
-    try {
-      console.log("Processing input:", {
-        contentCount: ncdInput.contents.length,
-        labelCount: ncdInput.labels.length
-      });
-
-      const contentSizes = ncdInput.contents.map(content =>
-          new TextEncoder().encode(content).length
-      );
-
-      console.log("Content sizes:", contentSizes); // Debug log
-
-      const sortedSizes = [...contentSizes].sort((a, b) => b - a);
-      const compressionDecision = CompressionService.needsAdvancedCompression(
-          sortedSizes[0],
-          sortedSizes[1]
-      );
-
-      console.log("Compression decision:", compressionDecision); // Debug log
-
-      setCompressionInfo({
-        algorithm: compressionDecision.recommendedAlgo,
-        reason: compressionDecision.reason
-      });
-
-      if (currentCompressor !== compressionDecision.recommendedAlgo) {
-        initializeWorker(compressionDecision.recommendedAlgo);
-      }
-
-      if (ncdWorker) {
-        setIsLoading(true);
-        console.log("Sending data to worker"); // Debug log
-        ncdWorker.postMessage(ncdInput);
-      } else {
-        throw new Error("Worker not initialized");
-      }
-    } catch (error) {
-      console.error("Error in onNcdInput:", error);
-      setErrorMsg(`Error processing input: ${error.message}`);
-      setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
     return () => {
@@ -359,7 +373,7 @@ export const QSearch = () => {
           resetDisplay={resetDisplay}
           setOpenLogin={setOpenLogin}
           authenticated={authenticated}
-          initialSearchMode={searchParams.get('searchMode')}
+          initialSearchMode={getSearchModeParamAsObj()}
         />
         {isLoading && (
           <div
@@ -385,6 +399,19 @@ export const QSearch = () => {
             qSearchTreeResult={qSearchTreeResult}
             executionTime={executionTime}
           />
+        )}
+
+        {compressionInfo && !isLoading && (
+            <div className="mt-2 mb-4 flex items-center justify-center gap-2 text-sm">
+              <div className={`px-3 py-1 rounded-full ${
+                  compressionInfo.algorithm === 'gzip'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-purple-100 text-purple-700'
+              }`}>
+                {compressionInfo.algorithm.toUpperCase()}
+              </div>
+              <span className="text-gray-600">{compressionInfo.reason}</span>
+            </div>
         )}
       </div>
     </>

@@ -1,4 +1,7 @@
 export const workerCode = `
+// Initial logging
+console.log('GZIP Worker: Starting initialization');
+
 // Helper to ensure consistent UTF-8 encoding
 function encodeText(text) {
     return new TextEncoder().encode(text);
@@ -36,11 +39,11 @@ async function compressedSizeSingle(str) {
 
 function calculateNCD(sizeX, sizeY, sizeXY) {
     // Add logging for debugging
-    console.log(\`size X: \${sizeX} size Y: \${sizeY} size XY: \${sizeXY}\`);
+    console.log(\`GZIP Worker: Calculating NCD - size X: \${sizeX} size Y: \${sizeY} size XY: \${sizeXY}\`);
     
     // Validate inputs
     if (sizeX <= 0 || sizeY <= 0 || sizeXY <= 0) {
-        console.error('Invalid compressed sizes:', { sizeX, sizeY, sizeXY });
+        console.error('GZIP Worker: Invalid compressed sizes:', { sizeX, sizeY, sizeXY });
         return 1; // Return maximum distance for invalid inputs
     }
     
@@ -51,7 +54,7 @@ function calculateNCD(sizeX, sizeY, sizeXY) {
     
     // Validate result
     if (ncd < 0 || ncd > 1) {
-        console.warn('NCD outside valid range:', ncd, { sizeX, sizeY, sizeXY });
+        console.warn('GZIP Worker: NCD outside valid range:', ncd, { sizeX, sizeY, sizeXY });
         return Math.min(Math.max(ncd, 0), 1); // Clamp to [0,1]
     }
     
@@ -59,6 +62,7 @@ function calculateNCD(sizeX, sizeY, sizeXY) {
 }
 
 async function processChunk(startI, endI, n, contents, singleCompressedSizes) {
+    console.log(\`GZIP Worker: Processing chunk \${startI}-\${endI} of \${n}\`);
     const results = [];
     for (let i = startI; i < endI; i++) {
         for (let j = i; j < n; j++) {
@@ -75,8 +79,9 @@ async function processChunk(startI, endI, n, contents, singleCompressedSizes) {
                     sizeXY
                 );
                 results.push({ i, j, ncd });
+                console.log(\`GZIP Worker: Processed pair (\${i},\${j}) with NCD = \${ncd}\`);
             } catch (error) {
-                console.error(\`Error processing pair (\${i},\${j}): \${error}\`);
+                console.error(\`GZIP Worker: Error processing pair (\${i},\${j}): \${error}\`);
                 results.push({ i, j, ncd: 1 }); // Use maximum distance for errors
             }
         }
@@ -84,24 +89,36 @@ async function processChunk(startI, endI, n, contents, singleCompressedSizes) {
     return results;
 }
 
+// Main message handler
 self.onmessage = async function (e) {
+    console.log('GZIP Worker: Received message:', e.data);
+    
     try {
         const { labels, contents } = e.data;
+        if (!labels || !contents || labels.length === 0 || contents.length === 0) {
+            throw new Error('Invalid input data');
+        }
+        
         const n = contents.length;
+        console.log(\`GZIP Worker: Processing \${n} items\`);
+        
         const singleCompressedSizes = new Array(n);
         const ncdMatrix = Array.from({ length: n }, () => Array(n).fill(0));
 
         // Step 1: Precompute single compressed sizes
+        console.log('GZIP Worker: Computing individual compressed sizes');
         for (let i = 0; i < n; i++) {
             try {
                 singleCompressedSizes[i] = await compressedSizeSingle(contents[i]);
+                console.log(\`GZIP Worker: Computed size for item \${i}: \${singleCompressedSizes[i]}\`);
             } catch (error) {
-                console.error(\`Error computing single compressed size for index \${i}: \${error}\`);
+                console.error(\`GZIP Worker: Error computing single compressed size for index \${i}: \${error}\`);
                 singleCompressedSizes[i] = 0; // Use 0 to indicate error
             }
         }
 
         // Step 2: Process in chunks to avoid memory issues
+        console.log('GZIP Worker: Starting chunk processing');
         const CHUNK_SIZE = 5; // Adjust based on your needs
         for (let i = 0; i < n; i += CHUNK_SIZE) {
             const endI = Math.min(i + CHUNK_SIZE, n);
@@ -115,13 +132,19 @@ self.onmessage = async function (e) {
             }
         }
 
+        console.log('GZIP Worker: Processing complete, sending results');
         // Send the final NCD matrix
         self.postMessage({ type: 'result', labels, ncdMatrix });
     } catch (error) {
+        console.error('GZIP Worker: Fatal error:', error);
         self.postMessage({ 
             type: 'error', 
-            message: \`Worker error: \${error.message}\`
+            message: \`GZIP Worker error: \${error.message}\`
         });
     }
 };
+
+// Send ready message immediately after initialization
+console.log('GZIP Worker: Sending ready message');
+self.postMessage({ type: 'ready', message: 'GZIP Worker initialized successfully' });
 `;
