@@ -81,7 +81,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
   }, [initialSearchMode]);
 
   const sendNcdInput = async (): Promise<void> => {
-    if (selectedItems && selectedItems.length > 8 && !authenticated) {
+    if (selectedItems && selectedItems.length > 16 && !authenticated) {
       setOpenLogin(true);
       return;
     }
