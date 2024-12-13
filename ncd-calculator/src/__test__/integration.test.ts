@@ -3,18 +3,41 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 import QSearch from '../components/QSearch';
 
+// Mock react-router-dom hooks
+vi.mock('react-router-dom', async () => {
+    const actual = await vi.importActual('react-router-dom');
+    return {
+        ...actual,
+        useSearchParams: () => [new URLSearchParams(), vi.fn()],
+        useLocation: () => ({ pathname: '/calculator', search: '', hash: '', state: null }),
+        useNavigate: () => vi.fn()
+    };
+});
+
 describe('QSearch Integration Tests', () => {
+    // Mock props for QSearch
+    const mockProps = {
+        openLogin: false,
+        setOpenLogin: vi.fn(),
+        authenticated: false,
+        setAuthenticated: vi.fn()
+    };
+
     afterEach(() => {
         vi.clearAllMocks();
         vi.resetModules();
     });
+
     beforeEach(() => {
         // Setup mocks
         global.URL.createObjectURL = vi.fn(() => 'http://localhost:3000');
+        global.URL.revokeObjectURL = vi.fn();
 
         global.Worker = vi.fn().mockImplementation(() => ({
             postMessage: vi.fn(),
             terminate: vi.fn(),
+            onmessage: vi.fn(),
+            onerror: vi.fn()
         }));
 
         const mockGLContext = {
@@ -60,8 +83,21 @@ describe('QSearch Integration Tests', () => {
             WebGLRenderer: vi.fn().mockImplementation(() => ({
                 render: vi.fn(),
                 setSize: vi.fn(),
+                domElement: document.createElement('canvas'),
+                dispose: vi.fn()
             })),
         }));
+
+        // Mock LocalStorage
+        const localStorageMock = {
+            getItem: vi.fn(),
+            setItem: vi.fn(),
+            clear: vi.fn(),
+            removeItem: vi.fn(),
+            length: 0,
+            key: vi.fn()
+        };
+        Object.defineProperty(window, 'localStorage', { value: localStorageMock });
     });
 
     test('test fasta search terms', async () => {
