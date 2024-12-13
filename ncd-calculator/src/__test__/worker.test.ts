@@ -90,7 +90,7 @@ test('calculate single pair NCD', async () => {
 });
 
 
-test('calculate NCD matrix score', async () => {
+test('Calculate score', async () => {
     let matrix = await calculateMatrixScore(SAMPLE_JSON);
     console.log(matrix);
 });

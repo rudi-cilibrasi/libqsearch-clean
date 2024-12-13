@@ -480,7 +480,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
                             : "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
                         }`}
         >
-          Calculate NCD Matrix
+          Calculate
         </button>
       </div>
     </div>

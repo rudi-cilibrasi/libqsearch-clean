@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import './App.css'
-import QSearch from "./components/QSearch.jsx"
-import ErrorPage from "./components/ErrorPage.jsx"
+import QSearch from "./components/QSearch"
+import ErrorPage from "./components/ErrorPage"
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
-import AboutPage from "@/components/AboutPage.tsx"
-import LandingPage from "@/components/LandingPage.tsx"
+import AboutPage from "@/components/AboutPage"
+import LandingPage from "@/components/LandingPage"
 
 function App() {
     const [openLogin, setOpenLogin] = useState(false)

@@ -84,7 +84,7 @@ describe('QSearch Integration Tests', () => {
         const result = screen.getByText('Enter Animal Name');
         expect(result).toBeInTheDocument();
 
-        const calculateNCDButton = screen.getByText('Calculate NCD Matrix');
+        const calculateNCDButton = screen.getByText('Calculate');
         expect(calculateNCDButton).toBeInTheDocument();
     });
 
@@ -103,7 +103,7 @@ describe('QSearch Integration Tests', () => {
             fireEvent.click(langLabel);
         }
 
-        const calculateNCDButton = screen.getByText('Calculate NCD Matrix');
+        const calculateNCDButton = screen.getByText('Calculate');
         expect(calculateNCDButton).toBeInTheDocument();
     });
 });
