@@ -11,7 +11,20 @@ import {CompressionService} from "@/services/CompressionService.ts";
 import {useSearchParams} from "react-router-dom";
 import {lzmaWorkerCode} from "@/workers/lzmaWorker.ts";
 
-export const QSearch = () => {
+
+interface QSearchProps {
+  openLogin: boolean;
+  setOpenLogin: (open: boolean) => void;
+  authenticated: boolean;
+  setAuthenticated: (auth: boolean) => void;
+}
+
+export const QSearch: React.FC<QSearchProps> = ({
+                                                  openLogin,
+                                                  setOpenLogin,
+                                                  authenticated,
+                                                  setAuthenticated
+                                                }) => {
   const [ncdMatrix, setNcdMatrix] = useState([]);
   const [labels, setLabels] = useState([]);
   const [hasMatrix, setHasMatrix] = useState(false);
@@ -23,8 +36,6 @@ export const QSearch = () => {
   const [labelMap, setLabelMap] = useState(new Map());
   const labelMapRef = useRef(labelMap);
   const [isLoading, setIsLoading] = useState(false);
-  const [openLogin, setOpenLogin] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
   const [isSeaarchDisabled, setIsSearchDisabled] = useState(false);
   const [confirmedSearchTerm, setConfirmedSearchTerm] = useState("");
   const [searchParams] = useSearchParams();
