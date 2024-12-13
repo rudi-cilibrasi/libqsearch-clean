@@ -20,7 +20,6 @@ COPY --from=builder /app/dist ./dist
 
 RUN mkdir -p /var/log/complearn_api
 
-ENV NODE_ENV=production
 ENV PORT=3001
 
 EXPOSE 3001

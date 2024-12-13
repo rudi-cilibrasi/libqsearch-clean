@@ -1,3 +1,6 @@
+### Complearn Online Demo 2.0
+https://openscienceresearchpark.com/
+
 ### Development environment
 ##### Config the API key for using NCBI APIs
 1. Go to: https://account.ncbi.nlm.nih.gov/settings/ > *Account Settings*
@@ -59,7 +62,12 @@ PORT=3001
 ```
 
 ##### Start up all services:
-Each sub-project has their own respective Dockerfile. All running by the `docker-compose.yml` in the root folder. Run this to start all services with docker-compose:
-```sh
-sh ./deploy.sh
+Each sub-project has their own respective Dockerfile. All running by the `docker-compose.yml` in the root folder. Run this to start all services:
+```
+cd scripts
+./build_and_launch_docker_system.sh # start all services inside dockers
+./deploy.sh # build ncd-calculator and serve at openscienceresearchpark.com
+./shawn_staging_build.sh # build ncd-calculator and serve at www.staging.openscienceresearchpark.com
+./nam_staging_build.sh # build ncd-calculator and serve at complearn.staging.openscienceresearchpark.com
+./teardown.sh # teardown all services
 ```

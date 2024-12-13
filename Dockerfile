@@ -9,7 +9,11 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . .
+COPY src /app/src
+COPY runtests /app
+COPY CMakeLists.txt /app
+COPY samples /app/samples
+COPY Makefile /app
 
 RUN chmod +x runtests
 RUN sed -i 's/mkdir build/mkdir -p build/' runtests || true

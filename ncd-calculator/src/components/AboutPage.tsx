@@ -35,6 +35,11 @@ const About: FC = (): JSX.Element => {
                         Built by researchers and developers dedicated to advancing the field of
                         information theory and compression-based similarity analysis.
                     </p>
+                    <br/>
+                    <a href="https://github.com/rudi-cilibrasi/libqsearch-clean" target="_blank"
+                       className="text-blue-500 hover:underline text-xl my-4">
+                        Contribute to our project on GitHub
+                    </a>
                 </div>
             </header>
 
