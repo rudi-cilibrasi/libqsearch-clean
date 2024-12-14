@@ -1,43 +1,23 @@
 import * as React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import {fireEvent, render, screen} from '@testing-library/react';
 import { vi } from 'vitest';
 import QSearch from '../components/QSearch';
+import {MemoryRouter} from "react-router";
 
-// Mock react-router-dom hooks
-vi.mock('react-router-dom', async () => {
-    const actual = await vi.importActual('react-router-dom');
-    return {
-        ...actual,
-        useSearchParams: () => [new URLSearchParams(), vi.fn()],
-        useLocation: () => ({ pathname: '/calculator', search: '', hash: '', state: null }),
-        useNavigate: () => vi.fn()
-    };
-});
+
 
 describe('QSearch Integration Tests', () => {
-    // Mock props for QSearch
-    const mockProps = {
-        openLogin: false,
-        setOpenLogin: vi.fn(),
-        authenticated: false,
-        setAuthenticated: vi.fn()
-    };
-
     afterEach(() => {
         vi.clearAllMocks();
         vi.resetModules();
     });
-
     beforeEach(() => {
         // Setup mocks
         global.URL.createObjectURL = vi.fn(() => 'http://localhost:3000');
-        global.URL.revokeObjectURL = vi.fn();
 
         global.Worker = vi.fn().mockImplementation(() => ({
             postMessage: vi.fn(),
             terminate: vi.fn(),
-            onmessage: vi.fn(),
-            onerror: vi.fn()
         }));
 
         const mockGLContext = {
@@ -83,63 +63,55 @@ describe('QSearch Integration Tests', () => {
             WebGLRenderer: vi.fn().mockImplementation(() => ({
                 render: vi.fn(),
                 setSize: vi.fn(),
-                domElement: document.createElement('canvas'),
-                dispose: vi.fn()
             })),
         }));
-
-        // Mock LocalStorage
-        const localStorageMock = {
-            getItem: vi.fn(),
-            setItem: vi.fn(),
-            clear: vi.fn(),
-            removeItem: vi.fn(),
-            length: 0,
-            key: vi.fn()
-        };
-        Object.defineProperty(window, 'localStorage', { value: localStorageMock });
     });
 
+
+
+
     test('test fasta search terms', async () => {
-        // const element = React.createElement(QSearch);
-        // render(element);
-        //
-        // // select FASTA Search
-        // const fastaSearchButton = screen.getByText('FASTA Search');
-        // fireEvent.click(fastaSearchButton);
-        //
-        // const searchBar = screen.getByPlaceholderText('Search...');
-        //
-        // // Test multiple search terms
-        // const searchTerms = ['dog', 'cat', 'fish', 'elephant'];
-        // for (const term of searchTerms) {
-        //     fireEvent.change(searchBar, { target: { value: term } });
-        //     fireEvent.keyDown(searchBar, { key: 'Enter', code: 'Enter', charCode: 13 });
-        // }
-        //
-        // const result = screen.getByText('Enter Animal Name');
-        // expect(result).toBeInTheDocument();
-        //
-        // const calculateNCDButton = screen.getByText('Calculate');
-        // expect(calculateNCDButton).toBeInTheDocument();
+        const element = React.createElement(QSearch);
+        const routerElement = React.createElement(MemoryRouter, {}, element);
+        render(routerElement);
+
+        // select FASTA Search
+        const fastaSearchButton = screen.getByText('FASTA Search');
+        fireEvent.click(fastaSearchButton);
+
+        const searchBar = screen.getByPlaceholderText('Search...');
+
+        // Test multiple search terms
+        const searchTerms = ['dog', 'cat', 'fish', 'elephant'];
+        for (const term of searchTerms) {
+            fireEvent.change(searchBar, { target: { value: term } });
+            fireEvent.keyDown(searchBar, { key: 'Enter', code: 'Enter', charCode: 13 });
+        }
+
+        const result = screen.getByText('Enter Animal Name');
+        expect(result).toBeInTheDocument();
+
+        const calculateNCDButton = screen.getByText('Calculate');
+        expect(calculateNCDButton).toBeInTheDocument();
     });
 
     test('test language', async () => {
-        // const element = React.createElement(QSearch);
-        // render(element);
-        //
-        // // select Language Analysis
-        // const languageButton = screen.getByText('Language Analysis');
-        // fireEvent.click(languageButton);
-        //
-        // // Test clicking on language options
-        // const languages = ['English', 'French', 'Russian', 'Spanish'];
-        // for (const lang of languages) {
-        //     const langLabel = screen.getByText(lang);
-        //     fireEvent.click(langLabel);
-        // }
-        //
-        // const calculateNCDButton = screen.getByText('Calculate');
-        // expect(calculateNCDButton).toBeInTheDocument();
+        const element = React.createElement(QSearch);
+        const routerElement = React.createElement(MemoryRouter, {}, element);
+        render(routerElement);
+
+        // select Language Analysis
+        const languageButton = screen.getByText('Language Analysis');
+        fireEvent.click(languageButton);
+
+        // Test clicking on language options
+        const languages = ['English', 'French', 'Russian', 'Spanish'];
+        for (const lang of languages) {
+            const langLabel = screen.getByText(lang);
+            fireEvent.click(langLabel);
+        }
+
+        const calculateNCDButton = screen.getByText('Calculate');
+        expect(calculateNCDButton).toBeInTheDocument();
     });
 });
