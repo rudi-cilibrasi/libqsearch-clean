@@ -3,7 +3,7 @@ services:
   redis:
     image: redis:alpine
     container_name: complearn_redis
-    command: redis-server --requirepass "${VITE_REDIS_PASSWORD}" --appendonly yes
+    command: redis-server --requirepass "${VITE_REDIS_PASSWORD:-complearn}" --appendonly yes
     volumes:
       - redis_data:/data
     ports:
@@ -48,7 +48,7 @@ services:
     container_name: complearn_web
     restart: unless-stopped
     env_file:
-      - ./ncd-calculator/.env
+      - ./ncd-calculator/.env.production
     environment:
       - NODE_ENV=production
     ports:
@@ -57,6 +57,8 @@ services:
       - app_network
     profiles:
       - app
+    volumes:
+      - /home/nginx/hosts:/home/nginx/hosts
     depends_on:
       redis:
         condition: service_healthy
@@ -66,6 +68,7 @@ services:
   mysql_container:
     image: mysql:8.0
     container_name: mysql_container
+    restart: unless-stopped
     env_file:
       - ./complearn-genbank/.env.production
     ports:
