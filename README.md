@@ -1,6 +1,10 @@
 ### Complearn Online Demo 2.0
 https://openscienceresearchpark.com/
 
+### Communities
+
+https://x.com/cilibrar/status/1868028637821481347
+
 ### Research
 
 Based on the paper [Clustering by Compression](https://homepages.cwi.nl/~paulv/papers/cluster.pdf) by Cilibrasi and Vitányi
