@@ -1,6 +1,10 @@
 ### Complearn Online Demo 2.0
 https://openscienceresearchpark.com/
 
+### Research
+
+Based on the paper [Clustering by Compression](https://homepages.cwi.nl/~paulv/papers/cluster.pdf) by Cilibrasi and Vitányi
+
 ### Development environment
 ##### Config the API key for using NCBI APIs
 1. Go to: https://account.ncbi.nlm.nih.gov/settings/ > *Account Settings*
