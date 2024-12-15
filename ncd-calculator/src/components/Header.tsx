@@ -54,7 +54,28 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   useEffect(() => {
-    fetchUserData();
+    let mounted = true;
+
+    const fetchData = async () => {
+      try {
+        const authUserName = await getLoginUser();
+        if (mounted) {
+          setUserName(authUserName);
+          setAuthenticated(!!authUserName);
+        }
+      } catch (error) {
+        if (mounted) {
+          setUserName(null);
+          setAuthenticated(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleLogout = async (): Promise<void> => {
