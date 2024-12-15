@@ -1,4 +1,3 @@
-import React from 'react'
 import axios, { AxiosResponse } from "axios";
 import { BACKEND_BASE_URL } from "../config/api.js";
 

@@ -1,5 +1,16 @@
 import { BaseCacheMetadata } from "@/cache/CacheInterface.ts";
 
+export interface SearchContext {
+  type: 'breed' | 'species' | 'general';
+  taxonomicInfo: TaxonomicInfo;
+  searchModifiers?: {
+    breedTerm?: string;
+    speciesName?: string;
+    additionalTerms?: string[];
+  };
+}
+
+
 export interface TaxonomicMapping {
   id: string;
   group: string;

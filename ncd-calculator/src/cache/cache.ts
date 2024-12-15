@@ -66,40 +66,42 @@ export function useStorageState<T>(
     initialState: T
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
     const isMounted = React.useRef<boolean>(false);
-    
     const [value, setValue] = React.useState<T>(() => {
         const storedValue = localStorage.getItem(key);
-        
         if (!storedValue || storedValue === "null") {
+            // If no stored value, return the initialState as-is
             return initialState;
         }
-        
         try {
-            // Type assertion here is necessary as JSON.parse can return any
-            const parsedValue = JSON.parse(storedValue) as T;
-            // Validate that the parsed value matches the initial state type
+            const parsedValue = JSON.parse(storedValue);
+            if (Array.isArray(initialState) && !Array.isArray(parsedValue)) {
+                return [] as T; // Cast empty array to type T
+            }
+            if (Array.isArray(initialState)) {
+                return Array.isArray(parsedValue) ? parsedValue : [] as T;
+            }
             return typeof parsedValue === typeof initialState ? parsedValue : initialState;
         } catch (e) {
             console.error(`Error parsing localStorage key "${key}":`, e);
-            return initialState;
+            return Array.isArray(initialState) ? [] as T : initialState;
         }
     });
 
     React.useEffect(() => {
         if (!isMounted.current) {
-            isMounted.current = true; // Skip the first render
+            isMounted.current = true;
         } else {
             try {
                 if (value !== null && value !== undefined) {
                     localStorage.setItem(key, JSON.stringify(value));
                 } else {
-                    localStorage.removeItem(key);
+                    localStorage.setItem(key, Array.isArray(initialState) ? '[]' : 'null');
                 }
             } catch (e) {
                 console.error(`Error saving to localStorage key "${key}":`, e);
             }
         }
-    }, [value, key]);
+    }, [value, key, initialState]);
 
     return [value, setValue];
 }
