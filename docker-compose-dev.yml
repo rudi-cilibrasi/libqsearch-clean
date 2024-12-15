@@ -5,7 +5,7 @@ services:
     container_name: complearn_redis
     command: redis-server --requirepass "${VITE_REDIS_PASSWORD:-complearn}" --appendonly yes
     volumes:
-      - redis_data:/data
+      - ./data:/data
     ports:
       - "6379:6379"
     networks:
@@ -47,10 +47,6 @@ services:
         - VITE_API_URL=${VITE_API_URL:-http://complearn-genbank:3001}
     container_name: complearn_web
     restart: unless-stopped
-    env_file:
-      - ./ncd-calculator/.env.production
-    environment:
-      - NODE_ENV=production
     ports:
       - "3000:80"
     networks:
@@ -70,7 +66,7 @@ services:
     container_name: mysql_container
     restart: unless-stopped
     env_file:
-      - ./complearn-genbank/.env.production
+      - ./complearn-genbank/.env
     ports:
       - "3306:3306"
     volumes:
@@ -92,9 +88,7 @@ services:
     volumes:
       - complearn_logs:/var/log/complearn_api
     env_file:
-      - ./complearn-genbank/.env.production
-    environment:
-      - NODE_ENV=production
+      - ./complearn-genbank/.env
     ports:
       - "3001:3001"
     networks:

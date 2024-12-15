@@ -2,8 +2,9 @@ import app from "../app";
 import http from "http";
 import logger from "../configurations/logger";
 import { syncSequelize } from "../configurations/databaseConnection";
+import ENV_LOADER from "../configurations/envLoader";
 
-const port = normalizePort(process.env.PORT || '3001');
+const port = normalizePort(ENV_LOADER.PORT || '3001');
 app.set('port', port);
 
 const server = http.createServer(app);

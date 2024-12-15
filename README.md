@@ -73,7 +73,7 @@ PORT=3001
 Each sub-project has their own respective Dockerfile. All running by the `docker-compose.yml` in the root folder. Run this to start all services:
 ```
 cd scripts
-./build_and_launch_docker_system.sh # start all services inside dockers
+./prod_compose_build_up.sh # docker-compose build and up all services (except ncd-calculator)
 ./deploy.sh # build ncd-calculator and serve at openscienceresearchpark.com
 ./shawn_staging_build.sh # build ncd-calculator and serve at www.staging.openscienceresearchpark.com
 ./nam_staging_build.sh # build ncd-calculator and serve at complearn.staging.openscienceresearchpark.com

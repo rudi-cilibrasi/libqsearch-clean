@@ -38,7 +38,7 @@ export class GenBankSearchService {
 
   constructor() {
     this.genbankCache = new GenbankCache();
-    this.genBankQueries = new GenBankQueries(import.meta.env.VITE_NCBI_API_KEY || '');
+    this.genBankQueries = new GenBankQueries();
     this.taxonomyCache = new Map();
   }
 
