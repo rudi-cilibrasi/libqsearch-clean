@@ -7,6 +7,7 @@ export interface SelectedItem {
   label: string;
   content: string | undefined;
   type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD;
+  cacheKey?: string;
 }
 
 export interface InputAccumulatorProps {

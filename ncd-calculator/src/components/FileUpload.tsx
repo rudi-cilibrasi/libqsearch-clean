@@ -7,10 +7,11 @@ import { FILE_UPLOAD } from "../constants/modalConstants";
 import { FileSearch, Info, Upload } from "lucide-react";
 import { FileInfo, getFile } from "../functions/file";
 import { SelectedItem } from "./InputAccumulator";
-import { GZIP_MAX_WINDOW } from "@/services/CompressionService.ts";
+import { GZIP_MAX_WINDOW } from "@/services/CompressionService";
+import { useNCDCache } from "@/hooks/useNCDCache";
+import {CRC32Calculator} from "@/functions/crc8.ts";
 
 interface FileUploadProps {
-  addItem: (item: SelectedItem) => void;
   selectedItems: SelectedItem[];
   setSelectedItems: React.Dispatch<React.SetStateAction<SelectedItem[]>>;
 }
@@ -52,7 +53,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     }
   ];
 
-  // Keep all the existing handler functions
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
@@ -63,18 +63,35 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     setIsDragging(false);
   }, []);
 
-  const getFileItem = (fileInfo: FileInfo): SelectedItem => {
+  const processFileContent = async (fileInfo: FileInfo): Promise<{
+    content: string;
+    cacheKey?: string;
+  }> => {
+    const content = typeof fileInfo.content === 'string' ? fileInfo.content : '';
+
+    if (effectiveAlgorithm === 'lzma') {
+      const contentBytes = new TextEncoder().encode(content);
+      const cacheKey = CRC32Calculator.generateKey(contentBytes, 'lzma');
+      return { content, cacheKey };
+    }
+
+    return { content };
+  };
+
+  const getFileItem = async (fileInfo: FileInfo): Promise<SelectedItem> => {
     const content = typeof fileInfo.content === 'string' ? fileInfo.content : '';
     const name = fileInfo.name || 'unnamed';
 
-    if (isFasta({ ...fileInfo, content, name: fileInfo.name || 'unnamed' })) {
-      return getFastaInfoFromFile({ ...fileInfo, content, name: fileInfo.name || 'unnamed' });
+    if (isFasta({ ...fileInfo, content, name })) {
+      return getFastaInfoFromFile({ ...fileInfo, content, name });
     } else {
+      const processed = await processFileContent(fileInfo);
       return {
         type: FILE_UPLOAD,
-        content,
+        content: processed.content,
         label: name,
         id: name,
+        cacheKey: processed.cacheKey
       };
     }
   };
@@ -101,11 +118,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     const algorithm = determineEffectiveAlgorithm(fileInfos);
     setEffectiveAlgorithm(algorithm);
 
-    const newItems = fileInfos
-        .map(file => getFileItem(file))
-        .filter(item => !selectedItems.find(selected => selected.id === item.id));
+    const newItems = await Promise.all(
+        fileInfos.map(async file => getFileItem(file))
+    );
 
-    setSelectedItems(prev => [...prev, ...newItems]);
+    const uniqueNewItems = newItems.filter(
+        item => !selectedItems.find(selected => selected.id === item.id)
+    );
+
+    setSelectedItems(prev => [...prev, ...uniqueNewItems]);
   }, [selectedItems, determineEffectiveAlgorithm]);
 
   const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
