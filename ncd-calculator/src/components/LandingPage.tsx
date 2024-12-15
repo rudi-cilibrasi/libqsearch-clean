@@ -1,11 +1,18 @@
 import { useNavigate } from 'react-router-dom';
 import { Upload, Database, Languages, ChevronRight, Info, ExternalLink } from 'lucide-react';
 import Header from './Header';
+import React from "react";
 
-const LandingPage = ({ openLogin, setOpenLogin, setAuthenticated }) => {
+interface LandingPageProps {
+    openLogin: boolean;
+    setOpenLogin: (open: boolean) => void;
+    setAuthenticated: (auth: boolean) => void;
+}
+
+const LandingPage: React.FC<LandingPageProps> = ({ openLogin, setOpenLogin, setAuthenticated }) => {
     const navigate = useNavigate();
 
-    const navigateToCalculator = (analysisType) => {
+    const navigateToCalculator = (analysisType: string) => {
         navigate(`/calculator?searchMode=${analysisType}`);
     };
 

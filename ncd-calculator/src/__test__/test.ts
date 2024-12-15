@@ -1,3 +1,4 @@
+import * as LZMA from 'lzma';
 // Load LZMA library
 const loadLZMAScript = async () => {
     const maxRetries = 3;

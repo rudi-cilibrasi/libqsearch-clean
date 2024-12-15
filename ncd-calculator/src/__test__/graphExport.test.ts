@@ -1,4 +1,3 @@
-import React from 'react'
 import createGraph from '../functions/graphExport.ts';
 
 describe('Graph DOT File Generation', () => {

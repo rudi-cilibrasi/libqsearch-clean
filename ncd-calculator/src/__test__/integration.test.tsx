@@ -4,8 +4,6 @@ import { vi } from 'vitest';
 import QSearch, {QSearchProps} from '../components/QSearch';
 import {MemoryRouter} from "react-router";
 
-
-
 describe('QSearch Integration Tests', () => {
     afterEach(() => {
         vi.clearAllMocks();
@@ -19,44 +17,6 @@ describe('QSearch Integration Tests', () => {
             postMessage: vi.fn(),
             terminate: vi.fn(),
         }));
-
-        const mockGLContext = {
-            getShaderPrecisionFormat: vi.fn(() => ({
-                precision: 0,
-                rangeMin: 0,
-                rangeMax: 0,
-            })),
-            getExtension: vi.fn(),
-            getParameter: vi.fn((param) => {
-                if (param === 'VERSION') {
-                    return 'WebGL 2.0 (OpenGL ES 3.0)';
-                }
-                return 'WebGL 1.0';
-            }),
-            createTexture: vi.fn(() => ({ texture: 'mockTexture' })),
-            bindTexture: vi.fn(),
-            createFramebuffer: vi.fn(() => ({})),
-            createBuffer: vi.fn(() => ({})),
-            activeTexture: vi.fn(),
-            texParameteri: vi.fn(),
-            texImage3D: vi.fn(),
-            clearColor: vi.fn(),
-            clearDepth: vi.fn(),
-            clearStencil: vi.fn(),
-            enable: vi.fn(),
-            depthFunc: vi.fn(),
-            frontFace: vi.fn(),
-            cullFace: vi.fn(),
-            viewport: vi.fn(),
-            getContextAttributes: vi.fn(() => ({
-                alpha: true,
-                depth: true,
-                stencil: false,
-                antialias: true
-            }))
-        };
-
-        global.HTMLCanvasElement.prototype.getContext = vi.fn(() => mockGLContext as unknown as CanvasRenderingContext2D);
 
         vi.mock('three', () => ({
             ...vi.importActual('three'),

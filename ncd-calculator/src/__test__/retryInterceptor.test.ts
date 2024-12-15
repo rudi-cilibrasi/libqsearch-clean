@@ -1,6 +1,4 @@
-import React from 'react'
 import axios from '../functions/fetchProxy.js';
-import axiosRetry from 'axios-retry';
 import MockAdapter from "axios-mock-adapter";
 
 const fetchData = async () => {
@@ -13,7 +11,7 @@ const fetchData = async () => {
 };
 
 describe('axiosRetry Tests', () => {
-    let mock;
+    let mock: MockAdapter;
     beforeEach(() => {
         jest.clearAllMocks(); // Clear any previous mocks
         mock = new MockAdapter(axios);
@@ -40,7 +38,7 @@ describe('axiosRetry Tests', () => {
         mock.onGet().replyOnce(429, {})
         mock.onGet().replyOnce(429, {})
         mock.onGet().replyOnce(429, {})
-        const response = await fetchData();
+        await fetchData();
 
         expect(mock.history.get.length).toBe(4);
 

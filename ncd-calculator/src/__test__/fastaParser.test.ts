@@ -1,17 +1,15 @@
-import React from 'react'
-/* eslint-disable */
 import {expect, test} from "vitest";
 import {
     getCleanSequence, getFastaInfoFromFile,
     hasMetadata,
     isValidFastaSequenceWithHeader,
     isValidFastaSequenceWithoutHeader,
-    parseFasta,
     parseFastaAndClean,
     parseMetadata,
     parseMultipleMetadata,
     validSequence
 } from "../functions/fasta.js";
+import {FileInfo} from "@/functions/file.ts";
 
 // Test cases for hasMetadata function
 test("hasMetadata returns true for valid metadata", () => {
@@ -176,9 +174,10 @@ test("test parseFasta with multiple sequences with headers", () => {
 const FILE_UPLOAD = "file_upload";
 
 test('should extract common name when present', () => {
-    const fileInfo = {
+    const fileInfo: FileInfo = {
         name: 'test.fasta',
-        content: ">NC_001323.1 Gallus gallus (chicken) mitochondrion, complete genome\nACGTACGT"
+        content: ">NC_001323.1 Gallus gallus (chicken) mitochondrion, complete genome\nACGTACGT",
+        ext: "fasta"
     };
 
     const expected = {
@@ -192,9 +191,10 @@ test('should extract common name when present', () => {
 });
 
 test('should use first two words of scientific name when no common name', () => {
-    const fileInfo = {
+    const fileInfo: FileInfo = {
         name: 'test.fasta',
-        content: ">NC_005089.1 Mus musculus mitochondrion, complete genome\nACGTACGT"
+        content: ">NC_005089.1 Mus musculus mitochondrion, complete genome\nACGTACGT",
+        ext: "fasta"
     };
 
     const expected = {
@@ -209,9 +209,10 @@ test('should use first two words of scientific name when no common name', () => 
 
 
 test('should use filename when no metadata present', () => {
-    const fileInfo = {
+    const fileInfo: FileInfo = {
         name: 'test.fasta',
-        content: "acgtacgt"
+        content: "acgtacgt",
+        ext: "fasta"
     };
 
     const expected = {
@@ -225,9 +226,10 @@ test('should use filename when no metadata present', () => {
 });
 
 test('should clean sequence by removing whitespace and newlines', () => {
-    const fileInfo = {
+    const fileInfo: FileInfo = {
         name: 'test.fasta',
-        content: ">NC_001323.1 Gallus gallus (chicken)\nACGT\nACGT\n"
+        content: ">NC_001323.1 Gallus gallus (chicken)\nACGT\nACGT\n",
+        ext: "fasta"
     };
 
     const expected = {
@@ -241,9 +243,10 @@ test('should clean sequence by removing whitespace and newlines', () => {
 });
 
 test('should handle empty content', () => {
-    const fileInfo = {
+    const fileInfo: FileInfo = {
         name: 'test.fasta',
-        content: ''
+        content: '',
+        ext: "fasta"
     };
 
     const expected = {
@@ -258,9 +261,10 @@ test('should handle empty content', () => {
 
 
 test('should handle multiple headers (should use first one)', () => {
-    const fileInfo = {
+    const fileInfo: FileInfo = {
         name: 'test.fasta',
-        content: ">NC_001323.1 Gallus gallus (chicken)\nacgt\n>NC_0013234.1 Gallus gallus2 (chicken2)\nacgt"
+        content: ">NC_001323.1 Gallus gallus (chicken)\nacgt\n>NC_0013234.1 Gallus gallus2 (chicken2)\nacgt",
+        ext: "fasta"
     };
 
     const expected = {
@@ -274,9 +278,10 @@ test('should handle multiple headers (should use first one)', () => {
 });
 
 test('should handle headers with special characters', () => {
-    const fileInfo = {
+    const fileInfo: FileInfo = {
         name: 'test.fasta',
-        content: ">NC_001323.1 Gallus-gallus (domestic_chicken) genome\nacgtacgt"
+        content: ">NC_001323.1 Gallus-gallus (domestic_chicken) genome\nacgtacgt",
+        ext: "fasta"
     };
 
     const expected = {
@@ -290,9 +295,10 @@ test('should handle headers with special characters', () => {
 });
 
 test('should handle case sensitivity in metadata', () => {
-    const fileInfo = {
+    const fileInfo: FileInfo = {
         name: 'test.fasta',
-        content: ">nc_001323.1 GALLUS GALLUS (Chicken) genome\nacgtacgt"
+        content: ">nc_001323.1 GALLUS GALLUS (Chicken) genome\nacgtacgt",
+        ext: "fasta"
     };
 
     const expected = {

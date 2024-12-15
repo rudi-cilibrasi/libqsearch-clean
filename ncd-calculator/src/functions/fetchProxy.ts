@@ -42,7 +42,7 @@ export const sendRequestToProxy = async (
   }
 };
 
-interface ApiResponse {
+export interface ApiResponse {
   [key: string]: any;
 }
 

@@ -32,12 +32,12 @@ export const QSearch: React.FC<QSearchProps> = ({
   const [errorMsg, setErrorMsg] = useState("");
   const [executionTime, setExecutionTime] = useState(performance.now());
   const qSearchWorkerRef = useRef<any>(null);
-  const [qSearchTreeResult, setQSearchTreeResult] = useState([]);
+  const [qSearchTreeResult, setQSearchTreeResult] = useState<any[] | null>([]);
   const [labelMap, setLabelMap] = useState(new Map());
   const labelMapRef = useRef(labelMap);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSeaarchDisabled, setIsSearchDisabled] = useState(false);
-  const [confirmedSearchTerm, setConfirmedSearchTerm] = useState("");
+  const [, setIsSearchDisabled] = useState(false);
+  const [confirmedSearchTerm,] = useState("");
   const [searchParams] = useSearchParams();
   const storageKeyManager = LocalStorageKeyManager.getInstance();
 
@@ -146,7 +146,7 @@ export const QSearch: React.FC<QSearchProps> = ({
       } else {
         throw new Error("Worker not initialized");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error in onNcdInput:", error);
       setErrorMsg(`Error processing input: ${error.message}`);
       setIsLoading(false);
@@ -211,66 +211,6 @@ export const QSearch: React.FC<QSearchProps> = ({
     };
   }, [searchParams]);
 
-  const handleParsedFileContent = (parsedData: ParsedData) => {
-    if (parsedData.valid) {
-      handleValidFileContent(parsedData);
-    } else {
-      handleInvalidFileContent();
-    }
-  };
-
-  interface ParsedData {
-    data: Array<{
-      accession: string;
-      sequence: string;
-    }>;
-    valid: boolean;
-  }
-
-  const handleValidFileContent = (parsedData: ParsedData) => {
-    setIsLoading(true);
-    const map = {
-      displayLabels: [] as string[],
-      accessions: [] as string[],
-    };
-    for (let i = 0; i < parsedData.data.length; i++) {
-      map.displayLabels.push(parsedData.data[i].accession);
-      map.accessions.push(parsedData.data[i].accession);
-    }
-    const labelMap = getLabelMap(map);
-    setLabelMap(labelMap);
-    labelMapRef.current = labelMap;
-    const ncdInput = getNcdInput(parsedData);
-    ncdWorker?.postMessage(ncdInput);
-  };
-
-  const handleInvalidFileContent = () => {
-    resetSearchResult("");
-  };
-
-  interface FastaData {
-    data: Array<{
-      accession: string;
-      sequence: string;
-    }>;
-  }
-
-  const getNcdInput = (parsedFasta: FastaData) => {
-    const input: {
-      contents: string[];
-      labels: string[];
-    } = {
-      contents: [],
-      labels: [],
-    };
-    for (let i = 0; i < parsedFasta.data.length; i++) {
-      const fasta = parsedFasta.data[i];
-      input.labels.push(fasta.accession);
-      input.contents.push(fasta.sequence);
-    }
-    return input;
-  };
-
   const displayNcdMatrix = (response: any) => {
     const { labels, ncdMatrix } = response;
     let displayNames = [];
@@ -292,30 +232,6 @@ export const QSearch: React.FC<QSearchProps> = ({
     });
   };
 
-  interface ProjectedInput {
-    accessions: string[];
-    displayLabels: string[];
-  }
-
-  const getLabelMap = (projectedInput: ProjectedInput) => {
-    let map = new Map();
-    const accessions = projectedInput.accessions;
-    const labels = projectedInput.displayLabels;
-    for (let i = 0; i < accessions.length; i++) {
-      map.set(accessions[i], labels[i]);
-    }
-    return map;
-  };
-
-  /**
-   * ncdInput: {
-   *     contents: [],
-   *     labels: [],
-   * }
-   *
-   *
-   */
-
   interface NCDInput {
     contents: string[];
     labels: string[];
@@ -328,16 +244,6 @@ export const QSearch: React.FC<QSearchProps> = ({
       }
     };
   }, [ncdWorker]);
-
-  const resetSearchResult = (message: string) => {
-    setErrorMsg(message);
-    setNcdMatrix([]);
-    setLabels([]);
-    labelMapRef.current = new Map();
-    setLabelMap(new Map());
-    setHasMatrix(false);
-    setQSearchTreeResult([]);
-  };
 
   const resetDisplay = () => {
     setErrorMsg("");
