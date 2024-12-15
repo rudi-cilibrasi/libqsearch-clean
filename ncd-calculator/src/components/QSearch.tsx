@@ -12,7 +12,7 @@ import {useSearchParams} from "react-router-dom";
 import {lzmaWorkerCode} from "@/workers/lzmaWorker.ts";
 
 
-interface QSearchProps {
+export interface QSearchProps {
   openLogin: boolean;
   setOpenLogin: (open: boolean) => void;
   authenticated: boolean;

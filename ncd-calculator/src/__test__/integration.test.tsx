@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {fireEvent, render, screen} from '@testing-library/react';
 import { vi } from 'vitest';
-import QSearch from '../components/QSearch';
+import QSearch, {QSearchProps} from '../components/QSearch';
 import {MemoryRouter} from "react-router";
 
 
@@ -67,11 +67,13 @@ describe('QSearch Integration Tests', () => {
         }));
     });
 
-
-
-
     test('test fasta search terms', async () => {
-        const element = React.createElement(QSearch);
+        const element: React.ReactElement<QSearchProps> = React.createElement(QSearch, {
+            openLogin: true,
+            setOpenLogin: vitest.fn(),
+            authenticated : false,
+            setAuthenticated: vitest.fn(),
+        });
         const routerElement = React.createElement(MemoryRouter, {}, element);
         render(routerElement);
 
@@ -96,7 +98,12 @@ describe('QSearch Integration Tests', () => {
     });
 
     test('test language', async () => {
-        const element = React.createElement(QSearch);
+        const element: React.ReactElement<QSearchProps> = React.createElement(QSearch, {
+            openLogin: true,
+            setOpenLogin: vitest.fn(),
+            authenticated : false,
+            setAuthenticated: vitest.fn(),
+        });
         const routerElement = React.createElement(MemoryRouter, {}, element);
         render(routerElement);
 
