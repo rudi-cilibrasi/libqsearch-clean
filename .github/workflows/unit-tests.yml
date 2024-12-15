@@ -9,19 +9,48 @@ on:
       - main
 
 jobs:
+  ncd-calculator-gui-tests:
+    needs: emscripten-build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22.x]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+          cache-dependency-path: ./ncd-calculator/package.json
+
+      - name: Install Dependencies
+        working-directory: ncd-calculator
+        run: npm i
+
+      - name: Build Project
+        working-directory: ncd-calculator
+        run: npm run build --if-present
+
+      - name: Run Tests
+        working-directory: ncd-calculator
+        run: npm test
+
   qsearch-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      
+
       # Build the cpp-builder stage only for tests
       - name: Build C++ test image
         run: docker build --target cpp-builder -t libqsearch-clean-test .
-      
+
       - name: Run C++ build
         run: |
           docker run --rm libqsearch-clean-test sh -c "rm -rf build && ./runtests --build"
-      
+
       - name: Run C++ unit tests
         run: docker run --rm libqsearch-clean-test ./runtests --unit
 
@@ -36,8 +65,8 @@ jobs:
           sudo chown $USER:$USER /opt/emsdk
           git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk
           /opt/emsdk/emsdk install latest
-          /opt/emsdk/emsdk activate latest   
-      
+          /opt/emsdk/emsdk activate latest
+
       - name: Build WASM with Emscripten
         run: |
           source /opt/emsdk/emsdk_env.sh
@@ -54,4 +83,3 @@ jobs:
             -s ENVIRONMENT=worker \
             src/*.cpp \
             -o ./ncd-calculator/src/wasm/qsearch.js
-
