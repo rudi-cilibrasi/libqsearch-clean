@@ -22,7 +22,7 @@ const ENV_LOADER = {
 
     FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL || "",
     BASE_URL: process.env.BASE_URL || "",
-    PORT: process.env.PORT || "",
+    PORT: process.env.PORT || "3001",
 
     DB_HOST: process.env.DB_HOST || "",
 

@@ -5,12 +5,10 @@ import {
 } from "../constants/taxonomy.js";
 
 export class GenBankQueries {
-  apiKey: string;
   DEFAULT_PAGE_SIZE: number;
   baseUrl: string;
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  constructor() {
     this.DEFAULT_PAGE_SIZE = 5;
     this.baseUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils`;
   }

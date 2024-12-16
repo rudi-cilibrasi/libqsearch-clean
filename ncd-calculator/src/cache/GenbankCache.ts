@@ -14,6 +14,7 @@ import {
 import {MemoryCache} from "@/cache/MemoryCache.ts";
 import {LocalStorageCache} from "@/cache/LocalStorageCache.ts";
 import {RedisStorageCache} from "@/cache/RedisStorageCache.ts";
+import {VITE_REDIS_ENDPOINT} from "@/config/api.tsx";
 
 export class GenbankCache {
     private readonly memoryCache: CacheInterface<CacheTypes>;
@@ -29,7 +30,7 @@ export class GenbankCache {
             ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
         this.redisCache = new CacheInterface(
-            new RedisStorageCache(import.meta.env.VITE_REDIS_ENDPOINT),
+            new RedisStorageCache(VITE_REDIS_ENDPOINT),
             {
                 ttl: 30 * 24 * 60 * 60 * 1000, // 30 days
             }
