@@ -1,4 +1,4 @@
-// Import types for Emscripten module
+/// <reference lib="webworker" />
 interface EmscriptenModule {
   run_qsearch: (
     matrixString: string,
@@ -66,7 +66,7 @@ Module({
       message: text,
     } as ConsoleMessage);
   },
-} as QSearchModuleConfig).then((initializedModule: EmscriptenModule) => {
+} as QSearchModuleConfig).then((initializedModule: any) => {
   qsearchModule = initializedModule;
   self.postMessage({
     action: "consoleLog",

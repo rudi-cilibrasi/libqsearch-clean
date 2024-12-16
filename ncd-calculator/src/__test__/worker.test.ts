@@ -1,20 +1,14 @@
-import React from 'react'
 import {test, expect} from "vitest";
 import {readFileSync} from "fs";
 import {join} from "node:path";
-
-const getSampleBuffaloes = () => {
-    return readFileSync(join(__dirname, "./mock_response/buffaloes_fasta.json"), 'utf-8');
-}
 
 const getSampleSequenceJson = () => {
     return JSON.parse(readFileSync(join(__dirname, "./mock_response/sequences.txt"), 'utf-8'));
 }
 
-
 const SAMPLE_JSON = getSampleSequenceJson();
 
-async function compressedSize(blob) {
+async function compressedSize(blob: any) {
     const stream = blob.stream();
     const compressionStream = new CompressionStream("gzip");
     const compressedStream = stream.pipeThrough(compressionStream);
@@ -23,21 +17,21 @@ async function compressedSize(blob) {
     return compressedBlob.size;
 }
 
-async function compressedSizePair(str1, str2) {
+async function compressedSizePair(str1: string, str2: string) {
     const blob = new Blob([str1, str2]);
     return await compressedSize(blob);
 }
 
-async function compressedSizeSingle(str) {
+async function compressedSizeSingle(str: string) {
     const blob = new Blob([str]);
     return await compressedSize(blob);
 }
 
-function calculateNCD(sizeX, sizeY, sizeXY) {
+function calculateNCD(sizeX: number, sizeY: number, sizeXY: number) {
     return (sizeXY - Math.min(sizeX, sizeY)) / Math.max(sizeX, sizeY);
 }
 
-const calculateMatrixScore = async (e) => {
+const calculateMatrixScore = async (e: any) => {
     const { contents } = e;
     const n = contents.length;
     const singleCompressedSizes = new Array(n);
@@ -66,9 +60,9 @@ test('test labels unique', () => {
 })
 
 beforeAll(() => {
-    global.Blob.prototype.stream = jest.fn(() => ({
-        getReader: jest.fn(),
-        pipeThrough: jest.fn(),
+    global.Blob.prototype.stream = vi.fn<() => any>(() => ({
+        getReader: vi.fn(),
+        pipeThrough: vi.fn(),
     }));
 });
 

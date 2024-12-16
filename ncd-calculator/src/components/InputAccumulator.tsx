@@ -3,8 +3,8 @@ import {Dna, FileType2, Globe2, X} from "lucide-react";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 
 export interface SelectedItem {
-  id: string;
-  label: string;
+  id: string | undefined;
+  label: string | undefined;
   content: string | undefined;
   type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD;
 }
@@ -12,7 +12,7 @@ export interface SelectedItem {
 export interface InputAccumulatorProps {
   MIN_ITEMS?: number;
   selectedItems: SelectedItem[];
-  onRemoveItem: (id: string) => void;
+  onRemoveItem: (id: string | undefined) => void;
   authenticated?: boolean;
 }
 

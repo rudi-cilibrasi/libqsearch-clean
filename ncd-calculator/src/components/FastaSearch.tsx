@@ -1,6 +1,4 @@
-import React, {useCallback, useState} from "react";
-import {getCleanSequence, isFasta} from "../functions/fasta.js";
-import {FileInfo, getFile} from "../functions/file.js";
+import React, {useState} from "react";
 import {Database, FileText, PawPrint} from "lucide-react";
 import {SearchInput} from "./SearchInput.jsx";
 import {FASTA} from "../constants/modalConstants.js";
@@ -29,14 +27,11 @@ interface ProjectionOption {
 export const FastaSearch: React.FC<FastaSearchProps> = ({
   addItem,
   selectedItems,
-  onSetApiKey,
   setSelectedItems,
   getAllFastaSuggestionWithLastIndex,
   getFastaSuggestionStartIndex,
   setFastaSuggestionStartIndex,
 }) => {
-  const [apiKey, setApiKey] = useState("");
-  const [isDragging, setIsDragging] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [projections, setProjections] = useState<ProjectionOption[]>([
     {
@@ -58,87 +53,14 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
       selected: false
     },
   ]);
-  const [searchError, setSearchError] = useState(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const genbankSearchService = new GenBankSearchService();
   const localStorageKeyManager = LocalStorageKeyManager.getInstance();
 
   const [autoLabelingEnabled, setAutoLabelingEnabled] = useState(true);
 
-
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
   const handleSearchTerm = (searchTerm: string) => {
     setSearchTerm(searchTerm);
-  };
-
-  const handleDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const files = Array.from(e.dataTransfer.files);
-      const fileInfos: FileInfo[] = await Promise.all(
-        files.map(async (file) => await getFile(file))
-      );
-      const newItems: SelectedItem[] = fileInfos
-        .map((file) => getFileItem(file))
-        .filter(
-          (item) => !selectedItems.find((selected) => selected.id === item.id)
-        );
-      setSelectedItems((prev: SelectedItem[]) => [...prev, ...newItems]);
-    },
-    [selectedItems, setSelectedItems]
-  );
-
-  const getFileItem = (fileInfo: FileInfo) => {
-    if (isFasta(fileInfo)) {
-      const sequenceClean = getCleanSequence(fileInfo.content as string);
-      return {
-        type: FASTA,
-        content: sequenceClean,
-        label: fileInfo.name,
-        id: fileInfo.name,
-      };
-    } else {
-      return {
-        type: FASTA,
-        content: fileInfo.content,
-        label: fileInfo.name,
-        id: fileInfo.name,
-      };
-    }
-  };
-
-const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(e.target.files as FileList);
-  const readyFiles = await Promise.all(files.map((file: File) => getFile(file)));
-  const newItems: SelectedItem[] = readyFiles
-    .map((file) => getFileItem(file))
-    .filter(
-      (item) => !selectedItems.find((selected) => selected.id === item.id)
-    );
-  setSelectedItems((prev: SelectedItem[]) => [...prev, ...newItems]);
-};
-
-  const handleKeydown = (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const item = {
-        type: "fasta",
-        id: searchTerm,
-        label: searchTerm,
-        content: "",
-      };
-      addItem(item);
-    }
-  };
-
-  const handleApiKey = (key) => {
-    setApiKey(key);
-    onSetApiKey(key);
   };
 
   const toggleProjection = (selectedKey: string) => {
@@ -164,7 +86,7 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     });
   };
 
-  const onSelectSearchTerm = (item) => {
+  const onSelectSearchTerm = (item: any) => {
     addItem({
       id: item.accessionId,
       type: FASTA,
@@ -188,7 +110,6 @@ const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
       <div>
         <SearchInput
           searchTerm={searchTerm}
-          addItem={addItem}
           label="Enter Animal Name"
           type="fasta"
           handleSearchTerm={handleSearchTerm}

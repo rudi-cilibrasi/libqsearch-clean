@@ -3,10 +3,10 @@ import { useStorageState } from '../cache/cache.ts';
 
 describe('useStorageState', () => {
     const localStorageMock = (() => {
-        let store = {};
+        let store: Record<string, any | null> = {}
         return {
-            getItem: jest.fn((key) => store[key] || null),
-            setItem: jest.fn((key, value) => (store[key] = value)),
+            getItem: jest.fn((key: string) => store[key]),
+            setItem: jest.fn((key: string, value: string) => (store[key] = value)),
             clear: jest.fn(() => (store = {})),
         };
     })();

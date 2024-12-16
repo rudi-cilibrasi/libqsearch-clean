@@ -2,9 +2,6 @@ import {GenBankSearchService} from "@/services/GenBankSearchService.ts";
 import {sendRequestToProxy} from "@/functions/fetchProxy.ts";
 import {beforeEach} from "vitest";
 
-
-
-
 describe("GenbankSearchService test", () => {
     vi.mock("../functions/fetchProxy.ts", () => ({
         sendRequestToProxy: vi.fn(),
@@ -273,7 +270,7 @@ describe("GenbankSearchService test", () => {
                     }
                 });
 
-                const result = await service.searchTaxonomyDirect("mammal");
+                await service.searchTaxonomyDirect("mammal");
                 // Should only use first ID
                 expect(sendRequestToProxy).toHaveBeenNthCalledWith(2, {
                     externalUrl: expect.stringContaining('9615')

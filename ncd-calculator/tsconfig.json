@@ -26,6 +26,7 @@
       ]
     },
     "types": [
+      "jest",
       "vitest/globals",
       "@testing-library/jest-dom"
     ],
