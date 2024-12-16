@@ -363,7 +363,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
   };
 
   const removeItem = (itemId: string): void => {
-    setSelectedItems(selectedItems.filter((item) => item.id !== itemId));
+    setSelectedItems([...selectedItems.filter((item) => item.id !== itemId)]);
   };
 
   const clearAllSelectedItems = (): void => {

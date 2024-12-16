@@ -8,7 +8,6 @@ import { FileSearch, Info, Upload } from "lucide-react";
 import { FileInfo, getFile } from "../functions/file";
 import { SelectedItem } from "./InputAccumulator";
 import { GZIP_MAX_WINDOW } from "@/services/CompressionService";
-import { useNCDCache } from "@/hooks/useNCDCache";
 import {CRC32Calculator} from "@/functions/crc8.ts";
 
 interface FileUploadProps {
@@ -65,16 +64,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
   const processFileContent = async (fileInfo: FileInfo): Promise<{
     content: string;
-    cacheKey?: string;
   }> => {
     const content = typeof fileInfo.content === 'string' ? fileInfo.content : '';
-
-    if (effectiveAlgorithm === 'lzma') {
-      const contentBytes = new TextEncoder().encode(content);
-      const cacheKey = CRC32Calculator.generateKey(contentBytes, 'lzma');
-      return { content, cacheKey };
-    }
-
     return { content };
   };
 
@@ -90,8 +81,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         type: FILE_UPLOAD,
         content: processed.content,
         label: name,
-        id: name,
-        cacheKey: processed.cacheKey
+        id: name
       };
     }
   };

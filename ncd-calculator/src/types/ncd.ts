@@ -7,7 +7,7 @@ export interface CompressedSizeCache {
 export interface NCDInput {
     contents: string[];
     labels: string[];
-    cachedSizes?: Map<string, CompressedSizeCache>;
+    cachedSizes?: Map<string, number>;
 }
 
 

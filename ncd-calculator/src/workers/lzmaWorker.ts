@@ -38,44 +38,41 @@ function calculateCRC32(data) {
         crc = (crc >>> 8) ^ crc32Table[(crc ^ data[i]) & 0xFF];
     }
     
-    return (~crc >>> 0);
-}
-
-// Updated cache key generation
-function generateCacheKey(content) {
-    const encoded = encodeText(content);
-    const crc = calculateCRC32(encoded);
-    return \`compression:lzma:\${crc.toString(16).padStart(8, '0')}\`;
+    // Convert to hex and pad to 8 characters
+    return (~crc >>> 0).toString(16).padStart(8, '0');
 }
 
 function getCachedSizes(content1, content2, cachedSizes) {
     if (!cachedSizes) return null;
     
-    const key1 = generateCacheKey(content1);
-    const key2 = generateCacheKey(content2);
+    const crc1 = calculateCRC32(encodeText(content1));
+    const crc2 = calculateCRC32(encodeText(content2));
     
-    console.log(\`LZMA Worker: Checking cache for keys: \${key1}, \${key2}\`);
+    // First check if individual sizes exist in cache
+    const key1 = \`lzma:\${crc1}\`;
+    const key2 = \`lzma:\${crc2}\`;
     
-    const cache1 = cachedSizes.get(key1);
-    const cache2 = cachedSizes.get(key2);
+    const size1 = cachedSizes.get(key1);
+    const size2 = cachedSizes.get(key2);
     
-    if (cache1 && cache2) {
-        const combinedSize = cache1.pairSizes.get(key2) || cache2.pairSizes.get(key1);
-        if (combinedSize) {
-            console.log(\`LZMA Worker: Cache hit for pair \${key1}, \${key2}\`);
-            return {
-                size1: cache1.individualSize,
-                size2: cache2.individualSize,
-                combinedSize
-            };
-        }
+    // Only proceed if we have both individual sizes
+    if (size1 === undefined || size2 === undefined) {
+        console.log('Missing individual sizes in cache');
+        return null;
     }
+
+    // Check for combined size
+    const pairKey = \`lzma:\${[crc1, crc2].sort().join('-')}\`;
+    const combinedSize = cachedSizes.get(pairKey);
     
-    console.log(\`LZMA Worker: Cache miss for pair \${key1}, \${key2}\`);
-    return null;
+    if (combinedSize === undefined) {
+        console.log('Missing combined size in cache');
+        return null;
+    }
+
+    console.log('Found all cached sizes:', { size1, size2, combinedSize });
+    return { size1, size2, combinedSize };
 }
-
-
 
 // Encoding and NCD calculation utilities
 function encodeText(text) {
@@ -173,7 +170,8 @@ async function processChunk(startI, endI, n, contents, singleCompressedSizes, ca
                 
                 if (cachedResult) {
                     console.log(\`LZMA Worker: Using cached result for pair (\${i},\${j})\`);
-                    // Use cached result directly without recompressing
+                    console.log('Cached values:', cachedResult);
+                    
                     ncd = calculateNCD(
                         cachedResult.size1,
                         cachedResult.size2,
@@ -181,15 +179,26 @@ async function processChunk(startI, endI, n, contents, singleCompressedSizes, ca
                     );
                     combinedSize = cachedResult.combinedSize;
                 } else {
-                    // Only compress if not found in cache
                     console.log(\`LZMA Worker: No cache found, computing pair (\${i},\${j})\`);
                     console.log(\`LZMA Worker: Processing pair - lengths:\`, contents[i].length, contents[j].length);
+                    console.log(\`Single compressed sizes:\`, singleCompressedSizes[i], singleCompressedSizes[j]);
+                    
                     combinedSize = await compressedSizePair(contents[i], contents[j]);
                     ncd = calculateNCD(
                         singleCompressedSizes[i],
                         singleCompressedSizes[j],
                         combinedSize
                     );
+                }
+                
+                if (isNaN(ncd)) {
+                    console.error('NaN NCD detected:', {
+                        i, j,
+                        size1: cachedResult ? cachedResult.size1 : singleCompressedSizes[i],
+                        size2: cachedResult ? cachedResult.size2 : singleCompressedSizes[j],
+                        combinedSize
+                    });
+                    ncd = 1;  // Fallback value
                 }
                 
                 console.log(\`LZMA Worker: Pair (\${i},\${j}) NCD = \${ncd}\`);
@@ -202,6 +211,12 @@ async function processChunk(startI, endI, n, contents, singleCompressedSizes, ca
     }
     
     return results;
+}
+
+function generateCacheKey(content) {
+    const encoded = encodeText(content);
+    const crc = calculateCRC32(encoded);
+    return \`lzma:\${crc}\`;
 }
 
 // Main message handler

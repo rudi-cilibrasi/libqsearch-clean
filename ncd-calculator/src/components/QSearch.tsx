@@ -117,12 +117,11 @@ export const QSearch: React.FC<QSearchProps> = ({
     try {
       setIsLoading(true);
       setExecutionTime(performance.now());
-      // Convert contents to buffers for analysis and caching
+
       const contentBuffers = ncdInput.contents.map(content =>
           new TextEncoder().encode(content)
       );
 
-      // Calculate sizes for compression decision
       const contentSizes = contentBuffers.map(buffer => buffer.length);
       console.log("Content sizes:", contentSizes);
 
@@ -137,30 +136,47 @@ export const QSearch: React.FC<QSearchProps> = ({
         reason: compressionDecision.reason
       });
 
-      // Only use cache for LZMA compression
       let enrichedInput = { ...ncdInput };
       if (compressionDecision.recommendedAlgo === 'lzma') {
-        const cachedSizes = new Map<string, CompressedSizeCache>();
+        const cachedSizes = new Map<string, number>();
+        // Calculate CRCs for all files
+        const fileCRCs = contentBuffers.map(buffer =>
+            CRC32Calculator.calculate(buffer)
+        );
+        const algorithm = compressionDecision.recommendedAlgo;
 
-        // Check cache for each file
-        for (let i = 0; i < contentBuffers.length; i++) {
-          const buffer = contentBuffers[i];
-          const cacheKey = CRC32Calculator.generateKey(buffer, 'lzma');
+        // Check individual sizes
+        fileCRCs.forEach((crc) => {
+          const size = ncdCache.getCompressedSize(algorithm, [crc]);
+          if (size !== null) {
+            cachedSizes.set(`${algorithm}:${crc}`, size);
+          }
+        });
 
-          // Get cached sizes if available
-          const cachedEntry = ncdCache.getCompressedSizes([buffer]).get(cacheKey);
-          if (cachedEntry) {
-            cachedSizes.set(cacheKey, cachedEntry);
+        // Only check pair sizes if we have both individual sizes
+        for (let i = 0; i < fileCRCs.length; i++) {
+          for (let j = i + 1; j < fileCRCs.length; j++) {
+            const size1 = ncdCache.getCompressedSize(algorithm, [fileCRCs[i]]);
+            const size2 = ncdCache.getCompressedSize(algorithm, [fileCRCs[j]]);
+
+            if (size1 !== null && size2 !== null) {
+              const pairSize = ncdCache.getCompressedSize(algorithm,
+                  [fileCRCs[i], fileCRCs[j]].sort()
+              );
+              if (pairSize !== null) {
+                const pairKey = `${algorithm}:${[fileCRCs[i], fileCRCs[j]].sort().join('-')}`;
+                cachedSizes.set(pairKey, pairSize);
+              }
+            }
           }
         }
 
         if (cachedSizes.size > 0) {
           enrichedInput.cachedSizes = cachedSizes;
-          console.log(`Found cached data for ${cachedSizes.size} files`);
+          console.log(`Found cached data for ${cachedSizes.size} entries`);
         }
       }
 
-      // Initialize or switch worker based on compression decision
       let activeWorker: Worker | null;
       if (currentCompressorRef.current !== compressionDecision.recommendedAlgo) {
         console.log(`Switching to ${compressionDecision.recommendedAlgo} worker`);
@@ -174,14 +190,12 @@ export const QSearch: React.FC<QSearchProps> = ({
       }
 
       activeWorker.postMessage(enrichedInput);
-
     } catch (error) {
       console.error("Error in onNcdInput:", error);
       setErrorMsg(`Error processing input: ${error.message}`);
       setIsLoading(false);
     }
   };
-
 
 
   const handleWorkerMessage = (e: MessageEvent<WorkerMessage>) => {
@@ -205,13 +219,14 @@ export const QSearch: React.FC<QSearchProps> = ({
             const content1 = new TextEncoder().encode(data.content1);
             const content2 = new TextEncoder().encode(data.content2);
 
-            // Generate keys for both files
-            const key1 = CRC32Calculator.generateKey(content1, 'lzma');
-            const key2 = CRC32Calculator.generateKey(content2, 'lzma');
+            const crc1 = CRC32Calculator.calculate(content1).toString();
+            const crc2 = CRC32Calculator.calculate(content2).toString();
 
-            // Store both directions of the pair
-            ncdCache.storeCompressedSize(content1, data.size1, key2, data.combinedSize);
-            ncdCache.storeCompressedSize(content2, data.size2, key1, data.combinedSize);
+            // Store individual sizes
+            ncdCache.storeCompressedSize('lzma', [crc1], data.size1);
+            ncdCache.storeCompressedSize('lzma', [crc2], data.size2);
+
+            ncdCache.storeCompressedSize('lzma', [crc1, crc2].sort(), data.combinedSize);
           });
         }
       }
