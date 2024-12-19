@@ -201,6 +201,16 @@ async function processChunk(startI, endI, n, contents, singleCompressedSizes, ca
                     ncd = 1;  // Fallback value
                 }
                 
+                self.postMessage({
+                    type: 'progress',
+                    i,
+                    j,
+                    value: ncd,
+                    sizeX: singleCompressedSizes[i],
+                    sizeY: singleCompressedSizes[j],
+                    sizeXY: combinedSize
+                });
+                
                 console.log(\`LZMA Worker: Pair (\${i},\${j}) NCD = \${ncd}\`);
                 results.push({ i, j, ncd, combinedSize });
             } catch (error) {
@@ -233,7 +243,14 @@ self.onmessage = async function(e) {
             throw new Error('Invalid input data');
         }
         
+        
         const n = contents.length;
+        const totalPairs = (n * (n - 1)) / 2;
+        self.postMessage({ 
+            type: 'start',
+            totalItems: n,
+            totalPairs,
+        }); 
         console.log(\`LZMA Worker: Processing \${n} items\`);
         
         // Initialize arrays
