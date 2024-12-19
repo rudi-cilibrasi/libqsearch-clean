@@ -1,7 +1,7 @@
 import { describe, beforeEach, it, expect } from 'vitest';
 import { GenBankSearchService } from '../services/GenBankSearchService';
 
-describe('Popular Animals Live Tests', () => {
+describe('Animals Live Tests', () => {
     let service: GenBankSearchService;
 
     beforeEach(() => {
@@ -28,7 +28,15 @@ describe('Popular Animals Live Tests', () => {
         { name: 'whale', taxId: '9771', scientificName: 'Balaenoptera' }
     ];
 
-    describe('Live taxonomy searches', () => {
+    const rareAnimals = [
+        { name: 'Saola', taxId: '97363', scientificName: 'Pseudoryx nghetinhensis' },
+        { name: 'Vaquita', taxId: '42100', scientificName: 'Phocoena sinus' },
+        { name: 'Kakapo', taxId: '2489341', scientificName: 'strigops habroptila' },
+        { name: 'Quokka', taxId: '30670', scientificName: 'setonix brachyurus' },
+        { name: 'Tasmanian Devil', taxId: '9305', scientificName: 'sarcophilus harrisii' },
+    ];
+
+    describe('Live popular taxonomy searches', () => {
         it('should find correct taxonomy IDs for all common names in parallel', async () => {
             const results = await Promise.all(
                 popularAnimals.map(animal =>
@@ -64,4 +72,39 @@ describe('Popular Animals Live Tests', () => {
         }, TIMEOUT);
     });
 
+    describe('Rare taxonomy searches', () => {
+        it('should find correct taxonomy IDs for all common names in parallel', async () => {
+            const results = await Promise.all(
+                rareAnimals.map(animal =>
+                    service.getTaxonomicGroupInfo(animal.name.toLowerCase())
+                        .then(result => ({
+                            animal,
+                            result,
+                            searchType: 'common'
+                        }))
+                )
+            );
+
+            results.forEach(({ animal, result }) => {
+                expect(result.taxId).toBe(animal.taxId);
+            });
+        }, TIMEOUT);
+
+        it('should find taxonomy IDs for all scientific names in parallel', async () => {
+            const results = await Promise.all(
+                rareAnimals.map(animal =>
+                    service.getTaxonomicGroupInfo(animal.scientificName.toLowerCase())
+                        .then(result => ({
+                            animal,
+                            result,
+                            searchType: 'scientific'
+                        }))
+                )
+            );
+
+            results.forEach(({ animal, result }) => {
+                expect(result.taxId).toBe(animal.taxId);
+            });
+        }, TIMEOUT);
+    });
 });
