@@ -1,3 +1,12 @@
+export interface CompressionStats {
+    processedPairs: number;
+    totalPairs: number;
+    bytesProcessed: number;
+    startTime: number;
+    currentPair: [number, number] | null;
+    lastNcdScore: number | null;
+}
+
 export interface CompressedSizeCache {
     individualSize: number;
     pairSizes: Map<string, number>;
@@ -28,6 +37,9 @@ export type WorkerMessage = {
     i: number;
     j: number;
     value: number;
+    sizeX: number;
+    sizeY: number;
+    sizeXY: number;
 } | {
     type: 'result';
     labels: string[];
@@ -45,4 +57,9 @@ export type WorkerMessage = {
 } | {
     type: 'ready';
     message: string;
+} | {
+    type: 'start';
+    totalItems: number;
+    totalPairs: number;
+    contents: string[];
 };
