@@ -164,6 +164,35 @@ export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
     commonNames: ["whale", "blue whale", "great blue whale"],
   },
 
+  "pseudoryx nghetinhensis": {
+    id: "97363",
+    group: "MAMMALS",
+    commonNames: ["saola", "spindlehorn", "asian unicorn", "vu quang bovid"],
+  },
+
+  "phocoena sinus": {
+    id: "42100",
+    group: "MAMMALS",
+    commonNames: ["vaquita"],
+  },
+
+  "strigops habroptila": {
+    id: "2489341",
+    group: "BIRDS",
+    commonNames: ["kakapo", "night parrot", "owl parrot"],
+  },
+
+  "setonix brachyurus": {
+    id: "30670",
+    group: "MAMMALS",
+    commonNames: ["quokka"],
+  },
+
+  "sarcophilus harrisii": {
+    id: "9305",
+    group: "MAMMALS",
+    commonNames: ["Marsupial Devil", "Tassie Devil", "Tasmanian Devil"],
+  },
 
   // Group level mappings for general searches
   MAMMAL: {
@@ -983,6 +1012,38 @@ export const GROUP_PATTERNS: GroupPattern[] = [
     family: "Caudata",
     taxId: "8292",
   },
+    // Rare animals
+  {
+    pattern: /(saola)/i,
+    group: "MAMMALS",
+    family: "Bovidae",
+    taxId: "97363",
+  },
+  {
+    pattern: /(vaquita)/i,
+    group: "MAMMALS",
+    family: "Phocoenidae",
+    taxId: "42100",
+  },
+  {
+    pattern: /(kakapo)/i,
+    group: "BIRDS",
+    family: "Psittacidae",
+    taxId: "2489341",
+  },
+  {
+    pattern: /(quokka)/i,
+    group: "MAMMALS",
+    family: "Macropodidae",
+    taxId: "30670",
+  },
+  {
+    pattern: /(Tassie Devil|Tasmanian Devil|Marsupial Devil)/i,
+    group: "MAMMALS",
+    family: "Dasyuridae",
+    taxId: "9305",
+  },
+
 ];
 
 export const TAXONOMIC_SEARCH_STRATEGIES = {
