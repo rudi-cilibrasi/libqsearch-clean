@@ -10,6 +10,9 @@ import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.ts";
 import {CompressionService} from "@/services/CompressionService.ts";
 import {useSearchParams} from "react-router-dom";
 import {lzmaWorkerCode} from "@/workers/lzmaWorker.ts";
+import { useNCDCache } from "@/hooks/useNCDCache";
+import {NCDInput, CompressedSizeCache, WorkerMessage} from "@/types/ncd";
+import {CRC32Calculator} from "@/functions/crc8.ts";
 
 
 export interface QSearchProps {
@@ -36,10 +39,12 @@ export const QSearch: React.FC<QSearchProps> = ({
   const [labelMap, setLabelMap] = useState(new Map());
   const labelMapRef = useRef(labelMap);
   const [isLoading, setIsLoading] = useState(false);
-  const [, setIsSearchDisabled] = useState(false);
-  const [confirmedSearchTerm,] = useState("");
-  const [searchParams] = useSearchParams();
+  const [isSeaarchDisabled, setIsSearchDisabled] = useState(false);
+  const [confirmedSearchTerm, setConfirmedSearchTerm] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
   const storageKeyManager = LocalStorageKeyManager.getInstance();
+  const ncdCache = useNCDCache();
+  const currentCompressorRef = useRef<string>("gzip");
 
 
   const getSearchModeParamAsObj = (): SearchMode => {
@@ -58,7 +63,6 @@ export const QSearch: React.FC<QSearchProps> = ({
 
 
   const initializeWorker = (algorithm: string): Worker => {
-    // First, clean up existing worker
     if (ncdWorker) {
       ncdWorker.terminate();
     }
@@ -84,9 +88,9 @@ export const QSearch: React.FC<QSearchProps> = ({
 
     setNcdWorker(worker);
     setCurrentCompressor(algorithm);
+    currentCompressorRef.current = algorithm;  // Update ref immediately
     return worker;
   };
-
 
   useEffect(() => {
     const searchMode = searchParams.get('searchMode');
@@ -107,22 +111,19 @@ export const QSearch: React.FC<QSearchProps> = ({
     if (!ncdInput?.contents?.length || !ncdInput?.labels?.length) {
       setErrorMsg("Invalid input data");
       setIsLoading(false);
-      setIsSearchDisabled(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      console.log("Processing input:", {
-        contentCount: ncdInput.contents.length,
-        labelCount: ncdInput.labels.length
-      });
+      setExecutionTime(performance.now());
 
-      const contentSizes = ncdInput.contents.map(content =>
-          new TextEncoder().encode(content).length
+      const contentBuffers = ncdInput.contents.map(content =>
+          new TextEncoder().encode(content)
       );
 
-      console.log("Content sizes:", contentSizes); // Debug log
+      const contentSizes = contentBuffers.map(buffer => buffer.length);
+      console.log("Content sizes:", contentSizes);
 
       const sortedSizes = [...contentSizes].sort((a, b) => b - a);
       const compressionDecision = CompressionService.needsAdvancedCompression(
@@ -130,23 +131,66 @@ export const QSearch: React.FC<QSearchProps> = ({
           sortedSizes[1]
       );
 
-      console.log("Compression decision:", compressionDecision); // Debug log
-
       setCompressionInfo({
         algorithm: compressionDecision.recommendedAlgo,
         reason: compressionDecision.reason
       });
 
+      let enrichedInput = { ...ncdInput };
+      if (compressionDecision.recommendedAlgo === 'lzma') {
+        const cachedSizes = new Map<string, number>();
+        // Calculate CRCs for all files
+        const fileCRCs = contentBuffers.map(buffer =>
+            CRC32Calculator.calculate(buffer)
+        );
+        const algorithm = compressionDecision.recommendedAlgo;
 
-      if (currentCompressor !== compressionDecision.recommendedAlgo) {
-        const worker = initializeWorker(compressionDecision.recommendedAlgo);
-        worker.postMessage(ncdInput);
-      } else if (ncdWorker) {
-        ncdWorker.postMessage(ncdInput);
-      } else {
-        throw new Error("Worker not initialized");
+        // Check individual sizes
+        fileCRCs.forEach((crc) => {
+          const size = ncdCache.getCompressedSize(algorithm, [crc]);
+          if (size !== null) {
+            cachedSizes.set(`${algorithm}:${crc}`, size);
+          }
+        });
+
+        // Only check pair sizes if we have both individual sizes
+        for (let i = 0; i < fileCRCs.length; i++) {
+          for (let j = i + 1; j < fileCRCs.length; j++) {
+            const size1 = ncdCache.getCompressedSize(algorithm, [fileCRCs[i]]);
+            const size2 = ncdCache.getCompressedSize(algorithm, [fileCRCs[j]]);
+
+            if (size1 !== null && size2 !== null) {
+              const pairSize = ncdCache.getCompressedSize(algorithm,
+                  [fileCRCs[i], fileCRCs[j]].sort()
+              );
+              if (pairSize !== null) {
+                const pairKey = `${algorithm}:${[fileCRCs[i], fileCRCs[j]].sort().join('-')}`;
+                cachedSizes.set(pairKey, pairSize);
+              }
+            }
+          }
+        }
+
+        if (cachedSizes.size > 0) {
+          enrichedInput.cachedSizes = cachedSizes;
+          console.log(`Found cached data for ${cachedSizes.size} entries`);
+        }
       }
-    } catch (error: any) {
+
+      let activeWorker: Worker | null;
+      if (currentCompressorRef.current !== compressionDecision.recommendedAlgo) {
+        console.log(`Switching to ${compressionDecision.recommendedAlgo} worker`);
+        activeWorker = initializeWorker(compressionDecision.recommendedAlgo);
+      } else {
+        activeWorker = ncdWorker;
+      }
+
+      if (!activeWorker) {
+        throw new Error("Worker initialization failed");
+      }
+
+      activeWorker.postMessage(enrichedInput);
+    } catch (error) {
       console.error("Error in onNcdInput:", error);
       setErrorMsg(`Error processing input: ${error.message}`);
       setIsLoading(false);
@@ -154,23 +198,42 @@ export const QSearch: React.FC<QSearchProps> = ({
   };
 
 
-  const handleWorkerMessage = (e: MessageEvent) => {
+  const handleWorkerMessage = (e: MessageEvent<WorkerMessage>) => {
     const message = e.data;
-    console.log("Worker message received:", message);
 
     if (message.type === "progress") {
-      console.log(`Progress: ${JSON.stringify(message)}`);
-    } else if (message.type === "result") {
-      if (!message || !message.labels?.length || !message.ncdMatrix?.length) {
+      console.log(`Progress: (${message.i}, ${message.j}) = ${message.value}`);
+    }
+    else if (message.type === "result") {
+      if (!message.labels?.length || !message.ncdMatrix?.length) {
         setErrorMsg("Invalid result format received");
         resetDisplay();
       } else {
-        console.log("Valid result received, displaying matrix");
+        console.log("Processing complete, displaying results");
         displayNcdMatrix(message);
+
+        // Store new compression data in cache if available
+        if (currentCompressorRef.current === 'lzma' && message.newCompressionData) {
+          console.log('Storing compression data in cache...');
+          message.newCompressionData.forEach(data => {
+            const content1 = new TextEncoder().encode(data.content1);
+            const content2 = new TextEncoder().encode(data.content2);
+
+            const crc1 = CRC32Calculator.calculate(content1).toString();
+            const crc2 = CRC32Calculator.calculate(content2).toString();
+
+            // Store individual sizes
+            ncdCache.storeCompressedSize('lzma', [crc1], data.size1);
+            ncdCache.storeCompressedSize('lzma', [crc2], data.size2);
+
+            ncdCache.storeCompressedSize('lzma', [crc1, crc2].sort(), data.combinedSize);
+          });
+        }
       }
-      setExecutionTime((prev) => performance.now() - prev);
+      setExecutionTime(prev => performance.now() - prev);
       setIsLoading(false);
-    } else if (message.type === "error") {
+    }
+    else if (message.type === "error") {
       console.error("Worker error:", message.message);
       setErrorMsg(`Compression error: ${message.message}`);
       setIsLoading(false);
@@ -211,6 +274,55 @@ export const QSearch: React.FC<QSearchProps> = ({
     };
   }, [searchParams]);
 
+
+  interface ParsedData {
+    data: Array<{
+      accession: string;
+      sequence: string;
+    }>;
+    valid: boolean;
+  }
+
+  const handleValidFileContent = (parsedData: ParsedData) => {
+    setIsLoading(true);
+    const map = {
+      displayLabels: [] as string[],
+      accessions: [] as string[],
+    };
+    for (let i = 0; i < parsedData.data.length; i++) {
+      map.displayLabels.push(parsedData.data[i].accession);
+      map.accessions.push(parsedData.data[i].accession);
+    }
+    const labelMap = getLabelMap(map);
+    setLabelMap(labelMap);
+    labelMapRef.current = labelMap;
+    const ncdInput = getNcdInput(parsedData);
+    ncdWorker?.postMessage(ncdInput);
+  };
+
+  interface FastaData {
+    data: Array<{
+      accession: string;
+      sequence: string;
+    }>;
+  }
+
+  const getNcdInput = (parsedFasta: FastaData) => {
+    const input: {
+      contents: string[];
+      labels: string[];
+    } = {
+      contents: [],
+      labels: [],
+    };
+    for (let i = 0; i < parsedFasta.data.length; i++) {
+      const fasta = parsedFasta.data[i];
+      input.labels.push(fasta.accession);
+      input.contents.push(fasta.sequence);
+    }
+    return input;
+  };
+
   const displayNcdMatrix = (response: any) => {
     const { labels, ncdMatrix } = response;
     let displayNames = [];
@@ -232,10 +344,29 @@ export const QSearch: React.FC<QSearchProps> = ({
     });
   };
 
-  interface NCDInput {
-    contents: string[];
-    labels: string[];
+  interface ProjectedInput {
+    accessions: string[];
+    displayLabels: string[];
   }
+
+  const getLabelMap = (projectedInput: ProjectedInput) => {
+    let map = new Map();
+    const accessions = projectedInput.accessions;
+    const labels = projectedInput.displayLabels;
+    for (let i = 0; i < accessions.length; i++) {
+      map.set(accessions[i], labels[i]);
+    }
+    return map;
+  };
+
+  /**
+   * ncdInput: {
+   *     contents: [],
+   *     labels: [],
+   * }
+   *
+   *
+   */
 
   useEffect(() => {
     return () => {
@@ -245,6 +376,16 @@ export const QSearch: React.FC<QSearchProps> = ({
     };
   }, [ncdWorker]);
 
+  const resetSearchResult = (message: string) => {
+    setErrorMsg(message);
+    setNcdMatrix([]);
+    setLabels([]);
+    labelMapRef.current = new Map();
+    setLabelMap(new Map());
+    setHasMatrix(false);
+    setQSearchTreeResult([]);
+  };
+
   const resetDisplay = () => {
     setErrorMsg("");
     setNcdMatrix([]);
@@ -253,6 +394,11 @@ export const QSearch: React.FC<QSearchProps> = ({
     setLabelMap(new Map());
     setHasMatrix(false);
     setQSearchTreeResult(null);
+    // Preserve the current search params
+    const currentMode = searchParams.get('searchMode');
+    if (currentMode) {
+      setSearchParams({ searchMode: currentMode });
+    }
   };
 
   const handleQsearchMessage = (event: MessageEvent) => {

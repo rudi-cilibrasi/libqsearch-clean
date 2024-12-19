@@ -53,10 +53,9 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
       selected: false
     },
   ]);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState(null);
   const genbankSearchService = new GenBankSearchService();
   const localStorageKeyManager = LocalStorageKeyManager.getInstance();
-
   const [autoLabelingEnabled, setAutoLabelingEnabled] = useState(true);
 
   const handleSearchTerm = (searchTerm: string) => {
@@ -86,7 +85,7 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
     });
   };
 
-  const onSelectSearchTerm = (item: any) => {
+  const onSelectSearchTerm = (item) => {
     addItem({
       id: item.accessionId,
       type: FASTA,
@@ -101,15 +100,13 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
     return selected[0].name;
   }
 
-
-
-
   return (
     <div className="p-4 h-full flex flex-col">
       {/* Fixed top section */}
       <div>
         <SearchInput
           searchTerm={searchTerm}
+          addItem={addItem}
           label="Enter Animal Name"
           type="fasta"
           handleSearchTerm={handleSearchTerm}

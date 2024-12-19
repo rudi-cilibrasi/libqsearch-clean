@@ -9,6 +9,7 @@ import {FileUpload} from "./FileUpload";
 import {LocalStorageKeyManager, LocalStorageKeys,} from "../cache/LocalStorageKeyManager";
 import {getFastaSequences} from "../functions/getPublicGenbank";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
+import {useSearchParams} from "react-router-dom";
 
 interface SelectedItem {
   type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD;
@@ -61,8 +62,15 @@ const ListEditor: React.FC<ListEditorProps> = ({
   const searchModeObj = {
     searchMode: FASTA
   }
-  const [searchMode, setSearchMode] = useStorageState<SearchMode>("searchMode", initialSearchMode && Object.keys(initialSearchMode).length !== 0 ? initialSearchMode : searchModeObj);
+  const defaultSearchMode = {
+    searchMode: initialSearchMode?.searchMode || FASTA
+  };
+  const [searchMode, setSearchMode] = useStorageState<SearchMode>(
+      "searchMode",
+      defaultSearchMode
+  );
   const [searchTerm, setSearchTerm] = React.useState<string>("");
+
   const [selectedItems, setSelectedItems] = useStorageState<SelectedItem[]>(
     "selectedItems",
     []
@@ -79,6 +87,15 @@ const ListEditor: React.FC<ListEditorProps> = ({
     (searchMode.searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
   const isClearDisabled = selectedItems.length === 0;
   const localStorageManager = LocalStorageKeyManager.getInstance();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+
+  const setMode = (mode: string) => {
+    setSearchMode({
+      searchMode: mode
+    });
+    setSearchParams({ searchMode: mode });
+  };
 
   useEffect(() => {
     if (initialSearchMode) {
@@ -346,12 +363,20 @@ const ListEditor: React.FC<ListEditorProps> = ({
   };
 
   const removeItem = (itemId: string): void => {
-    setSelectedItems(selectedItems.filter((item) => item.id !== itemId));
+    setSelectedItems([...selectedItems.filter((item) => item.id !== itemId)]);
   };
 
   const clearAllSelectedItems = (): void => {
+    const currentMode = searchMode.searchMode;
     setSelectedItems([]);
     resetDisplay();
+    // Restore the search mode
+    if (currentMode) {
+      setSearchParams({ searchMode: currentMode });
+      setSearchMode({
+        searchMode: currentMode
+      });
+    }
   };
 
   const getAllFastaSuggestionWithLastIndex = (): Record<string, number> => {
@@ -401,9 +426,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
     <div className="p-6 w-full max-w-6xl mx-auto">
       <div className="flex gap-4 mb-6">
         <button
-          onClick={() => setSearchMode({
-            searchMode: FASTA
-          })}
+            onClick={() => setMode(FASTA)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
                           searchMode.searchMode === FASTA
@@ -415,9 +438,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
           <span>FASTA Search</span>
         </button>
         <button
-          onClick={() => setSearchMode({
-            searchMode: LANGUAGE
-          })}
+            onClick={() => setMode(LANGUAGE)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
                           searchMode.searchMode === LANGUAGE
@@ -429,9 +450,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
           <span>Language Analysis</span>
         </button>
         <button
-          onClick={() => setSearchMode({
-            searchMode: FILE_UPLOAD
-          })}
+            onClick={() => setMode(FILE_UPLOAD)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
                           searchMode.searchMode === FILE_UPLOAD

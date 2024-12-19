@@ -1,4 +1,3 @@
-import { sendRequestToProxy } from "../functions/fetchProxy.js";
 import { getUri } from "../functions/url.js";
 import {
   ANIMAL_GROUPS,
@@ -70,8 +69,6 @@ export class GenBankQueries {
   }
 
 
-
-
   buildOptimizedQuery(
     searchTerm: string,
     taxonomicGroup: string[],
@@ -96,22 +93,19 @@ export class GenBankQueries {
         .map((term) => `"${term}"[Title]`)
         .join(" OR ");
 
-      // Core sequence terms that work for all animals
       const sequenceTerms = [
-        "complete genome",
-        "mitochondrial genome",
-        "whole genome",
-        "mitochondrion",
-      ]
-        .map((term) => `"${term}"[Title]`)
-        .join(" OR ");
+        'mitochondrial genome[Title]',
+        'mitochondrion complete genome[Title]',
+        'mitochondrial DNA[Title]',
+        'mtDNA complete genome[Title]'
+      ].join(' OR ');
 
       // Build query with both terms but connected with OR
-      return `txid${taxId}[Organism] AND ((${sequenceTerms}) OR (${variantTerms})) NOT patent[Title]`;
+      return `txid${taxId}[Organism] AND ((${sequenceTerms}) OR (${variantTerms})) NOT (scaffold[Title] OR "whole genome shotgun"[Title] OR chromosome[Title] OR contig[Title] OR "genomic sequence"[Title] OR "unplaced"[Title])`;
     }
 
     // Default case for unknown animals
-    return `txid${taxId}[Organism] AND ("complete genome"[Title] OR "mitochondrial genome"[Title]) NOT patent[Title]`;
+    return `txid${taxId}[Organism] AND ("complete genome"[Title] OR "mitochondrial genome"[Title]) NOT (scaffold[Title] OR "whole genome shotgun"[Title] OR chromosome[Title] OR contig[Title] OR "genomic sequence"[Title] OR "unplaced"[Title])`;
   }
 
   buildTaxonomySearchUri(
@@ -151,24 +145,6 @@ export class GenBankQueries {
     return getUri(this.baseUrl, "esearch.fcgi", params);
   }
 
-  buildWebEnvFetchUri(
-    webEnv: any,
-    queryKey: string,
-    page = 1,
-    pageSize = this.DEFAULT_PAGE_SIZE
-  ) {
-    const startIndex = (page - 1) * pageSize;
-
-    const params = new URLSearchParams({
-      db: "nuccore", // or 'taxonomy' depending on context
-      query_key: queryKey,
-      WebEnv: webEnv,
-      retstart: startIndex.toString(),
-      retmax: pageSize.toString(),
-      retmode: "json",
-    });
-    return getUri(this.baseUrl, "esearch.fcgi", params);
-  }
 
   buildSequenceSummaryUri(ids: string | string[]) {
     const params = new URLSearchParams({
@@ -177,24 +153,5 @@ export class GenBankQueries {
       retmode: "json",
     }).toString();
     return getUri(this.baseUrl, "esummary.fcgi", params);
-  }
-
-  // Helper method for handling large result sets using WebEnv
-  async fetchWithHistory(initialUri: string) {
-    const response = await sendRequestToProxy({ externalUrl: initialUri });
-
-    if (response.esearchresult?.webenv && response.esearchresult?.querykey) {
-      return {
-        webEnv: response.esearchresult.webenv,
-        queryKey: response.esearchresult.querykey,
-        count: parseInt(response.esearchresult.count, 10),
-        idlist: response.esearchresult.idlist || [],
-      };
-    }
-
-    return {
-      count: parseInt(response.esearchresult?.count || "0", 10),
-      idlist: response.esearchresult?.idlist || [],
-    };
   }
 }

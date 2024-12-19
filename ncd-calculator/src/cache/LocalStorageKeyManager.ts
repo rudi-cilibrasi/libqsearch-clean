@@ -1,5 +1,5 @@
 const STORAGE_VERSION_NAME = "complearn_storage_version";
-const STORAGE_VERSION = 15;
+const STORAGE_VERSION = 22;
 const LOG_PREFIX = "[Storage Manager]";
 
 type StorageKeyFunction = () => string;
@@ -33,6 +33,9 @@ export class LocalStorageKeyManager {
       "^fasta_localPageCount:",
       "^fasta_searchTermAccessions:",
       "^fasta_accessionSequence:",
+      "^selectedItems$",
+      "^searchMode$",
+      "^udhr_cache$"
     ] as const;
   }
 
@@ -118,23 +121,45 @@ export class LocalStorageKeyManager {
   }
   public clearAllCaches(): void {
     console.log(`${LOG_PREFIX} Clearing all caches`);
-    this.patterns.forEach((pattern) => {
-      try {
-        const regex = new RegExp(pattern);
-        Object.keys(localStorage).forEach((key) => {
-          if (regex.test(key)) {
-            localStorage.removeItem(key);
-            console.log(`${LOG_PREFIX} Cleared cache for key: ${key}`);
-          }
-        });
-      } catch (e) {
-        console.error(`${LOG_PREFIX} Error clearing cache for pattern ${pattern}:`, e);
-      }
-    });
+    try {
+      const keys = Object.keys(localStorage);
+      keys.forEach((key) => {
+        if (key !== STORAGE_VERSION_NAME) {
+          localStorage.removeItem(key);
+          console.log(`${LOG_PREFIX} Cleared cache for key: ${key}`);
+        }
+      });
+      localStorage.setItem('selectedItems', '[]');
+      localStorage.setItem('searchMode', JSON.stringify({ searchMode: 'fasta' }));
+      Object.values(LocalStorageKeys).forEach(keyFn => {
+        if (keyFn() !== STORAGE_VERSION_NAME) {
+          localStorage.setItem(`${keyFn()}`, JSON.stringify({}));
+        }
+      });
+
+    } catch (e) {
+      console.error(`${LOG_PREFIX} Error clearing caches:`, e);
+    }
   }
+  public clearCacheByPattern(pattern: string): void {
+    console.log(`${LOG_PREFIX} Clearing cache by pattern: ${pattern}`);
+    try {
+      const regex = new RegExp(pattern);
+      Object.keys(localStorage).forEach((key) => {
+        if (regex.test(key)) {
+          localStorage.removeItem(key);
+          console.log(`${LOG_PREFIX} Cleared cache for key: ${key}`);
+        }
+      });
+    } catch (e) {
+      console.error(`${LOG_PREFIX} Error clearing cache for pattern ${pattern}:`, e);
+    }
+  }
+
   public getAllKeys(): string[] {
     return Object.keys(localStorage);
   }
+
   public remove(key: StorageKeyFunction, id: string): void {
     const storageKey = `${key()}:${id}`;
     try {
