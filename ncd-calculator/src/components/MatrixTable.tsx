@@ -4,8 +4,6 @@ import NCDMatrixInfo from "@/components/NCDMatrixInfo";
 interface MatrixTableProps {
   ncdMatrix: number[][];
   labels: string[];
-  searchTerm: string;
-  executionTime: number;
 }
 
 interface CellStyle {
@@ -15,8 +13,6 @@ interface CellStyle {
 const MatrixTable: React.FC<MatrixTableProps> = ({
                                                    ncdMatrix,
                                                    labels,
-                                                   searchTerm,
-                                                   executionTime,
                                                  }) => {
   const getCellStyle = (value: number): CellStyle => {
     const red = Math.round(255 * value);

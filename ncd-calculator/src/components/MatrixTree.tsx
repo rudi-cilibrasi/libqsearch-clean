@@ -1,31 +1,21 @@
 import React from "react";
 import MatrixTable from "./MatrixTable";
-import { QSearchTree3D } from "./QSearchTree3D";
-
-interface QSearchTreeNode {
-  id: string;
-  name: string;
-  children?: QSearchTreeNode[];
-}
+import {QSearchTree3D} from "./QSearchTree3D";
 
 interface MatrixTreeProps {
   hasMatrix: boolean;
   labels: string[];
   ncdMatrix: number[][];
-  confirmedSearchTerm: string;
   errorMsg?: string;
   qSearchTreeResult?: any;
-  executionTime: number;
 }
 
 export const MatrixTree: React.FC<MatrixTreeProps> = ({
   hasMatrix,
   labels,
   ncdMatrix,
-  confirmedSearchTerm,
   errorMsg,
   qSearchTreeResult,
-  executionTime,
 }) => {
   return (
     <div style={{ marginTop: "10px", textAlign: "left" }}>
@@ -34,8 +24,6 @@ export const MatrixTree: React.FC<MatrixTreeProps> = ({
           <MatrixTable
             ncdMatrix={ncdMatrix}
             labels={labels}
-            searchTerm={confirmedSearchTerm}
-            executionTime={executionTime}
           />
         </div>
       )}
