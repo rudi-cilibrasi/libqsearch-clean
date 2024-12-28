@@ -1,6 +1,6 @@
-const STORAGE_VERSION_NAME = "complearn_storage_version";
-const STORAGE_VERSION = 22;
-const LOG_PREFIX = "[Storage Manager]";
+export const STORAGE_VERSION_NAME = "complearn_storage_version";
+export const STORAGE_VERSION = 51;
+export const LOG_PREFIX = "[Storage Manager]";
 
 type StorageKeyFunction = () => string;
 
@@ -119,28 +119,41 @@ export class LocalStorageKeyManager {
       }
     });
   }
+
   public clearAllCaches(): void {
     console.log(`${LOG_PREFIX} Clearing all caches`);
     try {
-      const keys = Object.keys(localStorage);
-      keys.forEach((key) => {
-        if (key !== STORAGE_VERSION_NAME) {
-          localStorage.removeItem(key);
-          console.log(`${LOG_PREFIX} Cleared cache for key: ${key}`);
-        }
+      // First remove all items
+      Object.keys(localStorage).forEach((key) => {
+        localStorage.removeItem(key);
       });
+
+      // Then set version first
+      localStorage.setItem(STORAGE_VERSION_NAME, STORAGE_VERSION.toString());
+
+      // Then initialize with empty values
       localStorage.setItem('selectedItems', '[]');
       localStorage.setItem('searchMode', JSON.stringify({ searchMode: 'fasta' }));
+
+      // Initialize other storage
       Object.values(LocalStorageKeys).forEach(keyFn => {
-        if (keyFn() !== STORAGE_VERSION_NAME) {
-          localStorage.setItem(`${keyFn()}`, JSON.stringify({}));
+        const key = keyFn();
+        if (key !== STORAGE_VERSION_NAME) {
+          localStorage.setItem(key, JSON.stringify({}));
         }
       });
+
+      // Dispatch storage event for hooks to catch
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: STORAGE_VERSION_NAME,
+        newValue: STORAGE_VERSION.toString()
+      }));
 
     } catch (e) {
       console.error(`${LOG_PREFIX} Error clearing caches:`, e);
     }
   }
+
   public clearCacheByPattern(pattern: string): void {
     console.log(`${LOG_PREFIX} Clearing cache by pattern: ${pattern}`);
     try {
