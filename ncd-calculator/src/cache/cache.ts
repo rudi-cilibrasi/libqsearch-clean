@@ -1,4 +1,5 @@
 import React from "react";
+import {STORAGE_VERSION, STORAGE_VERSION_NAME} from "@/cache/LocalStorageKeyManager.ts";
 
 export const UDHR_CACHE = "udhr_cache";
 
@@ -65,43 +66,51 @@ export function useStorageState<T>(
     key: string,
     initialState: T
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
-    const isMounted = React.useRef<boolean>(false);
     const [value, setValue] = React.useState<T>(() => {
+        // Check version first
+        const storedVersion = localStorage.getItem(STORAGE_VERSION_NAME);
+
+        // If version mismatch, return initial state
+        if (!storedVersion || storedVersion !== STORAGE_VERSION.toString()) {
+            return initialState;
+        }
+
         const storedValue = localStorage.getItem(key);
         if (!storedValue || storedValue === "null") {
-            // If no stored value, return the initialState as-is
             return initialState;
         }
         try {
             const parsedValue = JSON.parse(storedValue);
-            if (Array.isArray(initialState) && !Array.isArray(parsedValue)) {
-                return [] as T; // Cast empty array to type T
-            }
-            if (Array.isArray(initialState)) {
-                return Array.isArray(parsedValue) ? parsedValue : [] as T;
-            }
-            return typeof parsedValue === typeof initialState ? parsedValue : initialState;
+            return Array.isArray(initialState)
+                ? (Array.isArray(parsedValue) ? parsedValue : [] as T)
+                : (typeof parsedValue === typeof initialState ? parsedValue : initialState);
         } catch (e) {
             console.error(`Error parsing localStorage key "${key}":`, e);
-            return Array.isArray(initialState) ? [] as T : initialState;
+            return initialState;
         }
     });
 
     React.useEffect(() => {
-        if (!isMounted.current) {
-            isMounted.current = true;
-        } else {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === STORAGE_VERSION_NAME) {
+                setValue(initialState);
+            }
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, [initialState]);
+
+    React.useEffect(() => {
+        const currentVersion = localStorage.getItem(STORAGE_VERSION_NAME);
+        // Only save if version matches
+        if (currentVersion === STORAGE_VERSION.toString()) {
             try {
-                if (value !== null && value !== undefined) {
-                    localStorage.setItem(key, JSON.stringify(value));
-                } else {
-                    localStorage.setItem(key, Array.isArray(initialState) ? '[]' : 'null');
-                }
+                localStorage.setItem(key, JSON.stringify(value));
             } catch (e) {
                 console.error(`Error saving to localStorage key "${key}":`, e);
             }
         }
-    }, [value, key, initialState]);
+    }, [value, key]);
 
     return [value, setValue];
 }

@@ -90,6 +90,15 @@ const ListEditor: React.FC<ListEditorProps> = ({
   const [searchParams, setSearchParams] = useSearchParams();
 
 
+  useEffect(() => {
+    const localStorageManager = LocalStorageKeyManager.getInstance();
+    localStorageManager.initialize();
+    if (localStorageManager.getStoredVersion() !== localStorageManager.getCurrentVersion()) {
+      setSelectedItems([]);
+    }
+  }, []);
+
+
   const setMode = (mode: string) => {
     setSearchMode({
       searchMode: mode
