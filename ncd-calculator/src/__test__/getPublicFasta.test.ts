@@ -79,7 +79,7 @@ test('test fetch sequence responses from fasta IDs', async () => {
         statusText: 'OK',
         data: mockResponse,
     });
-    const fastaListUri = getFastaListUri(IDS, apiKey);
+    const fastaListUri = getFastaListUri(IDS);
     const sequenceResponse: ApiResponse = await getApiResponse(fastaListUri);
     const parsed: FastaMetadata[] = parseFastaAndClean(sequenceResponse.toString());
     expect(arraysEqual(parsed.map(metadata => metadata.sequence), SEQUENCES));
@@ -103,7 +103,7 @@ test('test fetch fasta list from search term', async () => {
         statusText: 'OK',
         data: fs.readFileSync(path.resolve(__dirname, './mock_response/fetch_accession_numbers_fasta_ids'), 'utf-8'),
     });
-    let accessionUris: string[] = await getFastaAccessionNumbersFromIds(IDS, "XXX");
+    let accessionUris: string[] = await getFastaAccessionNumbersFromIds(IDS);
     expect(arraysEqual(accessionUris, ACCESSIONS));
 
     axios.post = vi.fn().mockResolvedValueOnce({
@@ -111,7 +111,7 @@ test('test fetch fasta list from search term', async () => {
         statusText: 'OK',
         data: fs.readFileSync(path.resolve(__dirname, "./mock_response/fetch_sequence_fasta_ids"), 'utf-8'),
     });
-    let fastaList = await getFastaList(IDS, "XXX");
+    let fastaList = await getFastaList(IDS);
     const parsed: FastaMetadata[] = parseFastaAndClean(fastaList);
     expect(arraysEqual(parsed.map(metadata => metadata.sequence), SEQUENCES));
 }, 30000)
