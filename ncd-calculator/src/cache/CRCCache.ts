@@ -1,4 +1,4 @@
-type CompressionType = 'lzma' | 'gzip';
+type CompressionType = 'lzma' | 'gzip' | 'zstd';
 
 export class CRCCache {
     private cache: Map<string, number>;

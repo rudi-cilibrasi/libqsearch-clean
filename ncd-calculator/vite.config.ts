@@ -1,5 +1,7 @@
 import { defineConfig, transformWithEsbuild, Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
 
 const treatJsFilesAsJsx: Plugin = {
   name: "treat-js-files-as-jsx",
@@ -14,7 +16,12 @@ const treatJsFilesAsJsx: Plugin = {
 
 export default defineConfig({
   base: "./",
-  plugins: [treatJsFilesAsJsx, react()],
+  plugins: [
+    treatJsFilesAsJsx,
+    react(),
+    wasm(),
+    topLevelAwait()
+  ],
   test: {
     globals: true,
     testTimeout: 10_000,
@@ -34,7 +41,11 @@ export default defineConfig({
       "@": "/src",
     },
   },
+  worker: {
+    format: 'es',
+    plugins: [wasm()]
+  },
   optimizeDeps: {
-    exclude: ['lzma-js']
+    exclude: ['lzma-js', '@bokuweb/zstd-wasm']
   }
 });

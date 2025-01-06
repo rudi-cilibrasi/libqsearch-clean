@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bokuweb/zstd-wasm": "^0.0.22",
     "@react-three/drei": "^9.117.3",
     "@react-three/fiber": "^8.17.10",
     "@react-three/test-renderer": "^8.2.1",
@@ -55,9 +56,12 @@
     "text-encoding-utf-8": "^1.0.2",
     "three": "^0.169.0",
     "troika-three-text": "^0.50.2",
+    "vite-plugin-top-level-await": "^1.4.4",
+    "vite-plugin-wasm": "^3.4.1",
     "vitest-canvas-mock": "^0.3.3",
     "winston": "^3.17.0",
-    "xml2js": "^0.6.2"
+    "xml2js": "^0.6.2",
+    "zstd-wasm": "^0.0.9"
   },
   "devDependencies": {
     "@babel/plugin-transform-modules-commonjs": "^7.25.9",

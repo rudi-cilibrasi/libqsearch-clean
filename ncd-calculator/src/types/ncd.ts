@@ -7,11 +7,6 @@ export interface CompressionStats {
     lastNcdScore: number | null;
 }
 
-export interface CompressedSizeCache {
-    individualSize: number;
-    pairSizes: Map<string, number>;
-    timestamp?: number;
-}
 
 export interface NCDInput {
     contents: string[];
@@ -20,19 +15,22 @@ export interface NCDInput {
 }
 
 
-export interface NCDCacheResult {
-    key: string;
-    individualSize: number;
-    pairSizes: Map<string, number>;
+export type WorkerMessage =  WorkerReadyMessage | WorkerStartMessage | WorkerProcessMessage | WorkerResultMessage | WorkerErrorMessage;
+
+export type WorkerReadyMessage = {
+    type: 'ready';
+    message: string;
 }
 
-export interface CompressionResult {
-    recommendedAlgo: 'gzip' | 'lzma';
-    reason: string;
+export type WorkerStartMessage = {
+    type: 'start';
+    totalItems: number;
+    totalPairs: number;
+    contents: string[];
 }
 
 
-export type WorkerMessage = {
+export type WorkerProcessMessage = {
     type: 'progress';
     i: number;
     j: number;
@@ -40,7 +38,9 @@ export type WorkerMessage = {
     sizeX: number;
     sizeY: number;
     sizeXY: number;
-} | {
+}
+
+export type WorkerResultMessage = {
     type: 'result';
     labels: string[];
     ncdMatrix: number[][];
@@ -51,15 +51,10 @@ export type WorkerMessage = {
         size2: number;
         combinedSize: number;
     }>;
-} | {
+}
+
+
+export type WorkerErrorMessage = {
     type: 'error';
     message: string;
-} | {
-    type: 'ready';
-    message: string;
-} | {
-    type: 'start';
-    totalItems: number;
-    totalPairs: number;
-    contents: string[];
-};
+}
