@@ -14,9 +14,25 @@ const treatJsFilesAsJsx: Plugin = {
   },
 };
 
+// Handle Node.js built-in modules for browser
+const handleBuiltins: Plugin = {
+  name: 'handle-builtins',
+  resolveId(source) {
+    if (source === 'path' || source === 'fs') {
+      return { id: 'virtual-' + source, external: true };
+    }
+  }
+};
+
 export default defineConfig({
   base: "./",
-  plugins: [treatJsFilesAsJsx, react(), wasm(), topLevelAwait()],
+  plugins: [
+    handleBuiltins,
+    treatJsFilesAsJsx,
+    react(),
+    wasm(),
+    topLevelAwait()
+  ],
   test: {
     globals: true,
     testTimeout: 10_000,
@@ -34,7 +50,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": "/src",
-    },
+    }
   },
   worker: {
     format: "es",
@@ -42,11 +58,24 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ["@bokuweb/zstd-wasm"],
-    include: ["lzma"],
+    esbuildOptions: {
+      target: 'es2020',
+      supported: {
+        'top-level-await': true
+      }
+    }
   },
   build: {
-    commonjsOptions: {
-      include: [/lzma/],
+    target: 'es2020',
+    rollupOptions: {
+      external: ['path', 'fs'],
+      output: {
+        format: 'es'
+      }
     },
-  },
+    commonjsOptions: {
+      include: [/lzma/, /node_modules/],
+      transformMixedEsModules: true
+    }
+  }
 });
