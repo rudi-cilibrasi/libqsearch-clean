@@ -1,15 +1,12 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useRef } from "react";
 import { getFastaInfoFromFile, isFasta } from "../functions/fasta";
 import { FILE_UPLOAD } from "../constants/modalConstants";
 import { FileSearch, Upload } from "lucide-react";
 import { FileInfo, getFile } from "../functions/file";
 import { SelectedItem } from "./InputAccumulator";
 import {
-  CompressionAlgorithm,
   CompressionService,
-  GZIP_MAX_WINDOW,
-  LZMA_MAX_WINDOW,
-  ZSTD_MAX_WINDOW,
+  type CompressionAlgorithm,
 } from "@/services/CompressionService";
 
 interface FileUploadProps {
@@ -17,11 +14,9 @@ interface FileUploadProps {
   setSelectedItems: React.Dispatch<React.SetStateAction<SelectedItem[]>>;
 }
 
-interface CompressionAlgorithmInfo {
-  name: string;
-  label: string;
-  description: string;
-  maxFileSize: number;
+interface CompressionResponse {
+  algorithm: CompressionAlgorithm;
+  reason: string;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({
@@ -29,37 +24,29 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   setSelectedItems,
 }) => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [selectedCompression, setSelectedCompression] =
-    useState<CompressionAlgorithm>("gzip");
+  const [selectedCompression, setSelectedCompression] = useState<
+    CompressionAlgorithm | "auto"
+  >("auto");
   const [effectiveAlgorithm, setEffectiveAlgorithm] =
-    useState<CompressionAlgorithm>("gzip");
+    useState<CompressionResponse | null>(null);
+  const compressionServiceRef = useRef(CompressionService.getInstance());
 
-  const compressionAlgorithms: CompressionAlgorithmInfo[] = [
+  const availableAlgorithms = [
     {
-      name: "auto",
+      value: "auto",
       label: "Auto-select",
       description: "Automatically choose best algorithm based on file size",
-      maxFileSize: Infinity,
     },
-    {
-      name: "gzip",
-      label: "GZIP",
-      description: "Fast compression, best for files ≤16KB",
-      maxFileSize: GZIP_MAX_WINDOW,
-    },
-    {
-      name: "lzma",
-      label: "LZMA",
-      description: "Better compression ratio, handles larger files",
-      maxFileSize: LZMA_MAX_WINDOW,
-    },
-    {
-      name: "zstd",
-      label: "ZSTD",
-      description: "Balanced compression, best for files ≤100MB",
-      maxFileSize: ZSTD_MAX_WINDOW,
-    },
+    ...CompressionService.getAvailableAlgorithms().map((algo) => {
+      const info = CompressionService.getAlgorithmInfo(algo);
+      return {
+        value: algo,
+        label: algo.toUpperCase(),
+        description: info.description,
+      };
+    }),
   ];
+
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
@@ -72,9 +59,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
   const processFileContent = async (
     fileInfo: FileInfo
-  ): Promise<{
-    content: string;
-  }> => {
+  ): Promise<{ content: string }> => {
     const content =
       typeof fileInfo.content === "string" ? fileInfo.content : "";
     return { content };
@@ -99,41 +84,56 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const determineEffectiveAlgorithm = useCallback(
-    (fileInfos: FileInfo[]): CompressionAlgorithm => {
+    (fileInfos: FileInfo[]): CompressionResponse => {
+      // Use selected algorithm if not auto
+      if (selectedCompression !== "auto") {
+        return {
+          algorithm: selectedCompression,
+          reason:
+            CompressionService.getAlgorithmInfo(selectedCompression)
+              .description,
+        };
+      }
+
+      // Calculate sizes and determine best algorithm
       const sizes = fileInfos.map((file) => {
-        let content = "";
-        if (typeof file.content === "string") {
-          content = file.content;
-        }
+        const content = typeof file.content === "string" ? file.content : "";
         return new TextEncoder().encode(content).length;
       });
       const sortedSizes = [...sizes].sort((a, b) => b - a);
-      const size1 = sortedSizes[0];
-      const size2 = sortedSizes[1];
-      const decision = CompressionService.needsAdvancedCompression(
-        size1,
-        size2
+      return CompressionService.needsAdvancedCompression(
+        sortedSizes[0],
+        sortedSizes[1]
       );
-      return decision.recommendedAlgo;
     },
     [selectedCompression]
   );
 
   const handleFiles = useCallback(
     async (files: File[]) => {
-      const fileInfos = await Promise.all(files.map((file) => getFile(file)));
-      const algorithm = determineEffectiveAlgorithm(fileInfos);
-      setEffectiveAlgorithm(algorithm);
+      try {
+        const fileInfos = await Promise.all(files.map((file) => getFile(file)));
+        const compressionDecision = determineEffectiveAlgorithm(fileInfos);
+        setEffectiveAlgorithm(compressionDecision);
 
-      const newItems = await Promise.all(
-        fileInfos.map(async (file) => getFileItem(file))
-      );
+        // Initialize compression service with the determined algorithm
+        await compressionServiceRef.current.initialize(
+          compressionDecision.algorithm
+        );
 
-      const uniqueNewItems = newItems.filter(
-        (item) => !selectedItems.find((selected) => selected.id === item.id)
-      );
+        const newItems = await Promise.all(
+          fileInfos.map(async (file) => getFileItem(file))
+        );
 
-      setSelectedItems((prev) => [...prev, ...uniqueNewItems]);
+        const uniqueNewItems = newItems.filter(
+          (item) => !selectedItems.find((selected) => selected.id === item.id)
+        );
+
+        setSelectedItems((prev) => [...prev, ...uniqueNewItems]);
+      } catch (error) {
+        console.error("Error processing files:", error);
+        // You might want to add error handling UI here
+      }
     },
     [selectedItems, determineEffectiveAlgorithm]
   );
@@ -155,6 +155,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const getStatusBadge = () => {
+    if (!effectiveAlgorithm) return null;
+
     if (selectedCompression === "auto") {
       return (
         <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
@@ -162,13 +164,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         </span>
       );
     }
-    if (selectedCompression === "gzip" && effectiveAlgorithm === "lzma") {
+
+    if (selectedCompression !== effectiveAlgorithm.algorithm) {
       return (
         <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
-          Switched to LZMA due to file size
+          Switched to {effectiveAlgorithm.algorithm.toUpperCase()} due to file
+          size
         </span>
       );
     }
+
     return null;
   };
 
@@ -181,12 +186,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           </label>
           <select
             value={selectedCompression}
-            onChange={(e) => setSelectedCompression(e.target.value)}
-            className="w-full p-2 border border-gray-200 rounded-lg text-sm
-              bg-white text-gray-700"
+            onChange={(e) =>
+              setSelectedCompression(
+                e.target.value as CompressionAlgorithm | "auto"
+              )
+            }
+            className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-700"
           >
-            {compressionAlgorithms.map((algo) => (
-              <option key={algo.name} value={algo.name}>
+            {availableAlgorithms.map((algo) => (
+              <option key={algo.value} value={algo.value}>
                 {algo.label} - {algo.description}
               </option>
             ))}
@@ -237,11 +245,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                 </li>
               </ul>
 
-              <div className="pt-1">
-                <p className="text-blue-600 text-xs font-medium flex items-center gap-2">
-                  Using: {effectiveAlgorithm.toUpperCase()} {getStatusBadge()}
-                </p>
-              </div>
+              {effectiveAlgorithm && (
+                <div className="pt-1">
+                  <p className="text-blue-600 text-xs font-medium flex items-center gap-2">
+                    Using: {effectiveAlgorithm.algorithm.toUpperCase()}{" "}
+                    {getStatusBadge()}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

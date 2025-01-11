@@ -3,7 +3,7 @@ import {clHostname, clURL} from "../commonTypes/clURL";
 export type GenBankHostName = clHostname & { __clHostname: void };
 
 export const ALLOWED_GENBANK_HOSTNAMES: Set<GenBankHostName> = new Set(Array.from([
-    "eutils.ncbi.nlm.nih.gov" 
+    "eutils.ncbi.nlm.nih.gov", "www.ohchr.org"
 ].map(e => e as GenBankHostName)));
 
 

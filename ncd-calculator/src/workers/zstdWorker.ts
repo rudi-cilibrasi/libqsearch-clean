@@ -45,7 +45,7 @@ function getCachedSizes(content1: string, content2: string, cachedSizes?: Map<st
     const combinedSize = cachedSizes.get(pairKey);
 
     if (combinedSize === undefined) return null;
-
+    console.log(`Cache hit for pair key: ${pairKey}, with size: ${combinedSize}`);
     return { size1, size2, combinedSize, key1: crc1, key2: crc2 };
 }
 
@@ -200,8 +200,8 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
             const crc = calculateCRC32(encoded);
             const key = `zstd:${crc}`;
             const cached = cachedSizes?.get(key);
-
             if (cached) {
+                console.log(`Cache hit for key: ${key} with size: ${cached}`);
                 singleCompressedSizes[i] = cached;
             } else {
                 singleCompressedSizes[i] = await compressedSizeSingle(contents[i]);

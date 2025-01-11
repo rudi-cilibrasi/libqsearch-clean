@@ -16,18 +16,13 @@ const treatJsFilesAsJsx: Plugin = {
 
 export default defineConfig({
   base: "./",
-  plugins: [
-    treatJsFilesAsJsx,
-    react(),
-    wasm(),
-    topLevelAwait()
-  ],
+  plugins: [treatJsFilesAsJsx, react(), wasm(), topLevelAwait()],
   test: {
     globals: true,
     testTimeout: 10_000,
     setupFiles: ["./vitest.setup.ts"],
     environment: "jsdom",
-    include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     deps: {
       inline: ["vitest-canvas-mock"],
     },
@@ -42,10 +37,16 @@ export default defineConfig({
     },
   },
   worker: {
-    format: 'es',
-    plugins: [wasm()]
+    format: "es",
+    plugins: [wasm()],
   },
   optimizeDeps: {
-    exclude: ['lzma-js', '@bokuweb/zstd-wasm']
-  }
+    exclude: ["@bokuweb/zstd-wasm"],
+    include: ["lzma"],
+  },
+  build: {
+    commonjsOptions: {
+      include: [/lzma/],
+    },
+  },
 });

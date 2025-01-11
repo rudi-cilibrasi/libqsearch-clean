@@ -71,7 +71,7 @@ router.post("/forward", async (req: Request, res: Response): Promise<any> => {
     }
   } catch (error) {
     logger.error(`Error in forwarding request: ${error}`);
-    res.status(500).send({ error: error.message });
+    res.status(500).send({ error: error });
   }
 });
 
