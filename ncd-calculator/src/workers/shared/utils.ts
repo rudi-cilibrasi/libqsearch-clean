@@ -2,7 +2,19 @@ export function encodeText(text: string): Uint8Array {
     return new TextEncoder().encode(text);
 }
 
-export function calculateCRC32(data: Uint8Array): string {
+
+export async function getPairFileConcatenated(str1: string, str2: string): Promise<Uint8Array> {
+    const encoded1 = encodeText(str1);
+    const encoded2 = encodeText(str2);
+    const delimiter = encodeText('\n###\n');
+    const combinedArray = new Uint8Array(encoded1.length + delimiter.length + encoded2.length);
+    combinedArray.set(encoded1, 0);
+    combinedArray.set(delimiter, encoded1.length);
+    combinedArray.set(encoded2, encoded1.length + delimiter.length);
+    return combinedArray;
+}
+
+export function getCRC32GeneratedTable(): Uint32Array {
     const table = new Uint32Array(256);
     for (let i = 0; i < 256; i++) {
         let crc = i;
@@ -11,7 +23,11 @@ export function calculateCRC32(data: Uint8Array): string {
         }
         table[i] = crc >>> 0;
     }
+    return table;
+}
 
+export function calculateCRC32(data: Uint8Array): string {
+    const table = getCRC32GeneratedTable();
     let crc = 0xFFFFFFFF;
     for (let i = 0; i < data.length; i++) {
         crc = (crc >>> 8) ^ table[(crc ^ data[i]) & 0xFF];
@@ -20,7 +36,7 @@ export function calculateCRC32(data: Uint8Array): string {
 }
 
 export function calculateNCD(sizeX: number, sizeY: number, sizeXY: number): number {
-    if (sizeX <= 0 || sizeY <= 0 || sizeXY <= 0) {
+    if (!isValidCompressionSize(sizeX) || !isValidCompressionSize(sizeY) || !isValidCompressionSize(sizeXY)) {
         console.error('Invalid compressed sizes:', { sizeX, sizeY, sizeXY });
         return 1;
     }
@@ -28,6 +44,10 @@ export function calculateNCD(sizeX: number, sizeY: number, sizeXY: number): numb
     const numerator = sizeXY - Math.min(sizeX, sizeY);
     const denominator = Math.max(sizeX, sizeY);
     return Math.min(Math.max(numerator / denominator, 0), 1);
+}
+
+export function isValidCompressionSize(size: number) {
+    return size >= 0;
 }
 
 export function getCachedSizes(

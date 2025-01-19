@@ -58,3 +58,9 @@ export type WorkerErrorMessage = {
     type: 'error';
     message: string;
 }
+
+
+export type NCDMatrixResponse = {
+    labels: string[];
+    ncdMatrix: number[][];
+}

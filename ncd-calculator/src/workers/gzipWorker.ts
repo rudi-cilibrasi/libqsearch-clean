@@ -3,7 +3,7 @@
 
 import {
     encodeText,
-    processChunk, calculateCRC32
+    processChunk, calculateCRC32, getPairFileConcatenated
 } from './shared/utils';
 import {
     NCDInput,
@@ -27,17 +27,9 @@ async function compressedSizeSingle(str: string): Promise<number> {
     return await compressedSize(encoded);
 }
 
-async function compressedSizePair(str1: string, str2: string): Promise<number> {
-    const encoded1 = encodeText(str1);
-    const encoded2 = encodeText(str2);
-
-    const delimiter = encodeText('\n###\n');
-    const combinedArray = new Uint8Array(encoded1.length + delimiter.length + encoded2.length);
-    combinedArray.set(encoded1, 0);
-    combinedArray.set(delimiter, encoded1.length);
-    combinedArray.set(encoded2, encoded1.length + delimiter.length);
-
-    return await compressedSize(combinedArray);
+async function getCompressedPairSize(str1: string, str2: string): Promise<number> {
+    const arr: Uint8Array = await getPairFileConcatenated(str1, str2);
+    return await compressedSize(arr);
 }
 
 async function handleMessage(event: MessageEvent<NCDInput>) {
@@ -85,7 +77,7 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
                 singleCompressedSizes,
                 'gzip',
                 cachedSizes,
-                compressedSizePair
+                getCompressedPairSize
             );
 
             allResults.push(...chunkResults);

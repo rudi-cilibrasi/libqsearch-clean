@@ -24,6 +24,21 @@ const handleBuiltins: Plugin = {
   }
 };
 
+const configureWasmHeaders: Plugin = {
+  name: 'configure-wasm-headers',
+  configureServer: (server) => {
+    server.middlewares.use((_req, res, next) => {
+      // Only set WASM content type for .wasm files
+      if (_req.url?.endsWith('.wasm')) {
+        res.setHeader('Content-Type', 'application/wasm');
+      }
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      next();
+    });
+  }
+};
+
 export default defineConfig({
   base: "./",
   plugins: [
@@ -31,7 +46,8 @@ export default defineConfig({
     treatJsFilesAsJsx,
     react(),
     wasm(),
-    topLevelAwait()
+    topLevelAwait(),
+    configureWasmHeaders
   ],
   test: {
     globals: true,
@@ -46,6 +62,10 @@ export default defineConfig({
   server: {
     open: true,
     port: 3000,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp'
+    }
   },
   resolve: {
     alias: {
@@ -57,7 +77,7 @@ export default defineConfig({
     plugins: [wasm()],
   },
   optimizeDeps: {
-    exclude: ["@bokuweb/zstd-wasm"],
+    exclude: ['zstd.wasm', 'zstd.js'],
     esbuildOptions: {
       target: 'es2020',
       supported: {
@@ -70,12 +90,19 @@ export default defineConfig({
     rollupOptions: {
       external: ['path', 'fs'],
       output: {
-        format: 'es'
+        format: 'es',
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name?.endsWith('.wasm')) {
+            return 'assets/wasm/[name][extname]';
+          }
+          return 'assets/[hash][extname]';
+        }
       }
     },
     commonjsOptions: {
       include: [/lzma/, /node_modules/],
       transformMixedEsModules: true
     }
-  }
+  },
+  assetsInclude: ['**/*.wasm']
 });

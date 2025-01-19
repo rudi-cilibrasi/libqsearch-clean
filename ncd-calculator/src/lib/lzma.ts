@@ -16,7 +16,7 @@
 /// do    (decompression only)
 /** xe */
 
-export const lzmaCode = `var LZMA = (function () {
+export const LZMA = (function () {
 
     "use strict";
 
@@ -2663,4 +2663,5 @@ export const lzmaCode = `var LZMA = (function () {
         /// do:decompress: decompress
     };
 }());
-`;
+
+

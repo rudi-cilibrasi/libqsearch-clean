@@ -1,8 +1,9 @@
 import type { WorkerMessage } from "../types/ncd";
 
-export type CompressionAlgorithm = "zstd" | "gzip" | "lzma";
+// Support only LZMA (for small files) and ZSTD (for larger files)
+export type CompressionAlgorithm = "lzma" | "zstd";
 
-interface CompressionResponse {
+export interface CompressionResponse {
   algorithm: CompressionAlgorithm;
   reason: string;
 }
@@ -11,74 +12,22 @@ export class CompressionService {
   private static instance: CompressionService;
   private worker: Worker | null = null;
   private currentAlgorithm: CompressionAlgorithm | null = null;
-  private initializing: Promise<void>;
+  private readonly initializing: Promise<void>;
 
-  // Size thresholds for different compression algorithms
   private static readonly MAX_SIZES = {
-    gzip: 32 * 1024, // 32KB
-    lzma: 1024 * 1024, // 1MB
-    zstd: 128 * 1024 * 1024, // 128MB
-  };
+    lzma: 1024 * 1024, // 1MB maximum for LZMA
+    zstd: 128 * 1024 * 1024, // 128MB maximum for ZSTD
+  } as const;
 
-  // Algorithm descriptions
+  private static readonly ABSOLUTE_MAX_SIZE = 128 * 1024 * 1024; // 128MB
+
   private static readonly ALGORITHM_DESCRIPTIONS = {
-    gzip: "Fast compression, best for files ≤32KB",
-    lzma: "High compression ratio (relatively slow), best for files ≤1MB",
-    zstd: "Balanced and fast compression, best for files ≤128MB",
-  };
+    lzma: "High compression ratio, optimal for files ≤1MB (source code, text).",
+    zstd: "Fast compression for files up to 128MB.",
+  } as const;
 
   private constructor() {
     this.initializing = this.initializeWorker("zstd");
-  }
-
-  async initialize(algorithm: CompressionAlgorithm = "gzip"): Promise<void> {
-    await this.initializing;
-    if (this.currentAlgorithm === algorithm && this.worker) {
-      return;
-    }
-    await this.initializeWorker(algorithm);
-  }
-
-  private async initializeWorker(
-    algorithm: CompressionAlgorithm
-  ): Promise<void> {
-    try {
-      if (this.worker) {
-        this.terminate();
-      }
-      switch (algorithm) {
-        case "gzip": {
-          const gzipWorker = await import(
-            "../../src/workers/gzipWorker?worker"
-          );
-          this.worker = new gzipWorker.default();
-          break;
-        }
-        case "lzma": {
-          const lzmaWorker = await import(
-            "../../src/workers/lzmaWorker?worker"
-          );
-          this.worker = new lzmaWorker.default();
-          break;
-        }
-        case "zstd": {
-          const zstdWorker = await import(
-            "../../src/workers/zstdWorker?worker"
-          );
-          this.worker = new zstdWorker.default();
-          break;
-        }
-        default:
-          throw new Error(`Unsupported compression algorithm: ${algorithm}`);
-      }
-      this.currentAlgorithm = algorithm;
-      await this.waitForWorkerReady();
-      console.log(
-        `Worker for algorithm: ${this.currentAlgorithm} is up and ready`
-      );
-    } catch (error) {
-      console.error(`Fail to initialize ${algorithm} worker: `, error);
-    }
   }
 
   static getInstance(): CompressionService {
@@ -88,100 +37,167 @@ export class CompressionService {
     return CompressionService.instance;
   }
 
+  async initialize(algorithm: CompressionAlgorithm = "zstd"): Promise<void> {
+    try {
+      await this.initializing;
+      if (this.currentAlgorithm === algorithm && this.worker) {
+        return;
+      }
+      await this.initializeWorker(algorithm);
+    } catch (error) {
+      console.error(`Failed to initialize ${algorithm} algorithm:`, error);
+      throw error;
+    }
+  }
+
+  private async initializeWorker(algorithm: CompressionAlgorithm): Promise<void> {
+    try {
+      if (this.worker) {
+        this.terminate();
+      }
+
+      let WorkerModule;
+      switch (algorithm) {
+        case "lzma":
+          WorkerModule = await import("../workers/lzmaWorker?worker");
+          break;
+        case "zstd":
+          WorkerModule = await import("../workers/zstdWorker?worker");
+          break;
+        default:
+          throw new Error(`Unsupported compression algorithm: ${algorithm}`);
+      }
+
+      this.worker = new WorkerModule.default();
+      this.currentAlgorithm = algorithm;
+      await this.waitForWorkerReady();
+      console.log(`Worker for algorithm: ${this.currentAlgorithm} is ready`);
+    } catch (error) {
+      console.error(`Failed to initialize ${algorithm} worker:`, error);
+      this.worker = null;
+      this.currentAlgorithm = null;
+      throw error;
+    }
+  }
+
+  // Wait for worker to signal ready state
   private async waitForWorkerReady(): Promise<void> {
-    if (!this.worker) throw new Error("No worker initialized");
+    if (!this.worker) {
+      throw new Error("No worker initialized");
+    }
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
+        cleanup();
         reject(new Error("Worker initialization timed out"));
-      }, 5000);
+      }, 10000);
 
       const handleMessage = (e: MessageEvent<WorkerMessage>) => {
         if (e.data.type === "ready") {
-          this.worker?.removeEventListener("message", handleMessage);
-          clearTimeout(timeout);
+          cleanup();
           resolve();
+        } else if (e.data.type === "error") {
+          cleanup();
+          reject(new Error(e.data.message));
         }
       };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.worker?.removeEventListener("message", handleMessage);
+      };
+
       this.worker.addEventListener("message", handleMessage);
     });
   }
 
   async processContent(
-    input: {
-      labels: string[];
-      contents: string[];
-      cachedSizes: Map<string, number> | undefined;
-      algorithm: CompressionAlgorithm;
-    },
-    onProgress?: (message: WorkerMessage) => void
+      input: {
+        labels: string[];
+        contents: string[];
+        cachedSizes: Map<string, number> | undefined;
+        algorithm: CompressionAlgorithm;
+      },
+      onProgress?: (message: WorkerMessage) => void
   ): Promise<WorkerMessage> {
-    await this.initializing;
-    if (input.algorithm && this.currentAlgorithm !== input.algorithm) {
-      await this.initialize(input.algorithm);
-    }
-    if (!this.worker) {
-      throw new Error(
-        `Failed to initialize worker with algorithm: ${input.algorithm}`
-      );
-    }
-    return new Promise((resolve, reject) => {
-      // message sending back to the QSearch component from the compressor workers
-      const handleMessage = (e: MessageEvent<WorkerMessage>) => {
-        const message = e.data;
-        const type = message.type;
-        switch (type) {
-          case "result": {
-            this.worker.removeEventListener("message", handleMessage);
-            resolve(message);
-            break;
+    try {
+      const totalSize = input.contents.reduce((sum, content) => {
+        return sum + (new TextEncoder().encode(content)).length;
+      }, 0);
+
+      if (totalSize > CompressionService.ABSOLUTE_MAX_SIZE) {
+        throw new Error(
+            `Total file size (${(totalSize / (1024 * 1024)).toFixed(2)}MB) ` +
+            `exceeds maximum allowed size (128MB)`
+        );
+      }
+
+      if (input.algorithm !== this.currentAlgorithm) {
+        await this.initialize(input.algorithm);
+      }
+
+      if (!this.worker) {
+        throw new Error(`Worker not initialized for algorithm: ${input.algorithm}`);
+      }
+
+      return new Promise((resolve, reject) => {
+        const handleMessage = (e: MessageEvent<WorkerMessage>) => {
+          const message = e.data;
+          switch (message.type) {
+            case "result":
+              cleanup();
+              resolve(message);
+              break;
+            case "error":
+              cleanup();
+              reject(new Error(message.message));
+              break;
+            case "progress":
+            case "start":
+              onProgress?.(message);
+              break;
           }
-          case "error": {
-            this.worker.removeEventListener("message", handleMessage);
-            reject(new Error(message.message));
-            break;
-          }
-          case "progress":
-          case "start":
-            if (onProgress) {
-              onProgress(message);
-            }
-            break;
-        }
-      };
-      if (this.worker) {
+        };
+
+        const cleanup = () => {
+          this.worker?.removeEventListener("message", handleMessage);
+        };
+
         this.worker.addEventListener("message", handleMessage);
         this.worker.postMessage(input);
-      }
-    });
+      });
+    } catch (error) {
+      console.error('Error processing content:', error);
+      throw error;
+    }
   }
 
-  static needsAdvancedCompression(
-    size1: number,
-    size2: number
-  ): CompressionResponse {
+  // Determine which compression algorithm to use based on file sizes
+  static needsAdvancedCompression(size1: number, size2: number): CompressionResponse {
     const maxSize = size1 + size2;
 
-    if (maxSize <= this.MAX_SIZES.gzip) {
-      return {
-        algorithm: "gzip",
-        reason: this.ALGORITHM_DESCRIPTIONS.gzip,
-      };
-    } else if (maxSize <= this.MAX_SIZES.lzma) {
+    if (maxSize > this.ABSOLUTE_MAX_SIZE) {
+      throw new Error(
+          `Combined file size (${(maxSize / (1024 * 1024)).toFixed(2)}MB) ` +
+          `exceeds maximum allowed size (128MB)`
+      );
+    }
+
+    if (maxSize <= this.MAX_SIZES.lzma) {
       return {
         algorithm: "lzma",
         reason: this.ALGORITHM_DESCRIPTIONS.lzma,
       };
-    } else {
-      return {
-        algorithm: "zstd",
-        reason: this.ALGORITHM_DESCRIPTIONS.zstd,
-      };
     }
+
+    return {
+      algorithm: "zstd",
+      reason: this.ALGORITHM_DESCRIPTIONS.zstd,
+    };
   }
 
   static getAvailableAlgorithms(): CompressionAlgorithm[] {
-    return ["gzip", "lzma", "zstd"];
+    return ["lzma", "zstd"];
   }
 
   static getAlgorithmInfo(algorithm: CompressionAlgorithm) {
@@ -194,6 +210,7 @@ export class CompressionService {
   terminate() {
     if (this.worker) {
       this.worker.terminate();
+      this.worker = null;
       this.currentAlgorithm = null;
     }
   }

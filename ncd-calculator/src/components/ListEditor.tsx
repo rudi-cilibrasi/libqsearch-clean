@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Dna, FileType2, Globe2 } from "lucide-react";
 import { getTranslationResponse } from "../functions/udhr";
-import { InputAccumulator } from "./InputAccumulator";
+import { InputHolder } from "./InputHolder.tsx";
 import { Language } from "./Language";
 import { cacheTranslation, getTranslationCache, useStorageState } from "../cache/cache";
 import { FastaSearch } from "./FastaSearch";
@@ -11,6 +11,7 @@ import { getFastaSequences } from "../functions/getPublicGenbank";
 import { FASTA, FILE_UPLOAD, LANGUAGE } from "../constants/modalConstants";
 import { useSearchParams } from "react-router-dom";
 import { CompressionService } from "@/services/CompressionService";
+import {useLabelManager} from "@/hooks/useLabelManager.ts";
 
 export interface SearchMode {
   searchMode: string;
@@ -92,6 +93,8 @@ const ListEditor: React.FC<ListEditorProps> = ({
       selectedItems.length < MIN_ITEMS ||
       (searchMode.searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
   const isClearDisabled = selectedItems.length === 0;
+
+  const labelManager = useLabelManager();
 
   // Initialize local storage and check version
   useEffect(() => {
@@ -177,14 +180,16 @@ const ListEditor: React.FC<ListEditorProps> = ({
   };
 
   const updateDisplayLabelMap = (selectedItems: SelectedItem[]): void => {
-    const map = new Map<string, string>();
-    for (let i = 0; i < selectedItems.length; i++) {
-      const id = selectedItems[i].id;
-      const label = selectedItems[i].label;
-      map.set(id, label);
+    selectedItems.forEach(item => {
+      labelManager.registerLabel(item.id, item.label);
+    });
+    const mapping = labelManager.getLabelMapping();
+    const newMapping = new Map();
+    for(let [key, value] of mapping) {
+      newMapping.set(key, value);
     }
-    labelMapRef.current = map;
-    setLabelMap(map);
+    labelMapRef.current = newMapping;
+    setLabelMap(newMapping);
   };
 
   const computeNcdInput = async (): Promise<SelectedItem[]> => {
@@ -473,7 +478,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
           {renderModal(searchMode)}
         </div>
       </div>
-      <InputAccumulator
+      <InputHolder
           selectedItems={selectedItems}
           onRemoveItem={removeItem}
           MIN_ITEMS={MIN_ITEMS}

@@ -4,12 +4,12 @@ import {MatrixTree} from "./MatrixTree";
 import ListEditor from "./ListEditor";
 import Header from "./Header";
 import {NCDProgress} from "./NCDProgress";
-import type {CompressionStats, NCDInput, WorkerResultMessage} from "@/types/ncd";
+import type {CompressionStats, NCDInput, NCDMatrixResponse, WorkerResultMessage} from "@/types/ncd";
 import {useNCDCache} from "@/hooks/useNCDCache";
-import {CRC32Calculator} from "@/functions/crc32";
 import {type CompressionAlgorithm, CompressionService} from "@/services/CompressionService";
-import {string} from "three/src/nodes/tsl/TSLCore";
 import {CRCCacheEntry} from "@/cache/CRCCache.ts";
+import {calculateCRC32} from "@/workers/shared/utils.ts";
+import {useLabelManager} from "@/hooks/useLabelManager.ts";
 
 export interface QSearchProps {
   openLogin: boolean;
@@ -32,6 +32,7 @@ export const QSearch: React.FC<QSearchProps> = ({
   const [labelMap, setLabelMap] = useState(new Map());
   const labelMapRef = useRef(labelMap);
   const [isLoading, setIsLoading] = useState(false);
+  const labelManager = useLabelManager();
   const [compressionInfo, setCompressionInfo] = useState<{
     algorithm: CompressionAlgorithm;
     reason: string;
@@ -57,12 +58,10 @@ export const QSearch: React.FC<QSearchProps> = ({
     if (event.data.action === "treeJSON") {
       try {
         const result = JSON.parse(event.data.result);
-        // Map labels using the current label map
-        for (let i = 0; i < result.nodes.length; i++) {
-          result.nodes[i].label = labelMapRef.current.get(
-              result.nodes[i].label
-          );
-        }
+        result.nodes = result.nodes.map(node => ({
+          ...node,
+          label: labelManager.getDisplayLabel(node.label) || ""
+        }));
         setQSearchTreeResult(result);
       } catch (error) {
         console.error("Error processing QSearch result:", error);
@@ -120,7 +119,7 @@ export const QSearch: React.FC<QSearchProps> = ({
           new TextEncoder().encode(content)
       );
 
-      const fileCRCs = contentBuffers.map((buffer) => CRC32Calculator.calculate(buffer));
+      const fileCRCs = contentBuffers.map((buffer) => calculateCRC32(buffer));
       const cachedSizes: Map<string, number> = new Map();
 
       for(const crc of fileCRCs) {
@@ -212,26 +211,20 @@ export const QSearch: React.FC<QSearchProps> = ({
   };
 
   // Display matrix and trigger QSearch processing
-  const displayNcdMatrix = (response: {
-    labels: string[];
-    ncdMatrix: number[][];
-  }) => {
+  const displayNcdMatrix = (response: NCDMatrixResponse) => {
     const { labels: responseLabels, ncdMatrix: matrix } = response;
-    const displayNames = responseLabels.map(
-        (label) => labelMapRef.current.get(label) || label
-    );
-
+    const displayNames = responseLabels
+        .filter(label => labelManager.hasDisplayLabel(label))
+        .map(label => labelManager.getDisplayLabel(label) || label);
     setLabels(displayNames);
     setNcdMatrix(matrix);
     setHasMatrix(true);
-
     qSearchWorkerRef.current?.postMessage({
       action: "processNcdMatrix",
-      labels: responseLabels,
+      labels: responseLabels.map(label => labelManager.normalizeId(label)),
       ncdMatrix: matrix,
     });
   };
-
   // Reset display state
   const resetDisplay = () => {
     setErrorMsg("");

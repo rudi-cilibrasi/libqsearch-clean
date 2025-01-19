@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { BACKEND_BASE_URL } from "../config/api";
-import { getLoginUser } from "../functions/user";
+import { getLoginUser } from "../functions/user.ts";
 
 interface HeaderProps {
   openLogin: boolean;
