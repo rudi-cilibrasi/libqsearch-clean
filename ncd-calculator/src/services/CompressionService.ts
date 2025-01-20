@@ -1,4 +1,6 @@
-import type { WorkerMessage } from "../types/ncd";
+import type {NCDInput, WorkerMessage} from "../types/ncd";
+import {calculateCRC32} from "@/workers/shared/utils.ts";
+import {CRCCache, CRCCacheEntry} from "@/cache/CRCCache.ts";
 
 export type CompressionAlgorithm = "lzma" | "zstd";
 
@@ -25,7 +27,7 @@ export class CompressionService {
   } as const;
 
   private constructor() {
-    this.initializeWorker("zstd").catch(console.error);
+    // this.initializeWorker("zstd").catch(console.error);
   }
 
   static getInstance(): CompressionService {
@@ -84,6 +86,7 @@ export class CompressionService {
     try {
       await this.listenForWorkerReady(abortController.signal);
     } catch (error) {
+      console.log(error);
       if (error instanceof DOMException && error.name === 'AbortError') {
         throw new Error("Worker initialization timed out");
       }
@@ -215,6 +218,47 @@ export class CompressionService {
       maxSize: this.MAX_SIZES[algorithm],
       description: this.ALGORITHM_DESCRIPTIONS[algorithm],
     };
+  }
+
+  static preprocessNcdInput = (input: NCDInput, crcCache: CRCCache): [CompressionResponse, Map<string, number>] =>  {
+    // Determine the best compression algorithm based on content sizes
+    const contentSizes = input.contents.map(
+        (content) => new TextEncoder().encode(content).length
+    );
+    const sortedSizes = [...contentSizes].sort((a, b) => b - a);
+    const compressionDecision = CompressionService.needsAdvancedCompression(
+        sortedSizes[0],
+        sortedSizes[1]
+    );
+
+    const compressionAlgo = compressionDecision.algorithm;
+
+    // Prepare cached sizes
+    const contentBuffers = input.contents.map((content) =>
+        new TextEncoder().encode(content)
+    );
+
+    const fileCRCs = contentBuffers.map((buffer) => calculateCRC32(buffer));
+    const cachedSizes: Map<string, number> = new Map();
+
+    for(const crc of fileCRCs) {
+      const size = crcCache.getCompressedSize(compressionAlgo, [crc]);
+      if (size) {
+        cachedSizes.set(`${compressionAlgo}:${crc}`, size);
+      }
+    }
+
+    for(let i = 0; i < fileCRCs.length; i++) {
+      for(let j = i + 1; j < fileCRCs.length; j++) {
+        if (i == j) continue;
+        const entry: CRCCacheEntry | null = crcCache.getCachedEntry(compressionAlgo, [fileCRCs[i], fileCRCs[j]]);
+        if (entry) {
+          cachedSizes.set(entry.key, entry.value);
+        }
+      }
+    }
+
+    return [compressionDecision, cachedSizes];
   }
 
   terminate() {

@@ -1,6 +1,6 @@
 // zstdWorker.ts
 /// <reference lib="webworker" />
-
+declare const self: DedicatedWorkerGlobalScope;
 import {
     encodeText,
     processChunk,
@@ -148,7 +148,8 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
                 singleCompressedSizes,
                 'zstd',
                 cachedSizes,
-                getCompressedPairSize
+                getCompressedPairSize,
+                self
             );
 
             allResults.push(...chunkResults);

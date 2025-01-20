@@ -86,7 +86,8 @@ export async function processChunk(
     singleCompressedSizes: number[],
     algorithm: string,
     cachedSizes: Map<string, number> | undefined,
-    compressPair: (str1: string, str2: string) => Promise<number>
+    compressPair: (str1: string, str2: string) => Promise<number>,
+    self: DedicatedWorkerGlobalScope
 ) {
     const results = [];
 
