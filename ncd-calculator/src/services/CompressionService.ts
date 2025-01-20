@@ -1,6 +1,5 @@
 import type { WorkerMessage } from "../types/ncd";
 
-// Support only LZMA (for small files) and ZSTD (for larger files)
 export type CompressionAlgorithm = "lzma" | "zstd";
 
 export interface CompressionResponse {
@@ -12,7 +11,6 @@ export class CompressionService {
   private static instance: CompressionService;
   private worker: Worker | null = null;
   private currentAlgorithm: CompressionAlgorithm | null = null;
-  private readonly initializing: Promise<void>;
 
   private static readonly MAX_SIZES = {
     lzma: 1024 * 1024, // 1MB maximum for LZMA
@@ -27,7 +25,7 @@ export class CompressionService {
   } as const;
 
   private constructor() {
-    this.initializing = this.initializeWorker("zstd");
+    this.initializeWorker("zstd").catch(console.error);
   }
 
   static getInstance(): CompressionService {
@@ -38,38 +36,22 @@ export class CompressionService {
   }
 
   async initialize(algorithm: CompressionAlgorithm = "zstd"): Promise<void> {
-    try {
-      await this.initializing;
-      if (this.currentAlgorithm === algorithm && this.worker) {
-        return;
-      }
-      await this.initializeWorker(algorithm);
-    } catch (error) {
-      console.error(`Failed to initialize ${algorithm} algorithm:`, error);
-      throw error;
+    if (this.currentAlgorithm === algorithm && this.worker) {
+      return;
     }
+    await this.initializeWorker(algorithm);
   }
 
   private async initializeWorker(algorithm: CompressionAlgorithm): Promise<void> {
+    if (this.worker) {
+      this.terminate();
+    }
+
+    const WorkerModule = await this.loadWorkerModule(algorithm);
+    this.worker = new WorkerModule.default();
+    this.currentAlgorithm = algorithm;
+
     try {
-      if (this.worker) {
-        this.terminate();
-      }
-
-      let WorkerModule;
-      switch (algorithm) {
-        case "lzma":
-          WorkerModule = await import("../workers/lzmaWorker?worker");
-          break;
-        case "zstd":
-          WorkerModule = await import("../workers/zstdWorker?worker");
-          break;
-        default:
-          throw new Error(`Unsupported compression algorithm: ${algorithm}`);
-      }
-
-      this.worker = new WorkerModule.default();
-      this.currentAlgorithm = algorithm;
       await this.waitForWorkerReady();
       console.log(`Worker for algorithm: ${this.currentAlgorithm} is ready`);
     } catch (error) {
@@ -80,18 +62,39 @@ export class CompressionService {
     }
   }
 
-  // Wait for worker to signal ready state
+  private async loadWorkerModule(algorithm: CompressionAlgorithm) {
+    switch (algorithm) {
+      case "lzma":
+        return import("../workers/lzmaWorker?worker");
+      case "zstd":
+        return import("../workers/zstdWorker?worker");
+      default:
+        throw new Error(`Unsupported compression algorithm: ${algorithm}`);
+    }
+  }
+
   private async waitForWorkerReady(): Promise<void> {
     if (!this.worker) {
       throw new Error("No worker initialized");
     }
 
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        cleanup();
-        reject(new Error("Worker initialization timed out"));
-      }, 10000);
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 10000);
 
+    try {
+      await this.listenForWorkerReady(abortController.signal);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error("Worker initialization timed out");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  private async listenForWorkerReady(signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
       const handleMessage = (e: MessageEvent<WorkerMessage>) => {
         if (e.data.type === "ready") {
           cleanup();
@@ -103,11 +106,17 @@ export class CompressionService {
       };
 
       const cleanup = () => {
-        clearTimeout(timeout);
         this.worker?.removeEventListener("message", handleMessage);
+        signal.removeEventListener("abort", handleAbort);
       };
 
-      this.worker.addEventListener("message", handleMessage);
+      const handleAbort = () => {
+        cleanup();
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      this.worker?.addEventListener("message", handleMessage);
+      signal.addEventListener("abort", handleAbort);
     });
   }
 
@@ -120,59 +129,60 @@ export class CompressionService {
       },
       onProgress?: (message: WorkerMessage) => void
   ): Promise<WorkerMessage> {
-    try {
-      const totalSize = input.contents.reduce((sum, content) => {
-        return sum + (new TextEncoder().encode(content)).length;
-      }, 0);
+    const totalSize = input.contents.reduce((sum, content) => {
+      return sum + new TextEncoder().encode(content).length;
+    }, 0);
 
-      if (totalSize > CompressionService.ABSOLUTE_MAX_SIZE) {
-        throw new Error(
-            `Total file size (${(totalSize / (1024 * 1024)).toFixed(2)}MB) ` +
-            `exceeds maximum allowed size (128MB)`
-        );
-      }
-
-      if (input.algorithm !== this.currentAlgorithm) {
-        await this.initialize(input.algorithm);
-      }
-
-      if (!this.worker) {
-        throw new Error(`Worker not initialized for algorithm: ${input.algorithm}`);
-      }
-
-      return new Promise((resolve, reject) => {
-        const handleMessage = (e: MessageEvent<WorkerMessage>) => {
-          const message = e.data;
-          switch (message.type) {
-            case "result":
-              cleanup();
-              resolve(message);
-              break;
-            case "error":
-              cleanup();
-              reject(new Error(message.message));
-              break;
-            case "progress":
-            case "start":
-              onProgress?.(message);
-              break;
-          }
-        };
-
-        const cleanup = () => {
-          this.worker?.removeEventListener("message", handleMessage);
-        };
-
-        this.worker.addEventListener("message", handleMessage);
-        this.worker.postMessage(input);
-      });
-    } catch (error) {
-      console.error('Error processing content:', error);
-      throw error;
+    if (totalSize > CompressionService.ABSOLUTE_MAX_SIZE) {
+      throw new Error(
+          `Total file size (${(totalSize / (1024 * 1024)).toFixed(2)}MB) ` +
+          `exceeds maximum allowed size (128MB)`
+      );
     }
+
+    if (input.algorithm !== this.currentAlgorithm) {
+      await this.initialize(input.algorithm);
+    }
+
+    if (!this.worker) {
+      throw new Error(`Worker not initialized for algorithm: ${input.algorithm}`);
+    }
+
+    return await this.processWorkerMessages(input, onProgress);
   }
 
-  // Determine which compression algorithm to use based on file sizes
+  private async processWorkerMessages(
+      input: any,
+      onProgress?: (message: WorkerMessage) => void
+  ): Promise<WorkerMessage> {
+    return new Promise((resolve, reject) => {
+      const handleMessage = (e: MessageEvent<WorkerMessage>) => {
+        const message = e.data;
+        switch (message.type) {
+          case "result":
+            cleanup();
+            resolve(message);
+            break;
+          case "error":
+            cleanup();
+            reject(new Error(message.message));
+            break;
+          case "progress":
+          case "start":
+            onProgress?.(message);
+            break;
+        }
+      };
+
+      const cleanup = () => {
+        this.worker?.removeEventListener("message", handleMessage);
+      };
+
+      this.worker?.addEventListener("message", handleMessage);
+      this.worker?.postMessage(input);
+    });
+  }
+
   static needsAdvancedCompression(size1: number, size2: number): CompressionResponse {
     const maxSize = size1 + size2;
 
