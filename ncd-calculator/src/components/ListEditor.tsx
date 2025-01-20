@@ -444,7 +444,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
           }`}
       >
         <Dna size={20}/>
-        <span>FASTA Search</span>
+        <span>Animal Grouping</span>
       </button>
       <button
           onClick={() => setMode(LANGUAGE)}
