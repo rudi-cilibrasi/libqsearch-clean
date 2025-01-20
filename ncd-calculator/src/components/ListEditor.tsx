@@ -1,16 +1,16 @@
-import React, { useEffect, useRef } from "react";
-import { Dna, FileType2, Globe2 } from "lucide-react";
-import { getTranslationResponse } from "../functions/udhr";
-import { InputHolder } from "./InputHolder.tsx";
-import { Language } from "./Language";
-import { cacheTranslation, getTranslationCache, useStorageState } from "../cache/cache";
-import { FastaSearch } from "./FastaSearch";
-import { FileUpload } from "./FileUpload";
-import { LocalStorageKeyManager, LocalStorageKeys } from "../cache/LocalStorageKeyManager";
-import { getFastaSequences } from "../functions/getPublicGenbank";
-import { FASTA, FILE_UPLOAD, LANGUAGE } from "../constants/modalConstants";
-import { useSearchParams } from "react-router-dom";
-import { CompressionService } from "@/services/CompressionService";
+import React, {useEffect, useRef} from "react";
+import {Dna, FileType2, Globe2} from "lucide-react";
+import {getTranslationResponse} from "../functions/udhr";
+import {InputHolder} from "./InputHolder.tsx";
+import {Language} from "./Language";
+import {cacheTranslation, getTranslationCache, useStorageState} from "../cache/cache";
+import {FastaSearch} from "./FastaSearch";
+import {FileUpload} from "./FileUpload";
+import {LocalStorageKeyManager, LocalStorageKeys} from "../cache/LocalStorageKeyManager";
+import {getFastaSequences} from "../functions/getPublicGenbank";
+import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
+import {useSearchParams} from "react-router-dom";
+import {CompressionService} from "@/services/CompressionService";
 import {useLabelManager} from "@/hooks/useLabelManager.ts";
 
 export interface SearchMode {
@@ -432,86 +432,87 @@ const ListEditor: React.FC<ListEditorProps> = ({
   };
 
 
-  return (<div className="p-6 w-full max-w-6xl mx-auto">
-    <div className="flex gap-4 mb-6">
-      <button
-          onClick={() => setMode(FASTA)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+  return (<div className="p-6 w-[1200px] mx-auto">
+        <div className="flex gap-4 mb-6">
+          <button
+              onClick={() => setMode(FASTA)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
-              searchMode.searchMode === FASTA
-                  ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-                  : "bg-gray-100 text-gray-600 border-2 border-transparent"
-          }`}
-      >
-        <Dna size={20}/>
-        <span>Animal Grouping</span>
-      </button>
-      <button
-          onClick={() => setMode(LANGUAGE)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+                  searchMode.searchMode === FASTA
+                      ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
+                      : "bg-gray-100 text-gray-600 border-2 border-transparent"
+              }`}
+          >
+            <Dna size={20}/>
+            <span>Animal Grouping</span>
+          </button>
+          <button
+              onClick={() => setMode(LANGUAGE)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
-              searchMode.searchMode === LANGUAGE
-                  ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-                  : "bg-gray-100 text-gray-600 border-2 border-transparent"
-          }`}
-      >
-        <Globe2 size={20}/>
-        <span>Language Analysis</span>
-      </button>
-      <button
-          onClick={() => setMode(FILE_UPLOAD)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+                  searchMode.searchMode === LANGUAGE
+                      ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
+                      : "bg-gray-100 text-gray-600 border-2 border-transparent"
+              }`}
+          >
+            <Globe2 size={20}/>
+            <span>Language Analysis</span>
+          </button>
+          <button
+              onClick={() => setMode(FILE_UPLOAD)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
                         ${
-              searchMode.searchMode === FILE_UPLOAD
-                  ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-                  : "bg-gray-100 text-gray-600 border-2 border-transparent"
-          }`}
-      >
-        <FileType2 size={20}/>
-        <span>File Upload</span>
-      </button>
-    </div>
+                  searchMode.searchMode === FILE_UPLOAD
+                      ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
+                      : "bg-gray-100 text-gray-600 border-2 border-transparent"
+              }`}
+          >
+            <FileType2 size={20}/>
+            <span>File Upload</span>
+          </button>
+        </div>
 
-    <div className="flex gap-6">
-      <div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto p-3">
-          {renderModal(searchMode)}
+        <div className="flex gap-6">
+          <div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-y-auto p-3">
+              {renderModal(searchMode)}
+            </div>
+          </div>
+          <InputHolder
+              selectedItems={selectedItems}
+              onRemoveItem={removeItem}
+              MIN_ITEMS={MIN_ITEMS}
+          />
+        </div>
+
+        <div className="flex justify-end mt-6">
+          <button
+              onClick={clearAllSelectedItems}
+              disabled={isClearDisabled}
+              className={`px-6 py-3 rounded-lg transition-all
+                        ${
+                  isClearDisabled
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
+              }`}
+          >
+            Clear All
+          </button>
+          <button
+              onClick={sendNcdInput}
+              disabled={isSearchDisabled}
+              className={`px-6 py-3 rounded-lg transition-all ml-5
+                        ${
+                  isSearchDisabled
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
+              }`}
+          >
+            Calculate
+          </button>
         </div>
       </div>
-      <InputHolder
-          selectedItems={selectedItems}
-          onRemoveItem={removeItem}
-          MIN_ITEMS={MIN_ITEMS}
-      />
-    </div>
-
-    <div className="flex justify-end mt-6">
-      <button
-          onClick={clearAllSelectedItems}
-          disabled={isClearDisabled}
-          className={`px-6 py-3 rounded-lg transition-all
-                        ${
-              isClearDisabled
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
-          }`}
-      >
-        Clear All
-      </button>
-      <button
-          onClick={sendNcdInput}
-          disabled={isSearchDisabled}
-          className={`px-6 py-3 rounded-lg transition-all ml-5
-                        ${
-              isSearchDisabled
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
-          }`}
-      >
-        Calculate
-      </button>
-    </div>
-  </div>);
+  );
 };
 
 export default ListEditor;

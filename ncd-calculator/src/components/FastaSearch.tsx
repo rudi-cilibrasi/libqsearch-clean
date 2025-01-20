@@ -5,8 +5,9 @@ import {FASTA} from "../constants/modalConstants.js";
 import {FastaSearchSuggestion} from "./FastaSearchSuggestion.jsx";
 import {GenBankSearchService} from "@/services/GenBankSearchService.ts";
 import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.js";
-import {SelectedItem} from "./InputAccumulator";
 import AutoLabelingToggle from "@/components/AutoLabelingToggle.tsx";
+import {Suggestion} from "@/services/genbank.ts";
+import {SelectedItem} from "@/components/ListEditor.tsx";
 
 interface FastaSearchProps {
   addItem(item: SelectedItem | any): void;
@@ -14,8 +15,8 @@ interface FastaSearchProps {
   onSetApiKey(key: string): void;
   setSelectedItems(items: SelectedItem[] | any): void;
   getAllFastaSuggestionWithLastIndex(): void;
-  getFastaSuggestionStartIndex(): void;
-  setFastaSuggestionStartIndex(index: number): void;
+  getFastaSuggestionStartIndex(): number;
+  setFastaSuggestionStartIndex(index: number): number;
 }
 
 interface ProjectionOption {
@@ -75,7 +76,7 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
   };
 
 
-  const handleSuggestionSelect = (suggestion) => {
+  const handleSuggestionSelect = (suggestion: Suggestion) => {
     handleSearchTerm(suggestion.primaryCommonName);
     addItem({
       id: suggestion.id,
