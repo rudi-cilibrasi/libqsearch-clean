@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 declare const self: DedicatedWorkerGlobalScope;
-import { calculateCRC32, encodeText } from "./shared/utils";
+import {calculateCRC32, calculateNCD, encodeText} from "./shared/utils";
 import type {
   NCDInput,
   WorkerErrorMessage,
@@ -138,22 +138,6 @@ async function compressedSizePair(str1: string, str2: string): Promise<number> {
     console.error("LZMA Worker: Pair compression error:", error);
     throw error;
   }
-}
-
-// Calculate NCD (Normalized Compression Distance) between two files
-function calculateNCD(sizeX: number, sizeY: number, sizeXY: number): number {
-  if (sizeX <= 0 || sizeY <= 0 || sizeXY <= 0) {
-    console.error("Invalid compressed sizes:", { sizeX, sizeY, sizeXY });
-    return 1;
-  }
-
-  // NCD formula: (C(xy) - min(C(x),C(y))) / max(C(x),C(y))
-  // where C(x) is the compressed size of x
-  const numerator = sizeXY - Math.min(sizeX, sizeY);
-  const denominator = Math.max(sizeX, sizeY);
-
-  // Ensure result is between 0 and 1
-  return Math.min(Math.max(numerator / denominator, 0), 1);
 }
 
 // Process input data and compute NCD matrix
