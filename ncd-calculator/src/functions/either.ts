@@ -1,14 +1,3 @@
-interface Left<L> {
-  left: L;
-  right: null;
-}
-
-interface Right<R> {
-  left: null;
-  right: R;
-}
-
-type EitherType<L, R> = Left<L> | Right<R>;
 
 export class Either<L, R> {
   private left: L | null;

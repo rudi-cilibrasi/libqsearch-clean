@@ -17,7 +17,7 @@ export interface InputAccumulatorProps {
   authenticated?: boolean;
 }
 
-export const InputAccumulator: React.FC<InputAccumulatorProps> = ({
+export const InputHolder: React.FC<InputAccumulatorProps> = ({
   MIN_ITEMS = 4,
   selectedItems,
   onRemoveItem,
@@ -53,6 +53,7 @@ export const InputAccumulator: React.FC<InputAccumulatorProps> = ({
   };
     const items = Array.isArray(selectedItems) ? selectedItems : [];
     return (
+
         <div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-200">
                 {!authenticated && items.length > 16 && (

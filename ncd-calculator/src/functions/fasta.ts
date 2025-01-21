@@ -1,6 +1,6 @@
 import { parseAccessionAndRemoveVersion } from "../cache/cache.ts";
 import { FILE_UPLOAD } from "../constants/modalConstants.js";
-import { SelectedItem } from '../components/InputAccumulator';
+import { SelectedItem } from '../components/InputHolder.tsx';
 import {FileInfo} from "@/functions/file.ts";
 
 export interface FastaMetadata {

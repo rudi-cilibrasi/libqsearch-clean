@@ -43,41 +43,61 @@ export const Language: React.FC<LanguageProps> = ({
     };
 
     return (
-        <div className="p-4 h-[700px] flex flex-col">
-            <SearchInput
-                label="Available Languages"
-                type="language"
-                handleSearchTerm={handleSearchTerm}
-                searchTerm={searchTerm}
-            />
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
-                <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
-                <p className="m-0 text-blue-800 text-sm leading-relaxed">
-                    Explore language relationships through the{" "}
-                    <strong>Universal Declaration of Human Rights (UDHR)</strong>. Select
-                    at least {MIN_ITEMS} languages to generate a meaningful language tree
-                    visualization using Normalized Compression Distance (NCD).
-                </p>
+        <div className="min-h-0 flex flex-col p-4 gap-4">
+            {/* Fixed top section */}
+            <div>
+                <SearchInput
+                    label="Available Languages"
+                    type="language"
+                    handleSearchTerm={handleSearchTerm}
+                    searchTerm={searchTerm}
+                />
             </div>
-            <div className="flex flex-col gap-2.5 max-h-[350px] overflow-y-auto p-1">
-                {availableLanguages
-                    .filter((lang) =>
-                        lang.label.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .map((lang) => (
-                        <div
-                            key={lang.id}
-                            onClick={() => addItem(lang)}
-                            className={`flex justify-between items-center p-4 rounded-lg cursor-pointer transition-all
-                ${isItemSelected(lang.id)
-                                ? "bg-blue-50 border border-blue-200"
-                                : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
-                            }`}
-                        >
-                            <span className="text-gray-700">{lang.label}</span>
-                            <ChevronRight size={20} className="text-gray-400" />
+
+            {/* Information Box - Styled similarly to FileUpload */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                    <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-2">
+                        <div>
+                            <h3 className="text-blue-800 font-medium text-sm">
+                                Explore Language Relationships! ✨
+                            </h3>
+                            <p className="text-blue-700 text-xs mt-1 leading-relaxed">
+                                Using the Universal Declaration of Human Rights (UDHR), discover how
+                                languages relate to each other. Select at least {MIN_ITEMS} languages
+                                to generate a meaningful visualization.
+                            </p>
                         </div>
-                    ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Available Languages List */}
+            <div className="flex-1 min-h-0">
+                <div className="h-full overflow-y-auto">
+                    <div className="flex flex-col gap-2">
+                        {availableLanguages
+                            .filter((lang) =>
+                                lang.label.toLowerCase().includes(searchTerm.toLowerCase())
+                            )
+                            .map((lang) => (
+                                <div
+                                    key={lang.id}
+                                    onClick={() => addItem(lang)}
+                                    className={`flex justify-between items-center p-4 rounded-lg cursor-pointer transition-all
+                                        ${
+                                        isItemSelected(lang.id)
+                                            ? "bg-blue-50 border border-blue-200"
+                                            : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                                    }`}
+                                >
+                                    <span className="text-gray-700">{lang.label}</span>
+                                    <ChevronRight size={20} className="text-gray-400" />
+                                </div>
+                            ))}
+                    </div>
+                </div>
             </div>
         </div>
     );

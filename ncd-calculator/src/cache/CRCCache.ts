@@ -1,4 +1,10 @@
-type CompressionType = 'lzma' | 'gzip';
+import {CompressionAlgorithm} from "@/services/CompressionService.ts";
+
+
+export type CRCCacheEntry = {
+    key: string;
+    value: number
+}
 
 export class CRCCache {
     private cache: Map<string, number>;
@@ -9,28 +15,49 @@ export class CRCCache {
         this.loadFromLocalStorage();
     }
 
-    public getCompressedSize(compressionType: CompressionType, partIds: string[]): number | null {
+    public getCompressedSize(compressionAlgo: CompressionAlgorithm, partIds: string[]): number | null {
         if (partIds.length < 1 || partIds.length > 2) {
             throw new Error('Must provide 1 or 2 IDs for compression');
         }
-        const cacheKey = this.generateCacheKey(compressionType, partIds);
+        const cacheKey = this.generateCacheKey(compressionAlgo, partIds);
         return this.cache.get(cacheKey) ?? null;
     }
 
+    public getCompressedSizeByKey(key: string): number | null {
+       if (!key || key.trim().length === 0) return null;
+       return this.cache.get(key) ?? null;
+    }
 
-    private generateCacheKey(compressionType: CompressionType, partIds: string[]): string {
+    public getCachedEntry(compressionAlgo: CompressionAlgorithm, partIds: string[]): CRCCacheEntry | null{
         if (partIds.length < 1 || partIds.length > 2) {
             throw new Error('Must provide 1 or 2 IDs for compression');
+        }
+        const key = this.generateCacheKey(compressionAlgo, partIds);
+        const size = this.getCompressedSizeByKey(key);
+        if (size) {
+            return {
+                key: key,
+                value: size
+            } as CRCCacheEntry;
         } else {
-            return partIds.length === 1 ? `${compressionType}:${partIds[0]}` : `${compressionType}:${partIds.sort().join("-")}`;
+            return null;
         }
     }
 
-    public storeCompressedSize(compressionType: CompressionType, partIds: string[], size: number): void {
+
+    public generateCacheKey(compressionAlgo: CompressionAlgorithm, partIds: string[]): string {
+        if (partIds.length < 1 || partIds.length > 2) {
+            throw new Error('Must provide 1 or 2 IDs for compression');
+        } else {
+            return partIds.length === 1 ? `${compressionAlgo}:${partIds[0]}` : `${compressionAlgo}:${partIds.sort().join("-")}`;
+        }
+    }
+
+    public storeCompressedSize(compressionAlgo: CompressionAlgorithm, partIds: string[], size: number): void {
         if (partIds.length < 1 || partIds.length > 2) {
             throw new Error('Must provide 1 or 2 IDs for compression');
         }
-        const cacheKey = this.generateCacheKey(compressionType, partIds);
+        const cacheKey = this.generateCacheKey(compressionAlgo, partIds);
         const existingCache = this.loadAllCache();
         if (existingCache[cacheKey]) {
             return;

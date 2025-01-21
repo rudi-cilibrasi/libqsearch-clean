@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { Text, OrbitControls } from "@react-three/drei";
 import { saveAs } from "file-saver";
 import createGraph from "../functions/graphExport";
+import {useLabelManager} from "@/hooks/useLabelManager.ts";
 
 // Types for the graph data
 interface GraphNode {
@@ -176,8 +177,6 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
 
     return positions;
   };
-
-  // Continuing in next part due to length...
 
   const updateSpring = (spring: SpringObject): void => {
     const { ballA, ballB, springRef } = spring;

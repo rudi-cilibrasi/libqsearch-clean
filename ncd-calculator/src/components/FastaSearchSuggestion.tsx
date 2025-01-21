@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { parseAccessionAndRemoveVersion } from "../cache/cache.ts";
 import { PaginatedResults, Suggestion } from "@/services/genbank.ts";
-import { SelectedItem } from "./InputAccumulator";
+import { SelectedItem } from "./InputHolder.tsx";
 import { GenBankSearchService } from "@/services/GenBankSearchService.ts";
 
 type DisplayMode = "common" | "scientific" | "accession";
