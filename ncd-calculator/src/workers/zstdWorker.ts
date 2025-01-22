@@ -1,19 +1,8 @@
 // zstdWorker.ts
 /// <reference lib="webworker" />
-
-import {
-    encodeText,
-    processChunk,
-    calculateCRC32,
-    getPairFileConcatenated
-} from './shared/utils';
-import {
-    NCDInput,
-    WorkerErrorMessage,
-    WorkerReadyMessage,
-    WorkerResultMessage,
-    WorkerStartMessage
-} from "@/types/ncd";
+declare const self: DedicatedWorkerGlobalScope;
+import {calculateCRC32, encodeText, getPairFileConcatenated, processChunk} from './shared/utils';
+import {NCDInput, WorkerErrorMessage, WorkerReadyMessage, WorkerResultMessage, WorkerStartMessage} from "@/types/ncd";
 
 // ZSTD Configuration Constants
 const ZSTD_CONFIG = {
@@ -120,7 +109,6 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
             totalPairs
         } as WorkerStartMessage);
 
-        // Process individual files first
         const singleCompressedSizes = new Array(n);
         const ncdMatrix = Array.from({ length: n }, () => Array(n).fill(0));
 
@@ -137,7 +125,6 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
             }
         }
 
-        // Process pairs in chunks
         const CHUNK_SIZE = 5;
         const allResults = [];
 
@@ -148,7 +135,8 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
                 singleCompressedSizes,
                 'zstd',
                 cachedSizes,
-                getCompressedPairSize
+                getCompressedPairSize,
+                self
             );
 
             allResults.push(...chunkResults);
@@ -180,16 +168,40 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
     }
 }
 
-// Initialize WASM and worker
+async function loadWasmBinary(): Promise<ArrayBuffer> {
+    try {
+        if (process.env.VITEST) {
+            const fs = await import('fs/promises');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
+
+            const currentDir = path.dirname(fileURLToPath(import.meta.url));
+            const wasmPath = path.resolve(currentDir, '..', 'wasm', 'zstd.wasm');
+            console.log('Loading WASM from path:', wasmPath);
+
+            return await fs.readFile(wasmPath);
+        }
+
+        const response = await fetch(new URL('../wasm/zstd.wasm', import.meta.url));
+        return await response.arrayBuffer();
+    } catch (error) {
+        console.error('Failed to load WASM binary:', error);
+        console.error('Current directory:', import.meta.url);
+        throw error;
+    }
+}
+
 (async function initializeWorker() {
     try {
         const ZSTDModule = await import('../wasm/zstd.js');
+        const wasmBinary = await loadWasmBinary();
+        console.log('WASM binary loaded, size:', wasmBinary.byteLength);
+
         wasmModule = await ZSTDModule.default({
+            wasmBinary,
             locateFile: (path: string) => {
                 if (path.endsWith('.wasm')) {
-                    // Use a more specific path that matches your project structure
-                    const wasmPath = new URL('../wasm/zstd.wasm', import.meta.url).href;
-                    return wasmPath.replace('auto-download', 'assets/wasm');
+                    return new URL('../wasm/zstd.wasm', import.meta.url).href;
                 }
                 return path;
             }
@@ -199,18 +211,22 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
         self.postMessage({
             type: 'ready',
             message: `ZSTD Worker initialized with level ${ZSTD_CONFIG.COMPRESSION_LEVEL}`
-        });
+        } as WorkerReadyMessage);
 
         self.onmessage = handleMessage;
     } catch (error) {
         console.error('WASM initialization error:', error);
+        if (error instanceof Error) {
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+        }
         self.postMessage({
             type: 'error',
             message: error instanceof Error
                 ? `Failed to initialize ZSTD module: ${error.message}`
                 : 'Unknown initialization error'
-        });
+        } as WorkerErrorMessage);
     }
-})();
+})()
 
 export type {};

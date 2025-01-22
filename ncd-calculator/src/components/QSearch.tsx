@@ -6,7 +6,7 @@ import Header from "./Header";
 import {NCDProgress} from "./NCDProgress";
 import type {CompressionStats, NCDInput, NCDMatrixResponse, WorkerResultMessage} from "@/types/ncd";
 import {useNCDCache} from "@/hooks/useNCDCache";
-import {type CompressionAlgorithm, CompressionService} from "@/services/CompressionService";
+import {type CompressionAlgorithm, CompressionResponse, CompressionService} from "@/services/CompressionService";
 import {CRCCacheEntry} from "@/cache/CRCCache.ts";
 import {calculateCRC32} from "@/workers/shared/utils.ts";
 import {useLabelManager} from "@/hooks/useLabelManager.ts";
@@ -101,43 +101,9 @@ export const QSearch: React.FC<QSearchProps> = ({
       setIsLoading(true);
       setErrorMsg("");
 
-      // Determine the best compression algorithm based on content sizes
-      const contentSizes = input.contents.map(
-          (content) => new TextEncoder().encode(content).length
-      );
-      const sortedSizes = [...contentSizes].sort((a, b) => b - a);
-      const compressionDecision = CompressionService.needsAdvancedCompression(
-          sortedSizes[0],
-          sortedSizes[1]
-      );
+      const [compressionDecision, cachedSizes] = CompressionService.preprocessNcdInput(input, ncdCache);
 
       setCompressionInfo(compressionDecision);
-      const compressionAlgo = compressionDecision.algorithm;
-
-      // Prepare cached sizes
-      const contentBuffers = input.contents.map((content) =>
-          new TextEncoder().encode(content)
-      );
-
-      const fileCRCs = contentBuffers.map((buffer) => calculateCRC32(buffer));
-      const cachedSizes: Map<string, number> = new Map();
-
-      for(const crc of fileCRCs) {
-        const size = ncdCache.getCompressedSize(compressionAlgo, [crc]);
-        if (size) {
-          cachedSizes.set(`${compressionAlgo}:${crc}`, size);
-        }
-      }
-
-      for(let i = 0; i < fileCRCs.length; i++) {
-        for(let j = i + 1; j < fileCRCs.length; j++) {
-          if (i == j) continue;
-          const entry: CRCCacheEntry | null = ncdCache.getCachedEntry(compressionAlgo, [fileCRCs[i], fileCRCs[j]]);
-          if (entry) {
-              cachedSizes.set(entry.key, entry.value);
-          }
-        }
-      }
 
       const result = await compressionServiceRef.current.processContent(
           {
