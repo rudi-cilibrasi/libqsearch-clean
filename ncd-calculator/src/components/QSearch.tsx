@@ -6,10 +6,9 @@ import Header from "./Header";
 import {NCDProgress} from "./NCDProgress";
 import type {CompressionStats, NCDInput, NCDMatrixResponse, WorkerResultMessage} from "@/types/ncd";
 import {useNCDCache} from "@/hooks/useNCDCache";
-import {type CompressionAlgorithm, CompressionResponse, CompressionService} from "@/services/CompressionService";
-import {CRCCacheEntry} from "@/cache/CRCCache.ts";
-import {calculateCRC32} from "@/workers/shared/utils.ts";
+import {type CompressionAlgorithm, CompressionService} from "@/services/CompressionService";
 import {useLabelManager} from "@/hooks/useLabelManager.ts";
+import {KGridNCD} from "@/components/KGridNCD.tsx";
 
 export interface QSearchProps {
   openLogin: boolean;
@@ -218,6 +217,7 @@ export const QSearch: React.FC<QSearchProps> = ({
             setOpenLogin={setOpenLogin}
             setAuthenticated={setAuthenticated}
         />
+        <KGridNCD/>
         <div className="max-w-7xl mx-auto px-4 py-8">
           <ListEditor
               onComputedNcdInput={onNcdInput}

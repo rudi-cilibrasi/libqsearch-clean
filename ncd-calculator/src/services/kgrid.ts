@@ -3,6 +3,7 @@ import * as pako from 'pako';
 export interface GridObject {
     id: string;
     content: string;
+    label: string;
 }
 
 export interface Position {
@@ -18,8 +19,8 @@ export interface Block {
 export interface GridState {
     width: number;
     height: number;
-    objects: GridObject[][];
-    ncdMatrix: number[][];
+    grid: string[][];
+    ncdMatrix: Record<string, Record<string, number>>;
     objectiveValue: number;
 }
 
@@ -49,22 +50,26 @@ export const calculateNCD = (obj1: GridObject, obj2: GridObject): number => {
 }
 
 
-export const precomputeNCDMatrix = (objects: GridObject[]): number[][] => {
-    const n = objects.length;
-    const matrix: number[][] = Array(n).fill(0).map(() => Array(n).fill(0));
+export const precomputeNCDMatrix = (objects: GridObject[]): Record<string, Record<string, number>> => {
+    const matrix: Record<string, Record<string, number>> = {};
 
-    // Calculate NCD for each unique pair
-    for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-            const ncd = calculateNCD(objects[i], objects[j]);
-            // NCD is symmetric, so store it in both positions
-            matrix[i][j] = ncd;
-            matrix[j][i] = ncd;
-        }
-        // Distance to self is 0
-        matrix[i][i] = 0;
+    for(const obj of objects) {
+        matrix[obj.id] = {};
     }
 
+    for(let i = 0; i < objects.length; i++) {
+        const obj1 = objects[i];
+
+        matrix[obj1.id][obj1.id] = 0;
+        for(let j = i + 1; j < objects.length; j++) {
+            const obj2 = objects[j];
+
+            const ncd = calculateNCD(obj1, obj2);
+
+            matrix[obj1.id][obj2.id] = ncd;
+            matrix[obj2.id][obj1.id] = ncd;
+        }
+    }
     return matrix;
 }
 
@@ -74,63 +79,41 @@ export const gradualFactor = (pos: Position): number => {
 
 export const calculateObjective = (grid: GridState): number => {
     let total = 0;
+    for (let i = 0; i < grid.height; i++) {
+        for (let j = 0; j < grid.width; j++) {
+            const currentId = grid.grid[i][j];
+            let positionNCD = 0;
 
-    // horizontal neighbors
-    for(let i = 0; i < grid.height; i++){
-        for(let j = 0; j < grid.width; j++) {
-            const right = (j + 1) % grid.width;
+            // right neighbor
+            const rightJ = (j + 1) % grid.width;
+            const rightNeighborId = grid.grid[i][rightJ];
+            positionNCD += grid.ncdMatrix[currentId][rightNeighborId]
 
-            const obj1 = grid.objects[i][j];
-            const obj2 = grid.objects[i][right];
+            // down neighbor
+            const downI = (i + 1) % grid.height;
+            const downNeighborId = grid.grid[i][downI];
+            positionNCD += grid.ncdMatrix[currentId][downNeighborId]
 
-            const ncdValue = grid.ncdMatrix[obj1.id][obj2.id];
             const factor = gradualFactor({i, j});
-
-            total += ncdValue * factor;
+            total += positionNCD * factor;
         }
     }
-
-    // vertical neighbors
-    for(let i = 0; i < grid.height; i++) {
-        for(let j = 0; j < grid.width; j++) {
-            const down = (i + 1) % grid.height;
-
-            const obj1 = grid.objects[i][j];
-            const obj2 = grid.objects[down][j];
-
-            const ncdFactor = grid.ncdMatrix[obj1.id][obj2.id];
-            const factor = gradualFactor({i, j});
-
-            total += ncdFactor * factor;
-        }
-    }
-
     return total;
 }
 
-export const deepCopy = (grid: GridState): GridState => {
-    const newGrid: GridState = {
-        height: grid.height,
-        width: grid.width,
-        objectiveValue: grid.objectiveValue,
-        ncdMatrix: [],
-        objects: [],
+export const deepCopy = (gridState: GridState): GridState => {
+    const newGridState: GridState = {
+        height: gridState.height,
+        width: gridState.width,
+        objectiveValue: gridState.objectiveValue,
+        ncdMatrix: gridState.ncdMatrix,
+        grid: [],
     };
-
-    newGrid.ncdMatrix = grid.ncdMatrix.map(row => [...row]);
-
-    newGrid.objects = [];
-    for(let i = 0; i < grid.height; i++) {
-        newGrid.objects[i] = [];
-        for(let j = 0; j < grid.width; j++) {
-            newGrid.objects[i][j] = {
-                id: grid.objects[i][j].id,
-                content: grid.objects[i][j].content
-            }
-        }
+    newGridState.grid = [];
+    for(let i = 0; i < gridState.height; i++) {
+        newGridState.grid[i] = [...gridState.grid[i]];
     }
-
-    return newGrid;
+    return newGridState;
 }
 
 
@@ -162,64 +145,49 @@ export const swapBlocks = (
     return newGrid;
 }
 
-export const extractBlock = (grid: GridState, block: Block): GridObject[][] => {
+export const extractBlock = (grid: GridState, block: Block): string[][] => {
     const {topLeft, bottomRight} = block;
 
     const blockHeight = bottomRight.i - topLeft.i + 1;
     const blockWidth = bottomRight.j - topLeft.j + 1;
 
-    const blockContent: GridObject[][] = [];
+    const blockContent: string[][] = [];
 
-    for(let i = 0; i < blockHeight; i++) {
+    for (let i = 0; i < blockHeight; i++) {
         blockContent[i] = [];
-        for(let j = 0; j < blockWidth; j++) {
+        for (let j = 0; j < blockWidth; j++) {
             const gridI = topLeft.i + i;
             const gridJ = topLeft.j + j;
 
-            if (gridI >= 0 && gridI < grid.height && gridJ >= 0 && gridJ < grid.width) {
-                blockContent[i][j] = {
-                    id: grid.objects[gridI][gridJ].id,
-                    content: grid.objects[gridI][gridJ].content
-                };
-            } else {
-                // Handle out-of-bounds gracefully
-                console.warn(`Block coordinates out of bounds: (${gridI},${gridJ})`);
-                blockContent[i][j] = {
-                    id: "undefined",
-                    content: "Out of bounds"
-                };
-            }
+            blockContent[i][j] = grid.grid[gridI][gridJ];
         }
     }
 
     return blockContent;
 };
 
-export const reflectHorizontally = (block: GridObject[][]): void => {
-    for(let i = 0; i < block.length; i++) {
+export const reflectHorizontally = (block: string[][]): void => {
+    for (let i = 0; i < block.length; i++) {
         block[i].reverse();
     }
 }
 
-export const reflectVertically = (block: GridObject[][]): void => {
+export const reflectVertically = (block: string[][]): void => {
     block.reverse();
 }
 
-export const placeBlock = (grid: GridState, block: Block, blockContent: GridObject[][]): void => {
+export const placeBlock = (grid: GridState, block: Block, blockContent: string[][]): void => {
     const {topLeft, bottomRight} = block;
 
     // copy the block content into the grid
-    for(let i = 0; i < blockContent.length; i++) {
-        for(let j = 0; j < blockContent[i].length; j++) {
+    for (let i = 0; i < blockContent.length; i++) {
+        for (let j = 0; j < blockContent[i].length; j++) {
             const gridI = topLeft.i + i;
             const gridJ = topLeft.j + j;
 
             // ensure the indicies are within grid bounds
             if (gridI >= 0 && gridI < grid.height && gridJ >= 0 && gridJ < grid.width) {
-                grid.objects[i][j] = {
-                    id: blockContent[i][j].id,
-                    content: blockContent[i][j].content
-                }
+                grid.grid[gridI][gridJ] = blockContent[i][j];
             }
         }
     }
@@ -228,9 +196,9 @@ export const placeBlock = (grid: GridState, block: Block, blockContent: GridObje
 
 export const isInSelectedBlock = (position: Position, selectedBlock1: Block | null, selectedBlock2: Block | null): boolean => {
     if (selectedBlock1) {
-        const {topLeft,bottomRight} = selectedBlock1;
+        const {topLeft, bottomRight} = selectedBlock1;
         if (position.i >= topLeft.i
-        && position.i <= bottomRight.i
+            && position.i <= bottomRight.i
             && position.j >= topLeft.j
             && position.j <= bottomRight.j
         ) {
@@ -239,7 +207,7 @@ export const isInSelectedBlock = (position: Position, selectedBlock1: Block | nu
     }
 
     if (selectedBlock2) {
-        const { topLeft, bottomRight } = selectedBlock2;
+        const {topLeft, bottomRight} = selectedBlock2;
         if (
             position.i >= topLeft.i &&
             position.i <= bottomRight.i &&
@@ -274,8 +242,8 @@ export const selectRandomBlock = (
 
     // Return the block definition
     return {
-        topLeft: { i: startI, j: startJ },
-        bottomRight: { i: startI + blockHeight - 1, j: startJ + blockWidth - 1 }
+        topLeft: {i: startI, j: startJ},
+        bottomRight: {i: startI + blockHeight - 1, j: startJ + blockWidth - 1}
     };
 }
 
@@ -299,13 +267,13 @@ export const createInitialState = (
     }
 
     // Create the initial grid arrangement
-    const grid: GridObject[][] = [];
+    const grid: string[][] = [];
     let objectIndex = 0;
 
     for (let i = 0; i < height; i++) {
         grid[i] = [];
         for (let j = 0; j < width; j++) {
-            grid[i][j] = shuffledObjects[objectIndex++];
+            grid[i][j] = shuffledObjects[objectIndex++].id;
         }
     }
 
@@ -316,7 +284,7 @@ export const createInitialState = (
     const initialState: GridState = {
         width,
         height,
-        objects: grid,
+        grid,
         ncdMatrix,
         objectiveValue: 0
     };

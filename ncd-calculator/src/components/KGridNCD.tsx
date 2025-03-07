@@ -8,24 +8,23 @@ import {
     Position, selectRandomBlock, swapBlocks
 } from "@/services/kgrid.ts";
 
+
 const GridCell: React.FC<{
-    object: GridObject,
+    id: string,
+    content: string,
+    label: string,
     position: Position,
     onSelect: (pos: Position) => void,
     isSelected: boolean
-}> = ({ object, position, onSelect, isSelected }) => {
-    const displayContent = object.content.length > 20
-        ? object.content.substring(0, 20) + '...'
-        : object.content;
-
+}> = ({ content, label, position, onSelect, isSelected }) => {
     return (
         <div
             className={`grid-cell ${isSelected ? 'selected' : ''}`}
             onClick={() => onSelect(position)}
-            title={object.content}
+            title={content}
         >
             <div className="cell-content">
-                {displayContent}
+                {label}
             </div>
         </div>
     );
@@ -40,15 +39,15 @@ export const KGridNCD: React.FC<{
           height = 3,
           objects = [
               // Default sample objects if none provided
-              { id: "0", content: "Lions are large cats that live in Africa." },
-              { id: "1", content: "Tigers are striped cats from Asia." },
-              { id: "2", content: "Dogs are loyal pets with keen senses." },
-              { id: "3", content: "Wolves are wild canines that live in packs." },
-              { id: "4", content: "Dolphins are intelligent marine mammals." },
-              { id: "5", content: "Sharks are predatory fish with cartilage skeletons." },
-              { id: "6", content: "Eagles are birds of prey with sharp vision." },
-              { id: "7", content: "Penguins are flightless birds that swim." },
-              { id: "8", content: "Frogs are amphibians that start life in water." }
+              { id: "0", label: "Lion", content: "Lions are large cats that live in Africa." },
+              { id: "1", label: "Tiger", content: "Tigers are striped cats from Asia." },
+              { id: "2", label: "Dog", content: "Dogs are loyal pets with keen senses." },
+              { id: "3", label: "Wolf", content: "Wolves are wild canines that live in packs." },
+              { id: "4", label: "Dolphin", content: "Dolphins are intelligent marine mammals." },
+              { id: "5", label: "Shark", content: "Sharks are predatory fish with cartilage skeletons." },
+              { id: "6", label: "Eagle", content: "Eagles are birds of prey with sharp vision." },
+              { id: "7", label: "Penguin", content: "Penguins are flightless birds that swim." },
+              { id: "8", label: "Frog", content: "Frogs are amphibians that start life in water." }
           ]
       }) => {
     // State hooks
@@ -193,6 +192,12 @@ export const KGridNCD: React.FC<{
         setTemperature(1.0);
     };
 
+    const gridObjects: Record<string, GridObject> = {}
+    objects.forEach(object => {
+        gridObjects[object.id] = object;
+    })
+
+
     return (
         <div className="k-grid-container">
             <div className="control-panel">
@@ -275,10 +280,12 @@ export const KGridNCD: React.FC<{
                     Array.from({ length: gridState.width }, (_, j) => (
                         <GridCell
                             key={`${i}-${j}`}
-                            object={gridState.objects[i][j]}
+                            content={gridObjects[gridState.grid[i][j]].content}
+                            label={gridObjects[gridState.grid[i][j]].label}
                             position={{ i, j }}
                             onSelect={handleCellSelect}
                             isSelected={isInSelectedBlock({ i, j }, selectedBlock1, selectedBlock2)}
+                         id={gridState.grid[i][j]}
                         />
                     ))
                 ))}
