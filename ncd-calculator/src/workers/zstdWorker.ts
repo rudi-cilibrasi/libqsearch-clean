@@ -94,7 +94,7 @@ async function getCompressedPairSize(str1: string, str2: string): Promise<number
 
 async function handleMessage(event: MessageEvent<NCDInput>) {
     try {
-        const { labels, contents, cachedSizes } = event.data;
+        const {labels, contents, cachedSizes} = event.data;
 
         if (!labels?.length || !contents?.length) {
             throw new Error('Invalid input data');
@@ -110,7 +110,7 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
         } as WorkerStartMessage);
 
         const singleCompressedSizes = new Array(n);
-        const ncdMatrix = Array.from({ length: n }, () => Array(n).fill(0));
+        const ncdMatrix = Array.from({length: n}, () => Array(n).fill(0));
 
         for (let i = 0; i < n; i++) {
             const encoded = encodeText(contents[i]);
@@ -141,7 +141,7 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 
             allResults.push(...chunkResults);
 
-            for (const { i, j, ncd } of chunkResults) {
+            for (const {i, j, ncd} of chunkResults) {
                 ncdMatrix[i][j] = ncd;
                 ncdMatrix[j][i] = ncd;
             }
@@ -169,28 +169,40 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 }
 
 async function loadWasmBinary(): Promise<ArrayBuffer> {
+    const isBrowser = typeof window !== 'undefined';
     try {
-        if (process.env.VITEST) {
-            const fs = await import('fs/promises');
-            const path = await import('path');
-            const { fileURLToPath } = await import('url');
+        if (isBrowser) {
+            console.log('Running in browser environment, fetching WASM from URL');
+            const response = await fetch('/wasm/zstd.wasm');
 
-            const currentDir = path.dirname(fileURLToPath(import.meta.url));
-            const wasmPath = path.resolve(currentDir, '..', 'wasm', 'zstd.wasm');
-            console.log('Loading WASM from path:', wasmPath);
-
-            return await fs.readFile(wasmPath);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch WASM: ${response.status} ${response.statusText}`);
+            }
+            return await response.arrayBuffer();
         }
+        else {
+            console.log('Running in Node.js environment, loading WASM from filesystem');
+            try {
+                // Dynamic imports to avoid reference errors in browser
+                const fs = await import('fs/promises');
+                const path = await import('path');
+                const url = await import('url');
 
-        const response = await fetch(new URL('../wasm/zstd.wasm', import.meta.url));
-        return await response.arrayBuffer();
+                const currentDir = path.dirname(url.fileURLToPath(import.meta.url));
+                const wasmPath = path.resolve(currentDir, '..', 'wasm', 'zstd.wasm');
+                console.log('Loading WASM from path:', wasmPath);
+
+                return await fs.readFile(wasmPath);
+            } catch (nodeError) {
+                console.error('Node.js module loading error:', nodeError);
+                throw nodeError;
+            }
+        }
     } catch (error) {
         console.error('Failed to load WASM binary:', error);
-        console.error('Current directory:', import.meta.url);
         throw error;
     }
 }
-
 (async function initializeWorker() {
     try {
         const ZSTDModule = await import('../wasm/zstd.js');

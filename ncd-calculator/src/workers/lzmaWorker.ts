@@ -15,7 +15,7 @@ import { LZMA } from '../lib/lzma';
 const COMPRESSION_SETTINGS = {
   // Maximum file size limit for LZMA compression
   // LZMA is most effective for smaller files where compression ratio is critical
-  MAX_FILE_SIZE: 1024 * 1024, // 1MB
+  MAX_FILE_SIZE: 128 * 1024 * 1024, // 1MB
 
   // Dictionary size limits for LZMA
   // Minimum: 4KB (2^12) - Suitable for very small files

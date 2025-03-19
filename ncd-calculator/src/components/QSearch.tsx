@@ -8,7 +8,6 @@ import type {CompressionStats, NCDInput, NCDMatrixResponse, WorkerResultMessage}
 import {useNCDCache} from "@/hooks/useNCDCache";
 import {type CompressionAlgorithm, CompressionService} from "@/services/CompressionService";
 import {useLabelManager} from "@/hooks/useLabelManager.ts";
-import {KGridNCD} from "@/components/KGridNCD.tsx";
 
 export interface QSearchProps {
   openLogin: boolean;
@@ -145,7 +144,16 @@ export const QSearch: React.FC<QSearchProps> = ({
       }
 
       // Display results
-      displayNcdMatrix(result as WorkerResultMessage);
+
+      const response: NCDMatrixResponse =  result as NCDMatrixResponse;
+      displayNcdMatrix(response);
+      const { labels, ncdMatrix } = response;
+      qSearchWorkerRef.current?.postMessage({
+        action: "processNcdMatrix",
+        // labels: labels.map(label => labelManager.normalizeId(label)),
+        labels: labels,
+        ncdMatrix: ncdMatrix,
+      });
 
       // Update cache with new compression data
       if ("newCompressionData" in result && result.newCompressionData) {
@@ -178,17 +186,15 @@ export const QSearch: React.FC<QSearchProps> = ({
   // Display matrix and trigger QSearch processing
   const displayNcdMatrix = (response: NCDMatrixResponse) => {
     const { labels: responseLabels, ncdMatrix: matrix } = response;
-    const displayNames = responseLabels
-        .filter(label => labelManager.hasDisplayLabel(label))
-        .map(label => labelManager.getDisplayLabel(label) || label);
-    setLabels(displayNames);
+    console.log('label from display matrix now: ' + JSON.stringify(labels));
+    // const displayNames = responseLabels
+    //     .filter(label => labelManager.hasDisplayLabel(label))
+    //     .map(label => labelManager.getDisplayLabel(label) || label);
+    // setLabels(displayNames);
+    setLabels(responseLabels)
     setNcdMatrix(matrix);
     setHasMatrix(true);
-    qSearchWorkerRef.current?.postMessage({
-      action: "processNcdMatrix",
-      labels: responseLabels.map(label => labelManager.normalizeId(label)),
-      ncdMatrix: matrix,
-    });
+
   };
   // Reset display state
   const resetDisplay = () => {
@@ -217,7 +223,6 @@ export const QSearch: React.FC<QSearchProps> = ({
             setOpenLogin={setOpenLogin}
             setAuthenticated={setAuthenticated}
         />
-        <KGridNCD/>
         <div className="max-w-7xl mx-auto px-4 py-8">
           <ListEditor
               onComputedNcdInput={onNcdInput}
@@ -244,10 +249,11 @@ export const QSearch: React.FC<QSearchProps> = ({
 
           {/* Error state */}
           {errorMsg && <div className="text-red-600 my-4">{errorMsg}</div>}
-
+          { /* FIXME: add the accession ID to the matrix tree so that the unique IDs can be used in the Kgrid*/}
           {/* Results */}
           {!isLoading && (
               <MatrixTree
+                  labelManager={labelManager}
                   hasMatrix={hasMatrix}
                   ncdMatrix={ncdMatrix}
                   labels={labels}

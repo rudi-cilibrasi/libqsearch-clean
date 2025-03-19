@@ -15,7 +15,7 @@ export class CompressionService {
   private currentAlgorithm: CompressionAlgorithm | null = null;
 
   private static readonly MAX_SIZES = {
-    lzma: 1024 * 1024, // 1MB maximum for LZMA
+    lzma: 128 * 1024 * 1024, // 1MB maximum for LZMA
     zstd: 128 * 1024 * 1024, // 128MB maximum for ZSTD
   } as const;
 
@@ -37,11 +37,11 @@ export class CompressionService {
     return CompressionService.instance;
   }
 
-  async initialize(algorithm: CompressionAlgorithm = "zstd"): Promise<void> {
+  async initialize(algorithm: CompressionAlgorithm = "lzma"): Promise<void> {
     if (this.currentAlgorithm === algorithm && this.worker) {
       return;
     }
-    await this.initializeWorker(algorithm);
+    await this.initializeWorker("lzma");
   }
 
   private async initializeWorker(algorithm: CompressionAlgorithm): Promise<void> {
