@@ -19,23 +19,9 @@ export interface Block {
 export interface GridState {
     width: number;
     height: number;
-    grid: string[][];
+    grid: number[][]; // grid index position
     ncdMatrix: Record<string, Record<string, number>>;
     objectiveValue: number;
-}
-
-export interface NCDDistributionCheck {
-    isProblematic: boolean;
-    problematicValues: number[];
-    message: string;
-}
-
-export interface CellWithNeighbors {
-    center: string;
-    east: string;
-    west: string;
-    south: string;
-    north: string
 }
 
 /**
@@ -54,7 +40,8 @@ export interface CellWithNeighbors {
  */
 export const calculateNCD = (str1: string, str2: string): number => {
     if (!str1 && !str2) return 0;
-    if (!str1 || !str2) return 1;
+    if (!str1 || !str2) return 0;
+
 
     const data1 = new TextEncoder().encode(str1);
     const data2 = new TextEncoder().encode(str2);
@@ -81,22 +68,6 @@ export const calculateNCD = (str1: string, str2: string): number => {
     return Math.max(0, Math.min(1, ncd));
 };
 
-
-export const ensureStringIds = (grid: GridState): GridState => {
-    const newGrid = [];
-    for (let i = 0; i < grid.height; i++) {
-        const innerGrid = [];
-        for (let j = 0; j < grid.width; j++) {
-            innerGrid.push(String(grid.grid[i][j]));
-        }
-        newGrid.push(innerGrid);
-    }
-    return {
-        ...grid,
-        grid: newGrid
-    }
-}
-
 export const precomputeNCDMatrix = (
     objects: GridObject[]
 ): Record<string, Record<string, number>> => {
@@ -122,6 +93,18 @@ export const precomputeNCDMatrix = (
     }
 
     return matrix;
+}
+
+
+export const createGradualFactorMatrix = (width: number, height: number): number[][] => {
+    const factorMatrix: number[][] = [];
+    for(let i = 0; i < height; i++) {
+        factorMatrix[i] = [];
+        for(let j = 0; j < width; j++) {
+            factorMatrix[i][j] = gradualFactor({i, j}, width, height);
+        }
+    }
+    return factorMatrix;
 }
 
 export const gradualFactor = (pos: Position, width: number, height: number): number => {
@@ -171,12 +154,12 @@ export const calculateObjective = (grid: GridState): number => {
 }
 
 export const deepCopy = (gridState: GridState): GridState => {
-    const newGrid: string[][] = [];
+    const newGrid: number[][] = [];
 
     for (let i = 0; i < gridState.height; i++) {
         newGrid[i] = [];
         for (let j = 0; j < gridState.width; j++) {
-            newGrid[i][j] = String(gridState.grid[i][j]);
+            newGrid[i][j] = gridState.grid[i][j];
         }
     }
     return {
@@ -188,7 +171,7 @@ export const deepCopy = (gridState: GridState): GridState => {
     }
 }
 
-export const extractBlock = (grid: GridState, block: Block): string[][] => {
+export const extractBlock = (grid: GridState, block: Block): number[][] => {
     // Normalize the block to ensure proper coordinates
     const normalizedBlock = normalizeBlock(block, grid.height, grid.width);
     const {topLeft, bottomRight} = normalizedBlock;
@@ -200,8 +183,8 @@ export const extractBlock = (grid: GridState, block: Block): string[][] => {
     console.log(`Extracting block with dimensions ${blockWidth}×${blockHeight}`);
 
     // Create a properly sized array
-    const blockContent: string[][] = Array(blockHeight).fill(null)
-        .map(() => Array(blockWidth).fill(""));
+    const blockContent: number[][] = Array(blockHeight).fill(null)
+        .map(() => Array(blockWidth).fill(-1));
 
     // Fill the array with grid content
     for (let i = 0; i < blockHeight; i++) {
@@ -210,7 +193,7 @@ export const extractBlock = (grid: GridState, block: Block): string[][] => {
             const gridI = (topLeft.i + i) % grid.height;
             const gridJ = (topLeft.j + j) % grid.width;
 
-            blockContent[i][j] = String(grid.grid[gridI][gridJ]);
+            blockContent[i][j] = grid.grid[gridI][gridJ];
         }
     }
 
@@ -233,7 +216,7 @@ export const reflectVertically = (block: string[][]): void => {
     block.reverse();
 }
 
-export const placeBlock = (grid: GridState, block: Block, blockContent: string[][]): void => {
+export const placeBlock = (grid: GridState, block: Block, blockContent: number[][]): void => {
     // Normalize the block to ensure proper coordinates
     const normalizedBlock = normalizeBlock(block, grid.height, grid.width);
     const {topLeft, bottomRight} = normalizedBlock;
@@ -274,7 +257,7 @@ export const placeBlock = (grid: GridState, block: Block, blockContent: string[]
 
             // Ensure we're within grid bounds (defensive programming)
             if (gridI >= 0 && gridI < grid.height && gridJ >= 0 && gridJ < grid.width) {
-                grid.grid[gridI][gridJ] = String(blockContent[i][j]);
+                grid.grid[gridI][gridJ] = blockContent[i][j];
             } else {
                 console.error(`Invalid grid position (${gridI},${gridJ}) when placing block`);
             }
@@ -324,11 +307,9 @@ export const normalizeBlock = (block: Block, gridHeight: number, gridWidth: numb
 
 export const createSafeInitialGrid = (width: number, height: number, objects: GridObject[]) => {
 
-    objects = ensureUniqueObjectIds(objects);
-
     const processedObjects = objects.map(object => ({
         ...object,
-        id: String(object.id)
+        id: object.id
     }))
 
     const uniqueIdsMap = new Map();
@@ -350,13 +331,13 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
     }
 
     const selected = shuffledObjects.slice(0, width * height);
-    const grid: string[][] = [];
+    const grid: number[][] = [];
 
     let index = 0;
     for (let i = 0; i < height; i++) {
         grid[i] = [];
         for (let j = 0; j < width; j++) {
-            grid[i][j] = selected[index].id;
+            grid[i][j] = index;
             index++;
         }
     }
@@ -367,33 +348,14 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
 
 
     const ncdMatrix = precomputeNCDMatrix(objects);
+    const factorMatrix = createGradualFactorMatrix(width, height);
 
     const gridState = {
         width, height, grid, ncdMatrix, objectiveValue: 0
     }
 
-    gridState.objectiveValue = calculateObjective(gridState);
-    return ensureStringIds(gridState);
-}
-
-
-export const calculateMatchPercentage = (grid1: GridState, grid2: GridState): number => {
-    if (grid1.width !== grid2.width || grid1.height !== grid2.height) {
-        throw new Error("Grids must have the same dimensions to calculate match percentage");
-    }
-
-    let matches = 0;
-    const totalCells = grid1.width * grid1.height;
-
-    for (let i = 0; i < grid1.height; i++) {
-        for (let j = 0; j < grid1.width; j++) {
-            if (grid1.grid[i][j] === grid2.grid[i][j]) {
-                matches++;
-            }
-        }
-    }
-
-    return matches / totalCells;
+    gridState.objectiveValue = calculateObjectiveWithSymmetryBreaking(gridState, factorMatrix);
+    return gridState;
 }
 
 export const selectRandomCell = (grid: GridState): Position => {
@@ -409,187 +371,86 @@ export const swapCells = (grid: GridState, pos1: Position, pos2: Position): Grid
     console.log(`Swapping cells: (${pos1.i},${pos1.j}) with (${pos2.i},${pos2.j})`);
 
     const newGrid = deepCopy(grid);
-    const value1 = String(grid.grid[pos1.i][pos1.j]);
-    const value2 = String(grid.grid[pos2.i][pos2.j]);
+    const value1 = grid.grid[pos1.i][pos1.j];
+    const value2 = grid.grid[pos2.i][pos2.j];
 
     newGrid.grid[pos1.i][pos1.j] = value2;
     newGrid.grid[pos2.i][pos2.j] = value1;
 
     console.log(`Swapped ${value1} at (${pos1.i},${pos1.j}) with ${value2} at (${pos2.i},${pos2.j})`);
     newGrid.objectiveValue = calculateObjective(newGrid);
-    return ensureStringIds(newGrid);
+    return newGrid;
 }
 
 
 const OPTIMIZE_STEP_OPTIONS = {
     initialTemperature: 10.0,  // Starting temperature (higher = more exploration)
-    finalTemperature: 0.01,    // Final temperature
+    finalTemperature: 0.00,    // Final temperature
     coolingRate: 0.9999,       // Cooling rate per iteration (slower = better results)
     swapsPerStep: 1,           // Number of swaps to try per step
-    resetProbability: 0.1,     // Probability of resetting to best grid
-    resetInterval: 1000, // 1second
 }
 
-export const optimizeStep = (grid: GridState, iterationCount: number, bestGrid: GridState | null): GridState => {
+export const optimizeStep = (grid: GridState, iterationCount: number, bestGrid: GridState | null, factorMatrix: number[][]): GridState => {
     const {
         initialTemperature,
         finalTemperature,
         coolingRate,
-        swapsPerStep,
-        resetProbability,
-        resetInterval,
+        swapsPerStep
     } = OPTIMIZE_STEP_OPTIONS;
 
     const newGrid = deepCopy(grid);
-
-    // calculate using exponential cooling schedule
     const temperature = initialTemperature * Math.pow(coolingRate, iterationCount);
-
     const inExploitationMode = temperature <= finalTemperature;
-    if (bestGrid && iterationCount > resetInterval && iterationCount % resetInterval === 0 && Math.random() < resetProbability) {
-        console.log(`[Iteration ${iterationCount}] Resetting to best grid (objective: ${bestGrid.objectiveValue})`);
 
-        const resetGrid = deepCopy(bestGrid);
-        for (let i = 0; i < 2; i++) {
-            const cell1 = selectRandomCell(resetGrid);
-            const cell2 = selectRandomCell(resetGrid);
-            if (cell1.i !== cell2.i && cell1.j !== cell2.j) {
-                const swapped = swapCells(resetGrid, cell1, cell2);
-                resetGrid.grid = swapped.grid;
-                resetGrid.objectiveValue = swapped.objectiveValue;
-            }
-        }
-        return ensureStringIds(resetGrid);
-    }
     const actualSwaps = inExploitationMode ? 1 : swapsPerStep;
     let bestSwapGrid = newGrid;
 
     for (let i = 0; i < actualSwaps; i++) {
         const cell1 = selectRandomCell(bestSwapGrid);
         const cell2 = selectRandomCell(bestSwapGrid);
-        if (!(cell1.i !== cell2.i || cell1.j !== cell2.j)) {
+
+        if (cell1.i === cell2.i && cell1.j === cell2.j) {
             continue;
         }
+
         const swapped = swapCells(bestSwapGrid, cell1, cell2);
-        const delta = swapped.objectiveValue = newGrid.objectiveValue;
-        // Acceptance probability based on delta and temperature
-        // If delta is negative (improvement), always accept
-        // If delta is positive (worse), accept with probability based on temperature
+        const delta = swapped.objectiveValue - newGrid.objectiveValue;
 
         const acceptanceProbability = delta <= 0 ? 1 : Math.exp(-delta / temperature);
+
         if (Math.random() < acceptanceProbability) {
             if (swapped.objectiveValue < bestSwapGrid.objectiveValue) {
                 bestSwapGrid = swapped;
-                bestSwapGrid.objectiveValue = swapped.objectiveValue;
             }
         }
-
     }
+
     if (iterationCount % 1000 === 0) {
         console.log(`[Iteration ${iterationCount}] Temperature: ${temperature.toFixed(6)}, Objective: ${bestSwapGrid.objectiveValue.toFixed(6)}`);
     }
-    return ensureStringIds(bestSwapGrid);
+
+    return bestSwapGrid;
 }
 
-const SYMMETRY_BREAKER_OPTIONS = {
-    alpha : 0.25,        // Primary gradient i-coefficient
-    beta : 0.35,         // Primary gradient j-coefficient
-    baseValue : 1.15,    // Base value to ensure positive factors
-    varAmplitude1 : 0.03, // Primary variation amplitude
-    varAmplitude2 : 0.02, // Secondary variation amplitude
-    varFreq1 : Math.PI,  // Primary variation frequency
-    varFreq2 : 2.71,     // Secondary variation frequency (using e for irrationality)
-    powerFactor : 0.4    // Power to control overall effect magnitude
-}
-
-export const symmetryBreaker = (pos: Position, width: number, height: number) => {
-    const {
-        alpha,
-        beta,
-        baseValue,
-        varAmplitude1,
-        varAmplitude2,
-        varFreq1,
-        varFreq2,
-        powerFactor
-    } = SYMMETRY_BREAKER_OPTIONS;
-
-    // Normalize position coordinates to [0,1] range
-    const normalizedI = pos.i / (height - 1 || 1);
-    const normalizedJ = pos.j / (width - 1 || 1);
-
-    // Primary gradient - increases exponentially toward bottom-right
-    // This breaks the major symmetry of the grid
-    const baseGradient = baseValue + (alpha * normalizedI) + (beta * normalizedJ);
-
-    const primaryVariation = varAmplitude1 * Math.sin(normalizedI * varFreq1) * Math.sin(normalizedJ * varFreq2);
-    // Uses phi (golden ratio) to ensure incommensurable frequencies
-    const phi = 1.618033988749895;
-    const secondaryVariation = varAmplitude2 * Math.sin(normalizedI * varFreq1 * phi) * Math.cos(normalizedJ * varFreq2 * phi);
-
-    return Math.pow(baseGradient + primaryVariation + secondaryVariation, powerFactor);
-}
-
-export const calculateObjectiveWithSymmetryBreaking = (grid: GridState): number => {
+export const calculateObjectiveWithSymmetryBreaking = (grid: GridState, factorMatrix: number[][]): number => {
     let total = 0;
-    for (let i = 0; i < grid.height; i++) {
-        for (let j = 0; j < grid.width; j++) {
-            const currentId = grid.grid[i][j];
+    for(let i = 0; i < grid.height; i++) {
+        for(let j = 0; j < grid.width; j++) {
             let positionNCD = 0;
-
+            const currentId = grid.grid[i][j];
             const rightJ = (j + 1) % grid.width;
             const rightNeighborId = grid.grid[i][rightJ];
-            positionNCD += grid.ncdMatrix[currentId][rightNeighborId];
+            if (grid.grid[i][j] !== -1 && grid.grid[i][rightJ] !== -1) {
+                positionNCD += grid.ncdMatrix[currentId][rightNeighborId];
+            }
 
             const downI = (i + 1) % grid.height;
             const downNeighborId = grid.grid[downI][j];
-            positionNCD += grid.ncdMatrix[currentId][downNeighborId];
-
-            const factor = symmetryBreaker({i, j}, grid.width, grid.height);
-            total += positionNCD * factor;
+            if (grid.grid[i][j] !== -1 && grid.grid[downI][j] !== -1) {
+                positionNCD += grid.ncdMatrix[currentId][downNeighborId];
+            }
+            total += positionNCD * factorMatrix[i][j];
         }
     }
     return total;
-}
-
-
-const ensureUniqueObjectIds = (inputObjects: GridObject[]) => {
-    // Group objects by ID to identify duplicates
-    const objectsById: Record<string, GridObject[]> = {};
-
-    inputObjects.forEach(obj => {
-        const id = String(obj.id);
-        if (!objectsById[id]) {
-            objectsById[id] = [];
-        }
-        objectsById[id].push(obj);
-    });
-
-    // Create objects with unique IDs while preserving original labels
-    const uniqueObjects: { id: string; content: string; label: string; }[] = [];
-
-    Object.entries(objectsById).forEach(([id, objectsWithSameId]) => {
-        if (objectsWithSameId.length === 1) {
-            // No duplicates, keep as is
-            uniqueObjects.push({
-                ...objectsWithSameId[0],
-                id: String(id)  // Ensure ID is a string
-            });
-        } else {
-            // For duplicates, create unique IDs by adding a suffix
-            objectsWithSameId.forEach((obj, index) => {
-                uniqueObjects.push({
-                    ...obj,
-                    // Create a unique ID while preserving the original pattern
-                    id: `${id}_${index + 1}`,
-                    // Keep the original label exactly as is
-                    label: obj.label,
-                    // Slightly modify content to ensure NCD differences if needed
-                    content: obj.content + (index > 0 ? ` [Variant ${index + 1}]` : '')
-                });
-            });
-        }
-    });
-
-    return uniqueObjects;
 }
