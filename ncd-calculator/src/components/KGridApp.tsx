@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { KGridDualOptimization } from './KGridDualOptimization';
-import { GridObject } from '@/services/kgrid.ts';
+import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
+import {KGridDualOptimization} from './KGridDualOptimization';
+import {GridObject} from '@/services/kgrid.ts';
 import {
     Dna,
     AlertTriangle,
     HelpCircle,
     Maximize2,
-    Minimize2
+    Minimize2,
+    Timer,
+    Zap
 } from 'lucide-react';
 
 interface KGridAppProps {
@@ -16,6 +18,15 @@ interface KGridAppProps {
     maxIterations?: number;
     ncdMatrixOverride?: number[][];
     labels?: string[];
+    onOptimizationStart?: () => void;
+    onOptimizationEnd?: () => void;
+    onIterationUpdate?: (iteration: number) => void;
+    autoStart?: boolean;
+    optimizationEndTime?: number;
+    totalExecutionTime?: number;
+    iterationsPerSecond?: number
+    optimizationStartTime?: number;
+    intervalMs?: number;
 }
 
 /**
@@ -29,22 +40,65 @@ const KGridApp: React.FC<KGridAppProps> = ({
                                                objects = [],
                                                maxIterations = 50000,
                                                ncdMatrixOverride,
-                                               labels
-                                           }) => {
-    // State for the transformed objects and matrix
+                                               labels,
+                                               onOptimizationStart,
+                                               onOptimizationEnd,
+                                               onIterationUpdate,
+                                               autoStart = false,
+                                               optimizationEndTime,
+                                           totalExecutionTime,
+                                           iterationsPerSecond,
+                                            optimizationStartTime,
+    intervalMs = 50
+}) =>
+{
     const [gridObjects, setGridObjects] = useState<GridObject[]>([]);
     const [isDataReady, setIsDataReady] = useState(false);
-    const [dataQualityWarning, setDataQualityWarning] = useState<string | null>(null);
     const [expanded, setExpanded] = useState(false);
+    const [runningOptimization, setRunningOptimization] = useState(false);
+    const [iterationCount, setIterationCount] = useState(0);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const gridContainerRef = useRef<HTMLDivElement | null>(null);
+    const autoStartRef = useRef(autoStart);
+    const hasTriggeredAutoStartRef = useRef(false);
+    const intervalMsRef = useRef(intervalMs);
 
-    // Transform the provided data for K-Grid visualization
+
+    // Function to resize grid container based on content
+    const resizeGridContainer = useCallback(() => {
+        if (gridContainerRef.current && containerRef.current) {
+            // Get the actual height of the grid content
+            const gridContent = gridContainerRef.current.querySelector('.k-grid-content');
+            if (gridContent) {
+                const contentHeight = gridContent.getBoundingClientRect().height;
+                const minHeight = 500; // Minimum height
+
+                // Set container height to content height or minimum, whichever is larger
+                containerRef.current.style.height = `${Math.max(contentHeight, minHeight)}px`;
+            }
+        }
+    }, []);
+
+    // Set up resize observer to handle responsive sizing
+    useEffect(() => {
+        if (gridContainerRef.current) {
+            const resizeObserver = new ResizeObserver(() => {
+                resizeGridContainer();
+            });
+
+            resizeObserver.observe(gridContainerRef.current);
+
+            return () => {
+                resizeObserver.disconnect();
+            };
+        }
+    }, [resizeGridContainer]);
+
     useEffect(() => {
         // If we have both NCD matrix and labels, prepare the data
         if (ncdMatrixOverride && labels && labels.length > 0) {
             prepareDataFromMatrix(labels, ncdMatrixOverride);
-        }
-        // Otherwise, use the provided objects directly
-        else if (objects && objects.length > 0) {
+        } else if (objects && objects.length > 0) {
             // Ensure all objects have string IDs
             const processedObjects = objects.map(obj => ({
                 ...obj,
@@ -65,11 +119,8 @@ const KGridApp: React.FC<KGridAppProps> = ({
             setGridObjects(uniqueObjects);
             setIsDataReady(true);
 
-        }
-        // No valid input
-        else {
-            setIsDataReady(false);
-            setDataQualityWarning("No data provided for visualization");
+            // Reset auto-start tracking when data changes
+            hasTriggeredAutoStartRef.current = false;
         }
     }, [ncdMatrixOverride, labels, objects]);
 
@@ -104,37 +155,90 @@ const KGridApp: React.FC<KGridAppProps> = ({
             setGridObjects(generatedObjects);
             setIsDataReady(true);
 
+            // Reset auto-start tracking when data changes
+            hasTriggeredAutoStartRef.current = false;
+
             console.log('Data prepared for KGridApp from matrix:', {
                 objects: generatedObjects,
                 matrixSize: `${matrix.length}x${matrix[0]?.length}`
             });
         } catch (error) {
             console.error('Error preparing data from matrix:', error);
-            setDataQualityWarning(`Error preparing visualization data: ${error instanceof Error ? error.message : String(error)}`);
             setIsDataReady(false);
         }
     }, []);
 
-
     // Calculate optimal dimensions if not specified
     const getOptimalDimensions = () => {
         if (width !== 3 || height !== 3) {
-            return { width, height };
+            return {width, height};
         }
 
         const itemCount = gridObjects.length;
         const optimalWidth = Math.ceil(Math.sqrt(itemCount));
         const optimalHeight = Math.ceil(itemCount / optimalWidth);
 
-        return { width: optimalWidth, height: optimalHeight };
+        return {width: optimalWidth, height: optimalHeight};
     };
 
-    const { width: displayWidth, height: displayHeight } = getOptimalDimensions();
+    const {width: displayWidth, height: displayHeight} = getOptimalDimensions();
 
     // Toggle fullscreen mode for better visualization
     const toggleExpanded = () => {
         setExpanded(!expanded);
+        // After toggle, resize the container to fit content
+        setTimeout(resizeGridContainer, 100);
     };
+
+    // Handle optimization start
+    const handleOptimizationStart = useCallback(() => {
+        console.log("Optimization started with swap interval of 20ms");
+        setRunningOptimization(true);
+        setIterationCount(0);
+
+        // Override the interval to 20ms for faster block swapping
+        intervalMsRef.current = 20;
+
+        // Call parent handler if provided
+        if (onOptimizationStart) {
+            onOptimizationStart();
+        }
+    }, [onOptimizationStart]);
+
+    // Handle optimization end
+    const handleOptimizationEnd = useCallback(() => {
+        console.log("Optimization ended");
+        setRunningOptimization(false);
+
+        // Call parent handler if provided
+        if (onOptimizationEnd) {
+            onOptimizationEnd();
+        }
+    }, [onOptimizationEnd]);
+
+    // Handle iteration updates
+    const handleIterationUpdate = useCallback((iteration: number) => {
+        setIterationCount(iteration);
+
+        // Call parent handler if provided
+        if (onIterationUpdate) {
+            onIterationUpdate(iteration);
+        }
+    }, [onIterationUpdate]);
+
+    // Handle auto-start if enabled
+    useEffect(() => {
+        if (autoStartRef.current && isDataReady && !hasTriggeredAutoStartRef.current && !runningOptimization) {
+            // Set a small timeout to ensure the component is fully rendered
+            const timer = setTimeout(() => {
+                console.log("Auto-starting optimization");
+                hasTriggeredAutoStartRef.current = true;
+                handleOptimizationStart();
+            }, 500);
+
+            return () => clearTimeout(timer);
+        }
+    }, [isDataReady, runningOptimization, handleOptimizationStart]);
 
     if (!isDataReady) {
         return (
@@ -164,14 +268,21 @@ const KGridApp: React.FC<KGridAppProps> = ({
     }
 
     return (
-        <div style={{
-            position: expanded ? 'fixed' : 'relative',
-            inset: expanded ? 0 : 'auto',
-            zIndex: expanded ? 50 : 'auto',
-            backgroundColor: expanded ? 'white' : 'transparent',
-            padding: expanded ? '24px' : 0,
-            overflow: expanded ? 'auto' : 'visible'
-        }}>
+        <div
+            ref={containerRef}
+            style={{
+                position: expanded ? 'fixed' : 'relative',
+                inset: expanded ? 0 : 'auto',
+                zIndex: expanded ? 50 : 'auto',
+                backgroundColor: expanded ? 'white' : 'transparent',
+                padding: expanded ? '24px' : 0,
+                overflow: expanded ? 'auto' : 'visible',
+                height: expanded ? '100vh' : 'auto',
+                minHeight: '500px', // Minimum height to prevent layout jumps
+                display: 'flex',
+                flexDirection: 'column'
+            }}
+        >
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -186,98 +297,33 @@ const KGridApp: React.FC<KGridAppProps> = ({
                     gap: '8px',
                     margin: 0
                 }}>
-                    <Dna size={20} style={{color: '#2563eb'}} />
+                    <Dna size={20} style={{color: '#2563eb'}}/>
                     K-Grid Clustering Visualization
                 </h2>
-                <button
-                    onClick={toggleExpanded}
-                    style={{
-                        padding: '8px',
-                        color: '#6b7280',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        borderRadius: '50%',
-                        cursor: 'pointer'
-                    }}
-                    title={expanded ? "Exit fullscreen" : "View fullscreen"}
-                >
-                    {expanded ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-                </button>
             </div>
 
-            {dataQualityWarning && (
-                <div style={{
-                    backgroundColor: '#fff3cd',
-                    color: '#856404',
-                    padding: '16px',
-                    borderRadius: '4px',
-                    marginBottom: '16px',
-                    border: '1px solid #ffeeba',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px'
-                }}>
-                    <AlertTriangle size={16} />
-                    <div>
-                        <div style={{fontWeight: 'bold', marginBottom: '4px'}}>Data Quality Warning</div>
-                        <div>{dataQualityWarning}</div>
-                        <div style={{marginTop: '8px', fontSize: '14px'}}>
-                            K-Grid works best with data that has well-differentiated similarity relationships.
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div style={{
-                padding: '16px',
-                backgroundColor: '#eff6ff',
-                borderRadius: '8px',
-                marginBottom: '24px'
-            }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px'
-                }}>
-                    <HelpCircle size={20} style={{color: '#2563eb', flexShrink: 0, marginTop: '4px'}} />
-                    <div>
-                        <h3 style={{
-                            fontWeight: '500',
-                            color: '#1e40af',
-                            margin: 0
-                        }}>How to Read This Visualization</h3>
-                        <p style={{
-                            marginTop: '4px',
-                            color: '#1e3a8a',
-                            fontSize: '14px'
-                        }}>
-                            This visualization shows two K-Grid optimizations running independently. Both grids
-                            attempt to arrange items so that similar ones (with lower NCD values) are placed
-                            next to each other. If both grids converge to the same arrangement, it indicates
-                            a strong clustering pattern in the data.
-                        </p>
-                        <p style={{
-                            marginTop: '8px',
-                            color: '#1e3a8a',
-                            fontSize: '14px'
-                        }}>
-                            Items with similar colors represent similar entities. The closer items are positioned
-                            to each other, the more similar their content is according to Normalized Compression
-                            Distance (NCD).
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div style={{
-                height: expanded ? 'calc(100vh - 220px)' : '600px'
-            }}>
+            <div
+                ref={gridContainerRef}
+                style={{
+                    flex: '1',
+                    minHeight: '500px',
+                    position: 'relative',
+                    className: 'k-grid-content'
+                }}
+            >
                 <KGridDualOptimization
                     width={displayWidth}
                     height={displayHeight}
                     objects={gridObjects}
                     maxIterations={maxIterations}
-                    ncdMatrixOverride={ncdMatrixOverride}
+                    onOptimizationStart={handleOptimizationStart}
+                    onOptimizationEnd={handleOptimizationEnd}
+                    onIterationUpdate={handleIterationUpdate}
+                    autoStart={autoStart && !hasTriggeredAutoStartRef.current}
+                    iterationsPerSecond={iterationsPerSecond}
+                    totalExecutionTime={totalExecutionTime}
+                    optimizationStartTime={optimizationStartTime}
+                    optimizationEndTime={optimizationEndTime}
                 />
             </div>
 
@@ -289,11 +335,12 @@ const KGridApp: React.FC<KGridAppProps> = ({
             }}>
                 <p style={{margin: 0}}>
                     Using {displayWidth}×{displayHeight} grid to visualize {gridObjects.length} items.
-                    Max iterations: {maxIterations}.
+                    Max iterations: {maxIterations.toLocaleString()}.
                 </p>
             </div>
         </div>
     );
-};
+}
+;
 
 export default KGridApp;

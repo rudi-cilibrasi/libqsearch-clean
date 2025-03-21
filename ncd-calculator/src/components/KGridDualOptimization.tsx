@@ -1,12 +1,10 @@
-import React, {useEffect, useState, useCallback, useMemo} from "react";
+import React, {useEffect, useState, useCallback, useMemo, useRef} from "react";
 import {
     GridObject,
     GridState,
-    calculateMatchPercentage,
-    ensureStringIds,
     createSafeInitialGrid,
     optimizeStep,
-    calculateObjectiveWithSymmetryBreaking,
+    calculateObjectiveWithSymmetryBreaking, createGradualFactorMatrix, deepCopy, calculateGridSimilarity,
 } from "@/services/kgrid.ts";
 import {GridDisplay} from "./GridDisplay";
 
@@ -15,6 +13,14 @@ interface KGridDualOptimizationProps {
     height: number;
     objects: GridObject[];
     maxIterations: number;
+    onOptimizationStart?: () => void;
+    onOptimizationEnd?: () => void;
+    onIterationUpdate?: (iteration: number) => void;
+    autoStart?: boolean;
+    optimizationEndTime?: number;
+    optimizationStartTime?: number;
+    totalExecutionTime?: number;
+    iterationsPerSecond?: number
 }
 
 export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
@@ -22,35 +28,53 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                                                                                 height = 3,
                                                                                 objects,
                                                                                 maxIterations = 50000,
+                                                                                onOptimizationStart,
+                                                                                onOptimizationEnd,
+                                                                                onIterationUpdate,
+                                                                                autoStart = false,
+                                                                                optimizationEndTime,
+                                                                                totalExecutionTime,
+                                                                                iterationsPerSecond,
+                                                                                optimizationStartTime
                                                                             }) => {
+    // Main grid states
     const [gridState1, setGridState1] = useState<GridState | null>(null);
     const [gridState2, setGridState2] = useState<GridState | null>(null);
+
+    // Tracking and control states
     const [iterations, setIterations] = useState(0);
     const [isRunning, setIsRunning] = useState(false);
     const [converged, setConverged] = useState(false);
     const [convergenceType, setConvergenceType] = useState("");
     const [matchPercentage, setMatchPercentage] = useState(0);
+
+    // Best state tracking
     const [bestObjective1, setBestObjective1] = useState(Number.MAX_VALUE);
     const [bestObjective2, setBestObjective2] = useState(Number.MAX_VALUE);
     const [bestGrid1, setBestGrid1] = useState<GridState | null>(null);
     const [bestGrid2, setBestGrid2] = useState<GridState | null>(null);
-    const [renderKey, setRenderKey] = useState(0);
 
+    // UI state
+    const [grid1Version, setGrid1Version] = useState(0);
+    const [grid2Version, setGrid2Version] = useState(0);
 
-    const updateGrids = (grid1: GridState, grid2: GridState) => {
-        const copiedGrid1 = JSON.parse(JSON.stringify(grid1));
-        const copiedGrid2 = JSON.parse(JSON.stringify(grid2));
-        setGridState1(ensureStringIds(copiedGrid1));
-        setGridState2(ensureStringIds(copiedGrid2));
+    // Performance tracking
+    const [lastAcceptedSwap1, setLastAcceptedSwap1] = useState<number | null>(null);
+    const [lastAcceptedSwap2, setLastAcceptedSwap2] = useState<number | null>(null);
 
-        setRenderKey(prev => prev + 1);
-    };
+    // Use refs for interval timers to avoid closure issues
+    const animationFrameRef = useRef<number | null>(null);
+    const lastUpdateTimeRef = useRef<number>(Date.now());
+    const autoStartRef = useRef(autoStart);
+    const hasStartedRef = useRef(false);
 
-    // Create a stable objects by ID mapping to prevent re-renders with new object references
+    // Track last grid states to detect meaningful changes
+    const lastGrid1Ref = useRef<number[][] | null>(null);
+    const lastGrid2Ref = useRef<number[][] | null>(null);
+
+    // Create a stable objects by ID mapping
     const objectsById = useMemo(() => {
         const mapping: Record<string, { label: string; content: string }> = {};
-
-        // Process all objects and ensure IDs are strings
         objects.forEach((obj) => {
             const stringId = String(obj.id);
             mapping[stringId] = {
@@ -58,75 +82,80 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                 content: obj.content || "",
             };
         });
-
-        console.log("Created objectsById mapping with keys:", Object.keys(mapping));
         return mapping;
     }, [objects]);
 
-    // Initialize grid states
-    const initializeGrid = useCallback(() => {
+    // Initialize a new grid
+    const initializeGrid = useCallback((factorMatrix: number[][]) => {
         console.log("Initializing grid with objects:", objects.length);
         const processedObjects = objects.map(obj => ({
             ...obj,
-            id: String(obj.id)
+            id: obj.id
         }));
         const grid = createSafeInitialGrid(width, height, processedObjects);
-        grid.objectiveValue = calculateObjectiveWithSymmetryBreaking(grid);
-        return ensureStringIds(grid);
+        grid.objectiveValue = calculateObjectiveWithSymmetryBreaking(grid, factorMatrix);
+        return grid;
     }, [width, height, objects]);
 
-    const updateMatchPercentage = useCallback(() => {
-        if (!gridState1 || !gridState2) return 0;
-
-        const currentMatchPercentage = calculateMatchPercentage(gridState1, gridState2);
-        setMatchPercentage(currentMatchPercentage);
-        return currentMatchPercentage;
-    }, [gridState1, gridState2]);
-
+    // Check for convergence between the two grids
     const checkConvergence = useCallback(() => {
         if (!gridState1 || !gridState2) return false;
 
-        const currentMatchPercentage = updateMatchPercentage();
-
+        // Update best states if needed
         if (gridState1.objectiveValue < bestObjective1) {
             setBestObjective1(gridState1.objectiveValue);
-            setBestGrid1(ensureStringIds(gridState1));
+            setBestGrid1(deepCopy(gridState1));
+            setLastAcceptedSwap1(iterations);
             console.log(`New best for Grid 1: ${gridState1.objectiveValue.toFixed(4)}`);
         }
 
         if (gridState2.objectiveValue < bestObjective2) {
             setBestObjective2(gridState2.objectiveValue);
-            setBestGrid2(ensureStringIds(gridState2));
+            setBestGrid2(deepCopy(gridState2));
+            setLastAcceptedSwap2(iterations);
             console.log(`New best for Grid 2: ${gridState2.objectiveValue.toFixed(4)}`);
         }
 
-        // Check for exact match (100% convergence)
-        if (currentMatchPercentage === 1) {
-            console.error("grid 1 content: " + JSON.stringify(gridState1.grid) + ", object mapped by id: " + JSON.stringify(objectsById) + "grid 2 content: " + JSON.stringify(gridState2.grid) + ", object mapped by id: " + JSON.stringify(objectsById) + "");
+        // Calculate similarity between grids
+        const currentSimilarity = calculateGridSimilarity(gridState1, gridState2);
+        setMatchPercentage(currentSimilarity);
+
+        // Check for termination conditions
+        if (currentSimilarity === 1) {
+            console.log("Grids have converged to identical arrangements");
             setConverged(true);
             setConvergenceType("exact match");
             setIsRunning(false);
-            updateGrids(gridState1, gridState2);
+            if (onOptimizationEnd) {
+                onOptimizationEnd();
+            }
             return true;
         }
 
-        // Check if we've reached max iterations
         if (iterations >= maxIterations) {
+            console.log("Maximum iterations reached");
             setConverged(true);
             setConvergenceType("max iterations reached");
             setIsRunning(false);
+            if (onOptimizationEnd) {
+                onOptimizationEnd();
+            }
             return true;
         }
 
-        // After 80% of max iterations, accept high objective similarity as convergence
-        if (iterations > maxIterations * 0.8 &&
-            Math.abs(gridState1.objectiveValue - gridState2.objectiveValue) < 0.0001 &&
-            iterations % 1000 === 0) {
+        // Check if we've gone too long without improvement
+        const iterationsSinceLastImprovement1 = lastAcceptedSwap1 !== null ? iterations - lastAcceptedSwap1 : 0;
+        const iterationsSinceLastImprovement2 = lastAcceptedSwap2 !== null ? iterations - lastAcceptedSwap2 : 0;
 
-            console.log("Accepting convergence based on objective value equality");
+        // If both grids haven't improved in 10,000 iterations, consider convergence
+        if (iterationsSinceLastImprovement1 > 10000 && iterationsSinceLastImprovement2 > 10000) {
+            console.log("Optimization stalled - no improvement in 10,000 iterations");
             setConverged(true);
-            setConvergenceType("objective value convergence");
+            setConvergenceType("optimization stalled");
             setIsRunning(false);
+            if (onOptimizationEnd) {
+                onOptimizationEnd();
+            }
             return true;
         }
 
@@ -138,120 +167,214 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         maxIterations,
         bestObjective1,
         bestObjective2,
-        bestGrid1,
-        bestGrid2,
-        updateMatchPercentage
+        lastAcceptedSwap1,
+        lastAcceptedSwap2,
+        onOptimizationEnd
     ]);
 
+    // Perform one optimization step for a grid
+    const performOptimizationStep = useCallback((gridState: GridState, iteration: number) => {
+        if (!gridState) return null;
+
+        // Perform the optimization step (which returns a new grid state)
+        const updatedGrid = optimizeStep(gridState, iteration);
+
+        // Always return a new object to ensure React detects the change
+        return {
+            ...updatedGrid,
+            grid: [...updatedGrid.grid.map(row => [...row])],
+            // Use new map objects to ensure reference change
+            idToIndexMap: new Map(updatedGrid.idToIndexMap),
+            indexToIdMap: new Map(updatedGrid.indexToIdMap)
+        };
+    }, []);
+
+
+    // Main optimization loop using requestAnimationFrame for smoother updates
     useEffect(() => {
         if (!isRunning || !gridState1 || !gridState2) return;
-        const optimizationTimer = setInterval(() => {
-            setGridState1((prevGrid) => {
-                if (!prevGrid) return prevGrid;
 
-                return optimizeStep(prevGrid, iterations, bestGrid1);
-            });
+        const runOptimizationStep = () => {
+            // Ensure minimum time between updates for UI responsiveness
+            const now = Date.now();
+            const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
 
-            setGridState2((prevGrid) =>
-                prevGrid ? optimizeStep(prevGrid, iterations, bestGrid2) : prevGrid
-            );
+            // Update grid states with new optimized versions
+            const newGrid1 = performOptimizationStep(gridState1, iterations);
+            const newGrid2 = performOptimizationStep(gridState2, iterations);
 
-            setRenderKey(prev => prev + 1);
-            setIterations((prev) => prev + 1);
+                // Check if grids have actually changed
 
+                    setGridState1(newGrid1);
+                    setGridState2(newGrid2);
+
+                // Update iteration counter and notify parent
+                setIterations(prev => {
+                    const newIteration = prev + 1;
+                    if (onIterationUpdate) {
+                        onIterationUpdate(newIteration);
+                    }
+                    return newIteration;
+                });
+
+                // Update the last update time
+                lastUpdateTimeRef.current = now;
+
+            // Check for convergence
             if (checkConvergence()) {
-                clearInterval(optimizationTimer);
+                if (animationFrameRef.current) {
+                    cancelAnimationFrame(animationFrameRef.current);
+                    animationFrameRef.current = null;
+                }
+                return;
             }
-        }, 1);
 
-        return () => clearInterval(optimizationTimer);
-    }, [isRunning, iterations, gridState1, gridState2, checkConvergence, bestGrid1, bestGrid2]);
+            // Schedule the next frame
+            animationFrameRef.current = requestAnimationFrame(runOptimizationStep);
+        };
 
+        // Start the animation loop
+        animationFrameRef.current = requestAnimationFrame(runOptimizationStep);
 
+        // Cleanup on unmount or when optimization stops
+        return () => {
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
+        };
+    }, [isRunning, gridState1, gridState2, iterations, performOptimizationStep, checkConvergence, onIterationUpdate]);
+
+    // Handle auto-start
     useEffect(() => {
-        if (!isRunning || !gridState1 || !gridState2) return;
-        const optimizationTimer = setInterval(() => {
-            setGridState1((prevGrid) =>
-                prevGrid ? optimizeStep(prevGrid, iterations, bestGrid1) : prevGrid
-            );
-
-            setGridState2((prevGrid) =>
-                prevGrid ? optimizeStep(prevGrid, iterations, bestGrid2) : prevGrid
-            );
-
-            setRenderKey(prev => prev + 1);
-
-            setIterations((prev) => prev + 1);
-
-            if (checkConvergence()) {
-                clearInterval(optimizationTimer);
+        if (autoStartRef.current && !hasStartedRef.current && gridState1 && gridState2) {
+            console.log("Auto-starting optimization");
+            hasStartedRef.current = true;
+            setIsRunning(true);
+            if (onOptimizationStart) {
+                onOptimizationStart();
             }
-        }, 1);
+        }
+    }, [gridState1, gridState2, onOptimizationStart]);
 
-        return () => clearInterval(optimizationTimer);
-    }, [isRunning, iterations, gridState1, gridState2, optimizeStep, checkConvergence, bestGrid1, bestGrid2]);
-
+    // Start a new optimization run
     const startOptimization = () => {
         try {
-            const initialGrid1 = initializeGrid();
-            const initialGrid2 = initializeGrid();
+            // Clear any existing animation frame
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
 
+            // Reset all state variables
+            setIterations(0);
+            setConverged(false);
+            setConvergenceType("");
+            setBestObjective1(Number.MAX_VALUE);
+            setBestObjective2(Number.MAX_VALUE);
+            setBestGrid1(null);
+            setBestGrid2(null);
+            setGrid1Version(0);
+            setGrid2Version(0);
+            setLastAcceptedSwap1(null);
+            setLastAcceptedSwap2(null);
+            lastGrid1Ref.current = null;
+            lastGrid2Ref.current = null;
+
+            // Create new initial grids
+            const precomputedGradualFactor = createGradualFactorMatrix(width, height);
+            const initialGrid1 = initializeGrid(precomputedGradualFactor);
+            const initialGrid2 = initializeGrid(precomputedGradualFactor);
+
+            // Update grid states
             setGridState1(initialGrid1);
             setGridState2(initialGrid2);
+
+            // Store initial grid layouts
+            lastGrid1Ref.current = initialGrid1.grid.map(row => [...row]);
+            lastGrid2Ref.current = initialGrid2.grid.map(row => [...row]);
+
+            // Start optimization
+            lastUpdateTimeRef.current = Date.now();
             setIsRunning(true);
 
-            console.log(
-                "Grid 1 content:",
-                initialGrid1.grid
-                    .flat()
-                    .map((id) => `${id}:${objectsById[id]?.label || "unknown"}`)
-            );
-            console.log(
-                "Grid 2 content:",
-                initialGrid2.grid
-                    .flat()
-                    .map((id) => `${id}:${objectsById[id]?.label || "unknown"}`)
-            );
+            // Notify parent about optimization start
+            if (onOptimizationStart) {
+                onOptimizationStart();
+            }
+
+            console.log("Started new optimization with initial grids:");
+            console.log("Grid 1:", JSON.stringify(initialGrid1.grid));
+            console.log("Grid 2:", JSON.stringify(initialGrid2.grid));
         } catch (error) {
             console.error("Error initializing grids:", error);
             setConvergenceType(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+
+            // Notify parent about optimization end
+            if (onOptimizationEnd) {
+                onOptimizationEnd();
+            }
         }
     }
 
-
-    useEffect(() => {
-        if (!isRunning || !gridState1 || !gridState2) return;
-
-        const optimizationTimer = setInterval(() => {
-            setGridState1((prevGrid) => {
-                if (!prevGrid) return prevGrid;
-
-                return optimizeStep(prevGrid, iterations, bestGrid1);
-            });
-
-            setGridState2((prevGrid) => {
-                if (!prevGrid) return prevGrid;
-
-                return optimizeStep(prevGrid, iterations, bestGrid2);
-            });
-
-            setRenderKey(prev => prev + 1);
-            setIterations((prev) => prev + 1);
-
-            if (checkConvergence()) {
-                clearInterval(optimizationTimer);
-            }
-        }, 1);
-
-        return () => clearInterval(optimizationTimer);
-    }, [isRunning, iterations, gridState1, gridState2, checkConvergence, bestGrid1, bestGrid2]);
-
+    // Stop the current optimization run
     const stopOptimization = () => {
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
         setIsRunning(false);
+
+        // Notify parent about optimization end
+        if (onOptimizationEnd) {
+            onOptimizationEnd();
+        }
+    };
+
+    // Initialize grids when component mounts
+    useEffect(() => {
+        try {
+            const precomputedGradualFactor = createGradualFactorMatrix(width, height);
+            const initialGrid1 = initializeGrid(precomputedGradualFactor);
+            const initialGrid2 = initializeGrid(precomputedGradualFactor);
+
+            setGridState1(initialGrid1);
+            setGridState2(initialGrid2);
+
+            lastGrid1Ref.current = initialGrid1.grid.map(row => [...row]);
+            lastGrid2Ref.current = initialGrid2.grid.map(row => [...row]);
+
+            console.log("Initial grids created");
+        } catch (error) {
+            console.error("Error creating initial grids:", error);
+        }
+    }, [width, height, initializeGrid]);
+
+    // Clean up when component unmounts
+    useEffect(() => {
+        return () => {
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
+        };
+    }, []);
+
+
+    // Format time display - converts ms to a readable format
+    const formatTime = (ms: number | undefined): string => {
+        if (ms === null) return "0:00";
+
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
     return (
-        <div style={{fontFamily: 'system-ui, sans-serif', width: '100%', height: '100%'}}>
+        <div className="k-grid-content"
+             style={{fontFamily: 'system-ui, sans-serif', width: '100%', height: '100%', minHeight: '500px'}}>
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -265,6 +388,26 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                         <div style={{fontWeight: 'bold'}}>
                             Status: {isRunning ? "Running" : converged ? "Converged" : "Ready"}
                         </div>
+                        {optimizationStartTime && (
+                            <>
+                                <div style={{
+                                    marginRight: "15px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center"
+                                }}>
+                                    <span style={{fontWeight: "bold"}}>Running Time</span>
+                                    <span>{optimizationEndTime ? formatTime(totalExecutionTime) : formatTime(Date.now() - optimizationStartTime)}</span>
+                                </div>
+
+                                {iterationsPerSecond !== null && (
+                                    <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
+                                        <span style={{fontWeight: "bold"}}>Iterations/sec</span>
+                                        <span>{Math.round(iterationsPerSecond || 0).toLocaleString()}</span>
+                                    </div>
+                                )}
+                            </>
+                        )}
                         {converged && (
                             <div style={{fontSize: '0.875rem'}}>
                                 Convergence type: {convergenceType}
@@ -273,7 +416,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                     </div>
 
                     <div>
-                        <div style={{fontWeight: 'bold'}}>Iterations: {iterations}</div>
+                        <div style={{fontWeight: 'bold'}}>Iterations: {iterations.toLocaleString()}</div>
                         <div style={{fontSize: '0.875rem'}}>
                             Match percentage: {(matchPercentage * 100).toFixed(2)}%
                         </div>
@@ -343,11 +486,14 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                 minHeight: '300px'
             }}>
                 <div style={{flex: '1', display: 'flex', flexDirection: 'column'}}>
-                    <h4 style={{textAlign: 'center', margin: '0 0 8px 0'}}>Grid 1</h4>
+                    <h4 style={{textAlign: 'center', margin: '0 0 8px 0'}}>
+                        Grid 1 {grid1Version > 0 &&
+                        <span style={{fontSize: '0.75rem', color: '#666'}}>v{grid1Version}</span>}
+                    </h4>
                     <div style={{flex: '1', border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden'}}>
                         {gridState1 ? (
                             <GridDisplay
-                                key={`grid1-${renderKey}`}
+                                key={`grid1-${grid1Version}-${iterations}`}
                                 grid={gridState1}
                                 objectsById={objectsById}
                                 iterations={iterations}
@@ -368,11 +514,14 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                 </div>
 
                 <div style={{flex: '1', display: 'flex', flexDirection: 'column'}}>
-                    <h4 style={{textAlign: 'center', margin: '0 0 8px 0'}}>Grid 2</h4>
+                    <h4 style={{textAlign: 'center', margin: '0 0 8px 0'}}>
+                        Grid 2 {grid2Version > 0 &&
+                        <span style={{fontSize: '0.75rem', color: '#666'}}>v{grid2Version}</span>}
+                    </h4>
                     <div style={{flex: '1', border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden'}}>
                         {gridState2 ? (
                             <GridDisplay
-                                key={`grid2-${renderKey}`}
+                                key={`grid2-${grid2Version}-${iterations}`}
                                 grid={gridState2}
                                 objectsById={objectsById}
                                 iterations={iterations}
@@ -392,45 +541,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                     </div>
                 </div>
             </div>
-
-            <div style={{
-                backgroundColor: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '4px',
-                marginTop: '16px'
-            }}>
-                <h4 style={{marginTop: 0}}>Dual-Grid Optimization Explained</h4>
-                <p style={{fontSize: '0.875rem', lineHeight: '1.5'}}>
-                    This implementation runs two independent optimizations starting from
-                    different random arrangements. The algorithm requires that both grids
-                    converge to exactly the same arrangement, providing strong evidence
-                    that we've found the global optimum.
-                </p>
-                <p style={{fontSize: '0.875rem', lineHeight: '1.5'}}>For proper convergence, the input data should
-                    contain files that:</p>
-                <ul style={{fontSize: '0.875rem', lineHeight: '1.5'}}>
-                    <li>Are larger than 1KB when possible</li>
-                    <li>
-                        Contain meaningful information (don't compress too efficiently)
-                    </li>
-                    <li>
-                        Have unique characteristics that differentiate them from other files
-                    </li>
-                </ul>
-                <p style={{fontSize: '0.875rem', lineHeight: '1.5'}}>The algorithm will stop when either:</p>
-                <ul style={{fontSize: '0.875rem', lineHeight: '1.5'}}>
-                    <li>Both grids match exactly (100% identical arrangement)</li>
-                    <li>Maximum iterations ({maxIterations}) are reached</li>
-                </ul>
-                <p style={{fontSize: '0.875rem', lineHeight: '1.5'}}>
-                    If the algorithm fails to converge, it indicates that your input data
-                    might have symmetries that create multiple equally optimal
-                    arrangements. Consider using more information-rich files if you
-                    encounter this issue.
-                </p>
-            </div>
         </div>
     );
 };
-
-export default KGridDualOptimization;

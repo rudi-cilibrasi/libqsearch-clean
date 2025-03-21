@@ -1,16 +1,41 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useState, useRef} from "react";
 import {GridObject} from "@/services/kgrid.ts";
 import KGridApp from "@/components/KGridApp.tsx";
 import {LabelManager} from "@/functions/labelUtils.ts";
 
-export const KGridVisualizer: React.FC<{
-    labels: string[],
-    ncdMatrix: number[][],
-    labelManager: LabelManager
-}> = ({labels, ncdMatrix, labelManager}) => {
+interface KGridVisualizerProps {
+    labels: string[];
+    ncdMatrix: number[][];
+    labelManager: LabelManager;
+    onOptimizationStart?: () => void;
+    onOptimizationEnd?: () => void;
+    optimizationStartTime?: number;
+    optimizationEndTime?: number;
+    totalExecutionTime?: number;
+    iterationsPerSecond?: number
+    onIterationUpdate?: (iteration: number) => void;
+    autoStart?: boolean;
+}
+
+export const KGridVisualizer: React.FC<KGridVisualizerProps> = ({
+                                                                    labels,
+                                                                    ncdMatrix,
+                                                                    labelManager,
+                                                                    onOptimizationStart,
+                                                                    onOptimizationEnd,
+                                                                    onIterationUpdate,
+                                                                    autoStart = false,
+                                                                    optimizationStartTime,
+                                                                    totalExecutionTime,
+                                                                    iterationsPerSecond,
+                                                                    optimizationEndTime
+                                                                }) => {
     const [gridObjects, setGridObjects] = useState<GridObject[]>([]);
     const [isDataReady, setIsDataReady] = useState(false);
+    const [hasStartedOptimization, setHasStartedOptimization] = useState(false);
+    const autoStartRef = useRef(autoStart);
 
+    // This effect runs when labels or ncdMatrix change
     useEffect(() => {
         if (!labels || !ncdMatrix || labels.length === 0 || ncdMatrix.length === 0) {
             setIsDataReady(false);
@@ -86,6 +111,8 @@ export const KGridVisualizer: React.FC<{
 
             setGridObjects(objects);
             setIsDataReady(true);
+            // Reset the optimization start flag when new data is loaded
+            setHasStartedOptimization(false);
 
             console.log('Data prepared for KGridApp:', {
                 objects,
@@ -96,8 +123,46 @@ export const KGridVisualizer: React.FC<{
             console.error('Error preparing data for KGrid:', e);
             setIsDataReady(false);
         }
-    }, [labels, ncdMatrix]);
+    }, [labels, ncdMatrix, labelManager]);
 
+    // This effect handles auto-start functionality
+    useEffect(() => {
+        // Only auto-start if:
+        // 1. autoStart is true
+        // 2. Data is ready
+        // 3. We haven't already started optimization in this session
+        if (autoStartRef.current && isDataReady && !hasStartedOptimization) {
+            // Small delay to ensure UI is ready
+            const timer = setTimeout(() => {
+                setHasStartedOptimization(true);
+                if (onOptimizationStart) {
+                    onOptimizationStart();
+                }
+            }, 500);
+
+            return () => clearTimeout(timer);
+        }
+    }, [isDataReady, hasStartedOptimization, onOptimizationStart]);
+
+    // Handle optimization events from KGridApp
+    const handleOptimizationStart = () => {
+        setHasStartedOptimization(true);
+        if (onOptimizationStart) {
+            onOptimizationStart();
+        }
+    };
+
+    const handleOptimizationEnd = () => {
+        if (onOptimizationEnd) {
+            onOptimizationEnd();
+        }
+    };
+
+    const handleIterationUpdate = (iteration: number) => {
+        if (onIterationUpdate) {
+            onIterationUpdate(iteration);
+        }
+    };
 
     if (!isDataReady) {
         return (
@@ -122,32 +187,22 @@ export const KGridVisualizer: React.FC<{
         <div className="mt-8">
             <div className="bg-blue-900 p-6 rounded-lg shadow-lg">
                 <h2 className="text-2xl font-bold mb-4">Animal Genome Similarity Visualization</h2>
-                <p className="text-gray-600 mb-6">
-                    This visualization shows the relationship between animal genomes based on
-                    Normalized Compression Distance (NCD). Similar animals are placed closer together
-                    in the grid arrangement. The algorithm starts with two random arrangements and
-                    optimizes them until they converge to the same pattern.
-                </p>
-
-                {/* Pass the transformed data to KGridApp */}
                 <KGridApp
                     width={width}
                     height={height}
                     objects={gridObjects}
                     ncdMatrixOverride={ncdMatrix}
                     maxIterations={50000}
+                    onOptimizationStart={handleOptimizationStart}
+                    onOptimizationEnd={handleOptimizationEnd}
+                    onIterationUpdate={handleIterationUpdate}
+                    optimizationStartTime={optimizationStartTime}
+                    optimizationEndTime={optimizationEndTime}
+                    totalExecutionTime={totalExecutionTime}
+                    iterationsPerSecond={iterationsPerSecond}
+                    autoStart={autoStartRef.current && !hasStartedOptimization}
                 />
-
-                <div className="mt-6 bg-blue-50 p-4 rounded-md">
-                    <h3 className="font-medium text-blue-800 mb-2">How to Interpret This Visualization</h3>
-                    <p className="text-blue-700 text-sm">
-                        The K-Grid visualization arranges animals so that those with similar genomic
-                        patterns appear close to each other. Colors indicate different animal types,
-                        and both grids should eventually converge to the same arrangement if the
-                        data has clear similarity patterns.
-                    </p>
-                </div>
             </div>
         </div>
     );
-}
+};

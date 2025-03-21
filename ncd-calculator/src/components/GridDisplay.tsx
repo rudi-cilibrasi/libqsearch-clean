@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useMemo} from "react";
+import React from "react";
 import {GridState} from "@/services/kgrid.ts";
 
 interface GridDisplayProps {
@@ -7,27 +7,12 @@ interface GridDisplayProps {
     iterations: number
 }
 
-export const GridDisplay = ({ grid, objectsById, iterations }) => {
-    // Use useRef to track if we need to force an update
-    const lastDataHash = useRef("");
-    const [forceUpdateKey, setForceUpdateKey] = useState(0);
+export const GridDisplay: React.FC<GridDisplayProps> = ({ grid, objectsById, iterations }) => {
+    // For debugging - log the grid content
+    console.log(`Rendering grid at iteration ${iterations}, grid data:`,
+        JSON.stringify(grid.grid));
 
-    // Generate a hash of the current grid data to detect changes
-    const currentDataHash = useMemo(() => {
-        if (!grid || !grid.grid) return "";
-        return JSON.stringify(grid.grid);
-    }, [grid]);
-
-    // Force re-render whenever the grid data actually changes
-    // This ensures the display updates even when React doesn't detect changes
-    useEffect(() => {
-        if (lastDataHash.current !== currentDataHash) {
-            lastDataHash.current = currentDataHash;
-            setForceUpdateKey(prev => prev + 1);
-        }
-    }, [currentDataHash, iterations]);
-
-    // If grid is not ready yet, show loading
+    // Early return if grid data isn't available
     if (!grid || !grid.grid || grid.grid.length === 0) {
         return (
             <div style={{
@@ -43,23 +28,25 @@ export const GridDisplay = ({ grid, objectsById, iterations }) => {
         );
     }
 
-    // Generate a color based on the label
-    const getColorForLabel = (label) => {
+    // Generate a color based on the label with improved contrast
+    const getColorForLabel = (label: string) => {
         let hash = 0;
         for (let i = 0; i < label.length; i++) {
             hash = label.charCodeAt(i) + ((hash << 5) - hash);
         }
         const h = Math.abs(hash % 360);
-        return `hsl(${h}, 70%, 80%)`;
+        // Increase saturation and reduce lightness for better visibility
+        return `hsl(${h}, 80%, 75%)`;
     };
 
-    // Log the actual grid data being rendered for debugging
-    console.log(`Rendering grid with key ${forceUpdateKey}, iteration ${iterations}:`,
-        JSON.stringify(grid.grid));
+    // Calculate transition duration based on iterations (faster at start, slower later)
+    const getTransitionDuration = () => {
+        // Start with faster transitions, slow down as optimization progresses
+        return Math.min(0.3, 0.1 + (iterations / 10000) * 0.2);
+    };
 
     return (
         <div
-            key={`grid-display-${forceUpdateKey}`}
             style={{
                 display: "grid",
                 gridTemplateColumns: `repeat(${grid.width}, 1fr)`,
@@ -73,19 +60,14 @@ export const GridDisplay = ({ grid, objectsById, iterations }) => {
             }}
         >
             {grid.grid.map((row, i) =>
-                row.map((id, j) => {
-                    // Ensure ID is a string
-                    const stringId = String(id);
+                row.map((indexId, j) => {
+                    // Generate a unique key that changes when cell content changes
+                    const cellKey = `cell-${i}-${j}-${indexId}-${iterations}`;
+                    const objectId = grid.indexToIdMap.get(indexId) || '';
+                    const object = objectsById[objectId];
 
-                    // Find the object data
-                    const object = objectsById[stringId];
-
-                    // Unique and consistent key for each cell
-                    const cellKey = `cell-${i}-${j}-${forceUpdateKey}-${stringId}`;
-
-                    // Handle missing objects gracefully
                     if (!object) {
-                        console.error(`Missing object for ID: ${stringId} at position (${i},${j})`);
+                        console.error(`Missing object for ID: ${indexId} (${objectId}) at position (${i},${j})`);
                         return (
                             <div
                                 key={cellKey}
@@ -102,15 +84,12 @@ export const GridDisplay = ({ grid, objectsById, iterations }) => {
                                 }}
                             >
                                 <div style={{ fontWeight: "bold" }}>Error</div>
-                                <div>Missing: {stringId}</div>
+                                <div>Missing: {indexId}</div>
                             </div>
                         );
                     }
 
-                    // Generate a color based on the label
                     const cellColor = getColorForLabel(object.label);
-
-                    // Truncate content for display
                     const shortContent = object.content?.length > 40
                         ? object.content.substring(0, 40) + "..."
                         : object.content || "";
@@ -130,8 +109,21 @@ export const GridDisplay = ({ grid, objectsById, iterations }) => {
                                 fontSize: "12px",
                                 minHeight: "80px",
                                 boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                transition: `all ${getTransitionDuration()}s ease-in-out`,
+                                position: "relative"
                             }}
                         >
+                            {/* Add a small position indicator in the corner */}
+                            <div style={{
+                                position: "absolute",
+                                top: "2px",
+                                right: "2px",
+                                fontSize: "9px",
+                                color: "rgba(0,0,0,0.5)"
+                            }}>
+                                ({i},{j})
+                            </div>
+
                             <div style={{
                                 fontWeight: "bold",
                                 marginBottom: "4px",
@@ -139,12 +131,6 @@ export const GridDisplay = ({ grid, objectsById, iterations }) => {
                                 textAlign: "center"
                             }}>
                                 {object.label}
-                            </div>
-                            <div style={{
-                                fontSize: "10px",
-                                opacity: 0.7,
-                            }}>
-                                ID: {stringId}
                             </div>
                             <div style={{
                                 fontSize: "10px",
@@ -157,6 +143,15 @@ export const GridDisplay = ({ grid, objectsById, iterations }) => {
                                 maxWidth: "100%"
                             }}>
                                 {shortContent}
+                            </div>
+
+                            {/* Add a small ID indicator at the bottom */}
+                            <div style={{
+                                marginTop: "4px",
+                                fontSize: "9px",
+                                opacity: 0.7
+                            }}>
+                                ID: {indexId}
                             </div>
                         </div>
                     );
