@@ -1,3 +1,5 @@
+// KGridVisualization.jsx
+
 import { useState, useEffect, useRef } from 'react';
 import { KGridDualOptimization } from './KGridDualOptimization';
 import { QSearchTree3D } from './QSearchTree3D';
@@ -5,7 +7,7 @@ import {
     Download,
     Upload,
 } from 'lucide-react';
-import {MatrixTable} from "@/components/MatrixTable.tsx";
+import { MatrixTable } from "@/components/MatrixTable.tsx";
 
 // Visualization types enum for better type safety
 const VisualizationType = {
@@ -51,6 +53,9 @@ const KGridVisualization = ({
     const [selectedCluster, setSelectedCluster] = useState(null);
     const [showHelp, setShowHelp] = useState(false);
 
+    // Track if optimization has been started manually
+    const manuallyStartedRef = useRef(false);
+
     // Update default view when tree data becomes available
     useEffect(() => {
         if (qSearchTreeResult && Object.keys(qSearchTreeResult).length > 0) {
@@ -66,11 +71,12 @@ const KGridVisualization = ({
     // Use a ref to track running state to avoid closure issues
     const isRunningRef = useRef(false);
 
-    // Handle optimization start
+    // Handle optimization start - should only happen when start button is clicked
     const handleOptimizationStart = () => {
         // Set running state
         setIsRunning(true);
         isRunningRef.current = true;
+        manuallyStartedRef.current = true;
 
         // Reset iteration counter
         setIterations(0);
@@ -110,7 +116,7 @@ const KGridVisualization = ({
         }
     };
 
-    // Handle iteration update
+    // Handle iteration update - also updates match percentage
     const handleIterationUpdate = (iteration) => {
         // Only update if still running
         if (!isRunningRef.current) return;
@@ -133,6 +139,14 @@ const KGridVisualization = ({
         if (onIterationUpdate) {
             onIterationUpdate(iteration);
         }
+    };
+
+    // Store the best match percentage
+    const bestMatchPercentageRef = useRef(0);
+
+    // Update matchPercentage from KGridDualOptimization
+    const handleMatchPercentageUpdate = (percentage) => {
+        setMatchPercentage(percentage);
     };
 
     // Format time display (mm:ss)
@@ -198,8 +212,7 @@ const KGridVisualization = ({
         );
     };
 
-
-    const getDisplayLabels = (ids: string[]): string[] => {
+    const getDisplayLabels = (ids) => {
         return ids.map(id => labelManager.getDisplayLabel(id) || 'Unknown');
     }
 
@@ -218,7 +231,7 @@ const KGridVisualization = ({
                     onIterationUpdate={handleIterationUpdate}
                     onCellSelect={handleCellSelect}
                     colorTheme={selectedTheme}
-                    autoStart={autoStart}
+                    autoStart={autoStart && !manuallyStartedRef.current}
                     optimizationStartTime={optimizationStartTime}
                     optimizationEndTime={optimizationEndTime}
                     totalExecutionTime={totalExecutionTime}
@@ -226,6 +239,7 @@ const KGridVisualization = ({
                     showSingleGrid={true}
                     isRunning={isRunning}
                     ncdMatrixResponse={ncdMatrixResponse}
+                    onMatchPercentageUpdate={handleMatchPercentageUpdate}
                 />
             </div>
         );
@@ -299,7 +313,7 @@ const KGridVisualization = ({
                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                         }`}
                     >
-                        Quartet Tree Visualization
+                        Tree Visualization
                     </button>
                     <button
                         onClick={() => setActiveViz(VisualizationType.KGRID)}
@@ -309,7 +323,7 @@ const KGridVisualization = ({
                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                         }`}
                     >
-                        K-Grid Visualization
+                        Grid Visualization
                     </button>
                     <button
                         onClick={() => setActiveViz(VisualizationType.MATRIX)}
@@ -326,7 +340,7 @@ const KGridVisualization = ({
 
             {/* Status Panel - Only for K-Grid visualization */}
             {activeViz === VisualizationType.KGRID && (
-                <div className="bg-blue-800 text-white p-3 border-b border-blue-900 flex justify-between items-center">
+                <div className="bg-blue-800 text-white border-b border-blue-900 flex justify-between items-center p-4">
                     <div className="flex items-center space-x-6">
                         <div className="flex items-center">
                             <span className="font-bold mr-2">Status:</span>
@@ -451,14 +465,16 @@ const KGridVisualization = ({
                         <div className="p-4 border-b border-gray-700">
                             <h4 className="font-bold mb-3 text-blue-300 text-base">Data</h4>
 
-                            <div className="flex gap-3">
-                                <button className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-base font-bold flex justify-center items-center">
-                                    <Upload size={16} className="mr-2" />
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    className="py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-sm font-bold flex justify-center items-center">
+                                    <Upload size={14} className="mr-1"/>
                                     Import
                                 </button>
 
-                                <button className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-base font-bold flex justify-center items-center">
-                                    <Download size={16} className="mr-2" />
+                                <button
+                                    className="py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-sm font-bold flex justify-center items-center">
+                                    <Download size={14} className="mr-1"/>
                                     Export
                                 </button>
                             </div>
@@ -478,7 +494,7 @@ const KGridVisualization = ({
 
                 {/* Main Visualization Area */}
                 <div className="flex-1 overflow-auto">
-                    {showHelp && (
+                {showHelp && (
                         <div className="bg-gray-800 p-4 border-l-4 border-yellow-500 mb-4 text-white text-left">
                             <h3 className="font-bold text-lg mb-2 text-yellow-300 text-center">About Genome Similarity Visualization</h3>
                             <p className="mb-2 text-base">
@@ -502,7 +518,7 @@ const KGridVisualization = ({
             </div>
 
             {/* Status Bar */}
-            <div className="bg-gray-900 text-gray-300 p-2 text-xs">
+            <div className="bg-gray-900 text-gray-300 p-2 text-xs mg-2">
                 <div className="flex justify-between items-center">
                     <div>
                         Status: {isRunning ? "Optimization running" : "Ready"} • Items: {ncdMatrixResponse?.labels.length || objects.length}
@@ -515,6 +531,5 @@ const KGridVisualization = ({
         </div>
     );
 };
-
 
 export default KGridVisualization;

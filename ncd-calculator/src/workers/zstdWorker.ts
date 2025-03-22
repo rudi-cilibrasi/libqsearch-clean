@@ -1,5 +1,7 @@
 // zstdWorker.ts
 /// <reference lib="webworker" />
+import {node} from "globals";
+
 declare const self: DedicatedWorkerGlobalScope;
 import {calculateCRC32, encodeText, getPairFileConcatenated, processChunk} from './shared/utils';
 import {NCDInput, WorkerErrorMessage, WorkerReadyMessage, WorkerResultMessage, WorkerStartMessage} from "@/types/ncd";
@@ -169,37 +171,24 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 }
 
 async function loadWasmBinary(): Promise<ArrayBuffer> {
-    const isBrowser = typeof window !== 'undefined';
     try {
-        if (isBrowser) {
-            console.log('Running in browser environment, fetching WASM from URL');
-            const response = await fetch('/wasm/zstd.wasm');
+        if (process.env.VITEST) {
+            const fs = await import('fs/promises');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
 
-            if (!response.ok) {
-                throw new Error(`Failed to fetch WASM: ${response.status} ${response.statusText}`);
-            }
-            return await response.arrayBuffer();
+            const currentDir = path.dirname(fileURLToPath(import.meta.url));
+            const wasmPath = path.resolve(currentDir, '..', 'wasm', 'zstd.wasm');
+            console.log('Loading WASM from path:', wasmPath);
+
+            return await fs.readFile(wasmPath);
         }
-        else {
-            console.log('Running in Node.js environment, loading WASM from filesystem');
-            try {
-                // Dynamic imports to avoid reference errors in browser
-                const fs = await import('fs/promises');
-                const path = await import('path');
-                const url = await import('url');
 
-                const currentDir = path.dirname(url.fileURLToPath(import.meta.url));
-                const wasmPath = path.resolve(currentDir, '..', 'wasm', 'zstd.wasm');
-                console.log('Loading WASM from path:', wasmPath);
-
-                return await fs.readFile(wasmPath);
-            } catch (nodeError) {
-                console.error('Node.js module loading error:', nodeError);
-                throw nodeError;
-            }
-        }
+        const response = await fetch(new URL('../wasm/zstd.wasm', import.meta.url));
+        return await response.arrayBuffer();
     } catch (error) {
         console.error('Failed to load WASM binary:', error);
+        console.error('Current directory:', import.meta.url);
         throw error;
     }
 }

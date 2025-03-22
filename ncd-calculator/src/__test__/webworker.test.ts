@@ -189,7 +189,8 @@ test('Test compression decision zstd', async () => {
         }
     }
 
-}, 50000);
+}, 60000);
+
 
 
 

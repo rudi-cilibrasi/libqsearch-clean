@@ -16,16 +16,19 @@ mkdir -p "$BUILD_DIR"
 echo "Creating custom C file: $CUSTOM_C_FILE"
 cat > "$CUSTOM_C_FILE" << 'EOL'
 #include <stddef.h>
+#include <emscripten.h>
 #include "zstd.h"
 #include "zstd_internal.h"
 
 // Get window size for specific compression level and input size
+EMSCRIPTEN_KEEPALIVE
 size_t ZSTD_getWindowSize(int compressionLevel, size_t inputSize) {
     ZSTD_compressionParameters params = ZSTD_getCParams(compressionLevel, inputSize, 0);
     return (size_t)1 << params.windowLog;
 }
 
 // Custom compress function that returns compression info
+EMSCRIPTEN_KEEPALIVE
 size_t ZSTD_compressWithInfo(void* dst, size_t dstCapacity,
                             const void* src, size_t srcSize,
                             int compressionLevel,
@@ -55,7 +58,7 @@ if [ ! -d "$BUILD_DIR/zstd" ]; then
     git clone --branch "v${ZSTD_VERSION}" --depth 1 "$ZSTD_REPO" "$BUILD_DIR/zstd"
 fi
 
-cd "$BUILD_DIR/zstd"
+cd "$BUILD_DIR"
 
 echo "Compiling to WASM..."
 emcc -O3 -s WASM=1 \
@@ -66,12 +69,11 @@ emcc -O3 -s WASM=1 \
     -s ENVIRONMENT='web,worker' \
     -s MODULARIZE=1 \
     -s EXPORT_ES6=1 \
-    -s USE_ES6_IMPORT_META=0 \
-    -I lib \
-    -I lib/common \
-    lib/common/*.c \
-    lib/compress/*.c \
-    lib/decompress/*.c \
+    -I ./zstd/lib \
+    -I ./zstd/lib/common \
+    ./zstd/lib/common/*.c \
+    ./zstd/lib/compress/*.c \
+    ./zstd/lib/decompress/*.c \
     "$CUSTOM_C_FILE" \
     -o "$INSTALL_DIR/zstd.js"
 

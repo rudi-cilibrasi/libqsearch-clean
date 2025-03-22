@@ -1,14 +1,17 @@
 #include <stddef.h>
+#include <emscripten.h>
 #include "zstd.h"
 #include "zstd_internal.h"
 
 // Get window size for specific compression level and input size
+EMSCRIPTEN_KEEPALIVE
 size_t ZSTD_getWindowSize(int compressionLevel, size_t inputSize) {
     ZSTD_compressionParameters params = ZSTD_getCParams(compressionLevel, inputSize, 0);
     return (size_t)1 << params.windowLog;
 }
 
 // Custom compress function that returns compression info
+EMSCRIPTEN_KEEPALIVE
 size_t ZSTD_compressWithInfo(void* dst, size_t dstCapacity,
                             const void* src, size_t srcSize,
                             int compressionLevel,

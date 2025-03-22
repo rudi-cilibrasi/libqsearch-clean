@@ -293,76 +293,92 @@ export const createGridObjectsFromMatrixResponse = (ncdMatrixResponse: NCDMatrix
 
 
 export const createSafeInitialGrid = (width: number, height: number, objects: GridObject[], ncdMatrixResponse: NCDMatrixResponse) => {
-    // Ensure we have unique objects with string IDs
+    // Process objects to ensure unique IDs as strings
     const processedObjects = objects.map(obj => ({
         ...obj,
         id: String(obj.id)
     }));
 
+    // Filter to unique objects
     const uniqueIdsMap = new Map();
     processedObjects.forEach(object => {
         if (!uniqueIdsMap.has(object.id)) {
             uniqueIdsMap.set(object.id, object);
         }
     });
-
     const uniqueObjects = Array.from(uniqueIdsMap.values());
 
-    if (uniqueObjects.length < width * height) {
-        throw new Error(`Not enough unique objects (${uniqueObjects.length}) for a ${width}×${height} grid`);
+    // Calculate optimal grid dimensions based on actual number of objects
+    const itemCount = uniqueObjects.length;
+    const minGridSize = Math.max(2, Math.min(itemCount, 4)); // Minimum viable grid size (at least 2x2)
+
+    // Adjust width and height based on available objects
+    const optimalWidth = Math.ceil(Math.sqrt(itemCount));
+    const optimalHeight = Math.ceil(itemCount / optimalWidth);
+
+    // Use provided dimensions or calculate optimal ones
+    const gridWidth = width || optimalWidth;
+    const gridHeight = height || optimalHeight;
+
+    // Ensure minimum viable grid size
+    if (itemCount < 4) {
+        throw new Error(`Need at least 4 unique objects, found only ${itemCount}`);
     }
 
-    const idToIndexMap = new Map<string, number>();  // String ID → numeric index
-    const indexToIdMap = new Map<number, string>();  // Numeric index → string ID
-
+    // Create mappings between string IDs and numeric indices
+    const idToIndexMap = new Map<string, number>();
+    const indexToIdMap = new Map<number, string>();
     uniqueObjects.forEach((obj, index) => {
         idToIndexMap.set(obj.id, index);
         indexToIdMap.set(index, obj.id);
     });
 
+    // Shuffle objects for random initial placement
     const shuffledObjects = [...uniqueObjects];
     for (let i = shuffledObjects.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffledObjects[i], shuffledObjects[j]] = [shuffledObjects[j], shuffledObjects[i]];
     }
 
-    const selected = shuffledObjects.slice(0, width * height);
+    // Select objects needed for the grid, up to grid capacity
+    const cellCount = gridWidth * gridHeight;
+    const selected = shuffledObjects.slice(0, Math.min(itemCount, cellCount));
 
+    // Fill grid with selected objects, repeating if necessary
     const grid: number[][] = [];
     let index = 0;
 
-    for (let i = 0; i < height; i++) {
+    for (let i = 0; i < gridHeight; i++) {
         grid[i] = [];
-        for (let j = 0; j < width; j++) {
-            const obj = selected[index];
+        for (let j = 0; j < gridWidth; j++) {
+            // If we have more cells than objects, cycle through objects
+            const objIndex = index % selected.length;
+            const obj = selected[objIndex];
             grid[i][j] = idToIndexMap.get(obj.id)!;
             index++;
         }
     }
 
-
+    // Create and return grid state
     const numericNcdMatrix = ncdMatrixResponse.ncdMatrix;
-
-    const factorMatrix = precomputeGradualFactorMatrix(width, height);
+    const factorMatrix = precomputeGradualFactorMatrix(gridWidth, gridHeight);
 
     const gridState = {
-        width,
-        height,
-        grid,                  // Contains numeric indices
-        numericNcdMatrix,      // Optimized numeric matrix
-        idToIndexMap,          // Mapping from string ID to numeric index
-        indexToIdMap,          // Mapping from numeric index to string ID
-        factorMatrix,          // Precomputed symmetry breaking factors
+        width: gridWidth,
+        height: gridHeight,
+        grid,
+        numericNcdMatrix,
+        idToIndexMap,
+        indexToIdMap,
+        factorMatrix,
         objectiveValue: 0
     };
 
     gridState.objectiveValue = calculateObjectiveWithNumericMatrix(gridState);
-
-    console.log(`Created initial grid ${width}×${height} with ${uniqueObjects.length} unique objects`);
+    console.log(`Created initial grid ${gridWidth}×${gridHeight} with ${itemCount} unique objects`);
 
     return gridState;
 };
-
 export const precomputeGradualFactorMatrix = (width: number, height: number): number[][] => {
     const factorMatrix: number[][] = [];
 
@@ -577,6 +593,7 @@ export const calculateGridSimilarity = (grid1: GridState, grid2: GridState): num
     if (grid1.width !== grid2.width || grid1.height !== grid2.height) {
         throw new Error("Grids must have the same dimensions to calculate similarity");
     }
+    console.log('grid1 now: ' + JSON.stringify(grid1) + ", grid 2: " + JSON.stringify(grid2));
 
     let matches = 0;
     const totalCells = grid1.height * grid1.width;
@@ -587,5 +604,7 @@ export const calculateGridSimilarity = (grid1: GridState, grid2: GridState): num
             }
         }
     }
+    console.log('matches now: ' + matches);
+    console.log('matches/total cells: ' + (matches/totalCells));
     return matches / totalCells;
 }
