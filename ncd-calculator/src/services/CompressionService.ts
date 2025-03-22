@@ -27,7 +27,7 @@ export class CompressionService {
   } as const;
 
   private constructor() {
-    // this.initializeWorker("zstd").catch(console.error);
+    this.initializeWorker("zstd").catch(console.error);
   }
 
   static getInstance(): CompressionService {

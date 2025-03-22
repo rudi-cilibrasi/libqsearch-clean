@@ -1,5 +1,7 @@
 // zstdWorker.ts
 /// <reference lib="webworker" />
+import {node} from "globals";
+
 declare const self: DedicatedWorkerGlobalScope;
 import {calculateCRC32, encodeText, getPairFileConcatenated, processChunk} from './shared/utils';
 import {NCDInput, WorkerErrorMessage, WorkerReadyMessage, WorkerResultMessage, WorkerStartMessage} from "@/types/ncd";
@@ -94,7 +96,7 @@ async function getCompressedPairSize(str1: string, str2: string): Promise<number
 
 async function handleMessage(event: MessageEvent<NCDInput>) {
     try {
-        const { labels, contents, cachedSizes } = event.data;
+        const {labels, contents, cachedSizes} = event.data;
 
         if (!labels?.length || !contents?.length) {
             throw new Error('Invalid input data');
@@ -110,7 +112,7 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
         } as WorkerStartMessage);
 
         const singleCompressedSizes = new Array(n);
-        const ncdMatrix = Array.from({ length: n }, () => Array(n).fill(0));
+        const ncdMatrix = Array.from({length: n}, () => Array(n).fill(0));
 
         for (let i = 0; i < n; i++) {
             const encoded = encodeText(contents[i]);
@@ -141,7 +143,7 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 
             allResults.push(...chunkResults);
 
-            for (const { i, j, ncd } of chunkResults) {
+            for (const {i, j, ncd} of chunkResults) {
                 ncdMatrix[i][j] = ncd;
                 ncdMatrix[j][i] = ncd;
             }
@@ -190,7 +192,6 @@ async function loadWasmBinary(): Promise<ArrayBuffer> {
         throw error;
     }
 }
-
 (async function initializeWorker() {
     try {
         const ZSTDModule = await import('../wasm/zstd.js');

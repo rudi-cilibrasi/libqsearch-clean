@@ -1,0 +1,162 @@
+/* KGridApp.css */
+.k-grid-app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #333;
+}
+
+.app-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.app-header h1 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.setup-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.grid-setup, .data-setup {
+    flex: 1;
+    min-width: 300px;
+}
+
+.grid-setup h2, .data-setup h2 {
+    margin-top: 0;
+    color: #2c3e50;
+    font-size: 1.5rem;
+}
+
+.input-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.input-group label {
+    display: flex;
+    flex-direction: column;
+    font-weight: 500;
+}
+
+.input-group input {
+    margin-top: 5px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100px;
+}
+
+.option-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.option-buttons button {
+    padding: 10px 15px;
+    background-color: #e9ecef;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.option-buttons button.active {
+    background-color: #4a90e2;
+    color: white;
+}
+
+.file-upload {
+    margin-top: 15px;
+}
+
+.file-upload-label {
+    display: inline-block;
+    padding: 10px 15px;
+    background-color: #4a90e2;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.file-upload-label:hover {
+    background-color: #3a80d2;
+}
+
+.file-upload input[type="file"] {
+    display: none;
+}
+
+.file-info {
+    margin: 10px 0;
+    font-style: italic;
+}
+
+.loading {
+    color: #666;
+    font-style: italic;
+}
+
+.error {
+    color: #d9534f;
+    font-weight: 500;
+}
+
+.file-requirements {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f1f8ff;
+    border-left: 4px solid #4a90e2;
+    border-radius: 4px;
+}
+
+.file-requirements h3 {
+    margin-top: 0;
+    font-size: 1rem;
+}
+
+.file-requirements ul {
+    margin-bottom: 0;
+    padding-left: 20px;
+}
+
+.optimization-container {
+    margin-top: 30px;
+}
+
+.app-footer {
+    margin-top: 50px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .setup-panel {
+        flex-direction: column;
+    }
+
+    .grid-setup, .data-setup {
+        width: 100%;
+    }
+}
