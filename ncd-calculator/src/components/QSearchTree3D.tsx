@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { Text, OrbitControls } from "@react-three/drei";
+import { Text, OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { saveAs } from "file-saver";
 import createGraph from "../functions/graphExport";
-import {useLabelManager} from "@/hooks/useLabelManager.ts";
 
 // Types for the graph data
 interface GraphNode {
@@ -26,15 +25,19 @@ interface ContainerStyle {
   height: string;
   position: "relative";
   overflow: "hidden";
+  background: string;
 }
 
 export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({ data }) => {
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
   const scaleFactor = Math.max(1, Math.sqrt(data.nodes.length) / 4);
+
   const containerStyle: ContainerStyle = {
     width: "100%",
-    height: "80vh",
+    height: "600px", // Fixed height
     position: "relative",
     overflow: "hidden",
+    background: theme === "dark" ? "#1a1a2e" : "#f0f2f5" // Dark navy or light gray
   };
 
   const handleExport = (): void => {
@@ -43,34 +46,61 @@ export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({ data }) => {
     saveAs(blob, "graph.dot");
   };
 
+  const toggleTheme = (): void => {
+    setTheme(prev => prev === "dark" ? "light" : "dark");
+  };
+
   return (
-    <div style={containerStyle}>
-      <div className="grid justify-items-end p-6">
-        <button
-          onClick={handleExport}
-          className="bg-blue-600 text-white hover:bg-blue-700 shadow-md"
+      <div style={containerStyle}>
+        <div className="grid grid-cols-2 gap-2 p-4 absolute top-0 right-0 z-10">
+          <button
+              onClick={toggleTheme}
+              className="bg-blue-600 text-white hover:bg-blue-700 shadow-md px-4 py-2 rounded-md text-sm flex items-center"
+          >
+            {theme === "dark" ? "Light Theme" : "Dark Theme"}
+          </button>
+          <button
+              onClick={handleExport}
+              className="bg-green-600 text-white hover:bg-green-700 shadow-md px-4 py-2 rounded-md text-sm flex items-center"
+          >
+            Export Graph
+          </button>
+        </div>
+
+        <Canvas
+            shadows
+            dpr={[1, 2]} // Better render quality on high DPI screens
         >
-          Export Graph
-        </button>
+          <PerspectiveCamera
+              makeDefault
+              position={[scaleFactor * 100, scaleFactor * 100, scaleFactor * 100]}
+              fov={60}
+              near={1}
+              far={1000}
+          />
+          <OrbitControls
+              enablePan={true}
+              enableZoom={true}
+              enableRotate={true}
+              autoRotate={true}
+              autoRotateSpeed={0.5}
+              maxDistance={scaleFactor * 300} // Limit zoom out
+              minDistance={scaleFactor * 10}  // Limit zoom in
+          />
+          <color attach="background" args={[theme === "dark" ? "#1a1a2e" : "#f0f2f5"]} />
+          <fog attach="fog" args={[theme === "dark" ? "#1a1a2e" : "#f0f2f5", 300, 500]} />
+          <QSearchTree
+              data={data}
+              scaleFactor={scaleFactor}
+              theme={theme}
+          />
+        </Canvas>
+
+        {/* Help overlay */}
+        <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white p-2 rounded text-xs">
+          <p>Mouse controls: Left-click rotate, Right-click pan, Scroll to zoom</p>
+        </div>
       </div>
-      <Canvas
-        camera={{
-          position: [scaleFactor * 100, scaleFactor * 100, scaleFactor * 100],
-          fov: 60,
-          near: 1,
-          far: 1000,
-        }}
-      >
-        <OrbitControls
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          autoRotate={true}
-          autoRotateSpeed={0.5}
-        />
-        <QSearchTree data={data} scaleFactor={scaleFactor} />
-      </Canvas>
-    </div>
   );
 };
 
@@ -78,6 +108,7 @@ export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({ data }) => {
 interface QSearchTreeProps {
   data: GraphData;
   scaleFactor: number;
+  theme: "light" | "dark";
 }
 
 interface BallObject {
@@ -99,7 +130,7 @@ interface SpringObject {
 
 type SimulationPhase = "initial" | "stabilizing" | "stable";
 
-const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
+const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor, theme }) => {
   const sceneRef = useRef<THREE.Scene>(null);
   const ballsRef = useRef<BallObject[]>([]);
   const springsRef = useRef<SpringObject[]>([]);
@@ -107,17 +138,18 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
   const simulationPhaseRef = useRef<SimulationPhase>("initial");
   const frameCountRef = useRef<number>(0);
 
+  // Update when data or theme changes
   useEffect(() => {
-    if (JSON.stringify(data) !== graph) {
+    if (JSON.stringify(data) !== graph || theme) {
       loadGraph(data);
       setGraph(JSON.stringify(data));
       simulationPhaseRef.current = "initial";
       frameCountRef.current = 0;
     }
-  }, [data]);
+  }, [data, theme]);
 
   const calculateInitialPositions = (
-    nodes: GraphNode[]
+      nodes: GraphNode[]
   ): Map<number, THREE.Vector3> => {
     const positions = new Map<number, THREE.Vector3>();
     const visited = new Set<number>();
@@ -125,16 +157,16 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
 
     // Find root nodes (nodes with most connections)
     const sortedNodes = [...nodes].sort(
-      (a, b) => b.connections.length - a.connections.length
+        (a, b) => b.connections.length - a.connections.length
     );
     const rootNode = sortedNodes[0];
 
     // Recursive function to position nodes in a tree-like structure
     const positionNode = (
-      node: GraphNode,
-      angle: number,
-      radius: number,
-      level: number
+        node: GraphNode,
+        angle: number,
+        radius: number,
+        level: number
     ): void => {
       if (visited.has(node.index)) return;
       visited.add(node.index);
@@ -185,17 +217,21 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
     const positionA = ballA.current.position;
     const positionB = ballB.current.position;
     const midPoint = new THREE.Vector3()
-      .addVectors(positionA, positionB)
-      .multiplyScalar(0.5);
+        .addVectors(positionA, positionB)
+        .multiplyScalar(0.5);
     springRef.current.position.copy(midPoint);
 
     const currentLength = positionA.distanceTo(positionB);
     springRef.current.scale.set(1, currentLength, 1);
 
     const direction = new THREE.Vector3().subVectors(positionB, positionA);
+    if (direction.length() === 0) return;
+
     const axis = new THREE.Vector3(0, 1, 0).cross(direction).normalize();
+    if (axis.length() === 0) return;
+
     const angle = Math.acos(
-      new THREE.Vector3(0, 1, 0).dot(direction.normalize())
+        Math.min(1, Math.max(-1, new THREE.Vector3(0, 1, 0).dot(direction.normalize())))
     );
     springRef.current.setRotationFromAxisAngle(axis, angle);
   };
@@ -221,8 +257,8 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
 
     const cameraDistance = camera.position.length();
     const labelScaleFactor = Math.max(
-      0.5,
-      cameraDistance / (100 * scaleFactor)
+        0.5,
+        cameraDistance / (100 * scaleFactor)
     );
 
     // Calculate total kinetic energy to monitor stability
@@ -235,19 +271,19 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
         if (ball !== otherBall && ball.ref.current && otherBall.ref.current) {
           if (!ball.ref.current || !otherBall.ref.current) return;
           const direction = ball.ref.current.position
-            .clone()
-            .sub(otherBall.ref.current.position);
+              .clone()
+              .sub(otherBall.ref.current.position);
           let distance = direction.length();
           if (distance < minDistance) distance = minDistance;
           direction.normalize();
 
           const phaseFactor =
-            phase === "initial" ? Math.min(1, frameCountRef.current / 50) : 1;
+              phase === "initial" ? Math.min(1, frameCountRef.current / 50) : 1;
 
           force.add(
-            direction.multiplyScalar(
-              (repulsionStrength * phaseFactor) / (distance * distance)
-            )
+              direction.multiplyScalar(
+                  (repulsionStrength * phaseFactor) / (distance * distance)
+              )
           );
         }
       });
@@ -255,20 +291,20 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
       // Continue with spring forces...
       springsRef.current.forEach((spring) => {
         if (
-          (spring.ballA.current === ball.ref.current ||
-            spring.ballB.current === ball.ref.current) &&
-          spring.ballA.current &&
-          spring.ballB.current &&
-          ball.ref.current
+            (spring.ballA.current === ball.ref.current ||
+                spring.ballB.current === ball.ref.current) &&
+            spring.ballA.current &&
+            spring.ballB.current &&
+            ball.ref.current
         ) {
           const otherBall =
-            spring.ballA.current === ball.ref.current
-              ? spring.ballB
-              : spring.ballA;
+              spring.ballA.current === ball.ref.current
+                  ? spring.ballB
+                  : spring.ballA;
           if (!otherBall.current) return;
           const direction = new THREE.Vector3().subVectors(
-            otherBall.current.position,
-            ball.ref.current.position
+              otherBall.current.position,
+              ball.ref.current.position
           );
           const currentLength = direction.length();
           direction.normalize();
@@ -280,11 +316,11 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
         const ballRef = ball.ref.current;
         const distanceToXY = Math.abs(ballRef.position.z);
         force.add(
-          new THREE.Vector3(
-            0,
-            0,
-            -Math.sign(ballRef.position.z) * squishForce * distanceToXY
-          )
+            new THREE.Vector3(
+                0,
+                0,
+                -Math.sign(ballRef.position.z) * squishForce * distanceToXY
+            )
         );
         force.add(ball.velocity.clone().multiplyScalar(-dampingFactor));
 
@@ -306,8 +342,6 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
     springsRef.current.forEach(updateSpring);
   });
 
-  // Continue with loadGraph function and return statement in the next part...
-
   const loadGraph = (graph: GraphData): void => {
     ballsRef.current = [];
     springsRef.current = [];
@@ -315,45 +349,59 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
     const nodeMap = new Map<number, BallObject>();
     const initialPositions = calculateInitialPositions(graph.nodes);
 
+    // Get theme-appropriate colors
+    const leafNodeColor = theme === "dark" ? 0x4287f5 : 0x0047AB; // Blue
+    const internalNodeColor = theme === "dark" ? 0xAA336A : 0x800080; // Purple
+    const springColor = theme === "dark" ? 0x555555 : 0xAAAAAA; // Gray
+    const textColor = theme === "dark" ? "white" : "black";
+
     // Create balls and labels
     graph.nodes.forEach((node) => {
       const position = initialPositions.get(node.index)!;
       const isLeaf = node.connections.length === 1;
-      const color = isLeaf ? 0x0000ff : 0xff00ff;
+      const color = isLeaf ? leafNodeColor : internalNodeColor;
 
       const ballRef = React.createRef<THREE.Mesh>();
       const labelRef = React.createRef<any>(); // Text component from @react-three/drei
 
       const ballSize = (isLeaf ? 4 : 2) * scaleFactor;
       const ball = (
-        <mesh
-          ref={ballRef}
-          position={[position.x, position.y, position.z]}
-          key={`ball-${node.index}`}
-        >
-          <sphereGeometry args={[ballSize, 32, 32]} />
-          <meshPhongMaterial color={color} shininess={50} />
-        </mesh>
+          <mesh
+              ref={ballRef}
+              position={[position.x, position.y, position.z]}
+              key={`ball-${node.index}`}
+              castShadow
+              receiveShadow
+          >
+            <sphereGeometry args={[ballSize, 32, 32]} />
+            <meshStandardMaterial color={color} roughness={0.5} metalness={0.5} />
+          </mesh>
       );
 
+      // Create label with background for better visibility
       const label = (
-        <Text
-          ref={labelRef}
-          position={[
-            position.x,
-            position.y + (isLeaf ? 6 : 4) * scaleFactor,
-            position.z,
-          ]}
-          fontSize={1.5 * scaleFactor}
-          color="yellow"
-          anchorX="center"
-          anchorY="middle"
-          key={`label-${node.index}`}
-          renderOrder={1}
-          material-depthTest={false}
-        >
-          {node.label}
-        </Text>
+          <Text
+              ref={labelRef}
+              position={[
+                position.x,
+                position.y + (isLeaf ? 6 : 4) * scaleFactor,
+                position.z,
+              ]}
+              fontSize={1.5 * scaleFactor}
+              color={textColor}
+              anchorX="center"
+              anchorY="middle"
+              key={`label-${node.index}`}
+              renderOrder={1}
+              material-depthTest={false}
+              outlineColor={theme === "dark" ? "#000000" : "#ffffff"}
+              outlineWidth={0.05}
+              backgroundColor={theme === "dark" ? "#000000" : "#ffffff"}
+              backgroundOpacity={0.6}
+              padding={[0.2, 0.3, 0.2, 0.3]}
+          >
+            {node.label}
+          </Text>
       );
 
       const velocity = new THREE.Vector3(0, 0, 0);
@@ -378,20 +426,28 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
         const ballB = nodeMap.get(connectionIndex);
 
         const hasSpring = springsRef.current.find(
-          (spring) =>
-            (spring.ballA === ballA?.ref && spring.ballB === ballB?.ref) ||
-            (spring.ballA === ballB?.ref && spring.ballB === ballA?.ref)
+            (spring) =>
+                (spring.ballA === ballA?.ref && spring.ballB === ballB?.ref) ||
+                (spring.ballA === ballB?.ref && spring.ballB === ballA?.ref)
         );
 
         if (ballA && ballB && !hasSpring) {
           const springRef = React.createRef<THREE.Mesh>();
           const spring = (
-            <mesh ref={springRef} key={`${ballA.index}-${ballB.index}`}>
-              <cylinderGeometry
-                args={[0.5 * scaleFactor, 0.5 * scaleFactor, 1, 8]}
-              />
-              <meshPhongMaterial color={0x808080} shininess={30} />
-            </mesh>
+              <mesh
+                  ref={springRef}
+                  key={`${ballA.index}-${ballB.index}`}
+                  castShadow
+              >
+                <cylinderGeometry
+                    args={[0.5 * scaleFactor, 0.5 * scaleFactor, 1, 8]}
+                />
+                <meshStandardMaterial
+                    color={springColor}
+                    roughness={0.7}
+                    metalness={0.3}
+                />
+              </mesh>
           );
 
           springsRef.current.push({
@@ -406,28 +462,29 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor }) => {
   };
 
   return (
-    <scene ref={sceneRef}>
-      <ambientLight intensity={0.5} color={0x404040} />
-      <directionalLight
-        color={0xffffff}
-        intensity={0.8}
-        position={[10, 10, 10]}
-        key="direction1"
-      />
-      <directionalLight
-        color={0xffffff}
-        intensity={0.8}
-        position={[-10, -10, -10]}
-        key="direction2"
-      />
-      {ballsRef.current.map((ballObj) => (
-        <group key={`group-${ballObj.index}`}>
-          {ballObj.ball}
-          {ballObj.label}
-        </group>
-      ))}
-      {springsRef.current.map((springObj) => springObj.mesh)}
-    </scene>
+      <scene ref={sceneRef}>
+        <ambientLight intensity={0.5} />
+        <directionalLight
+            color={0xffffff}
+            intensity={0.8}
+            position={[10, 10, 10]}
+            castShadow
+            key="direction1"
+        />
+        <directionalLight
+            color={0xffffff}
+            intensity={0.5}
+            position={[-10, -10, -10]}
+            key="direction2"
+        />
+        {ballsRef.current.map((ballObj) => (
+            <group key={`group-${ballObj.index}`}>
+              {ballObj.ball}
+              {ballObj.label}
+            </group>
+        ))}
+        {springsRef.current.map((springObj) => springObj.mesh)}
+      </scene>
   );
 };
 

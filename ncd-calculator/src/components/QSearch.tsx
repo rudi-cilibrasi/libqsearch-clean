@@ -1,6 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
-import {MatrixTree} from "./MatrixTree";
 import ListEditor from "./ListEditor";
 import Header from "./Header";
 import {NCDProgress} from "./NCDProgress";
@@ -8,6 +7,9 @@ import type {CompressionStats, NCDInput, NCDMatrixResponse, WorkerResultMessage}
 import {useNCDCache} from "@/hooks/useNCDCache";
 import {type CompressionAlgorithm, CompressionService} from "@/services/CompressionService";
 import {useLabelManager} from "@/hooks/useLabelManager.ts";
+import KGridVisualization from "@/components/KGridVisualization.tsx";
+import {GridObject} from "@/services/kgrid.ts";
+import {createMeshesFromInstancedMesh} from "three/examples/jsm/utils/SceneUtils";
 
 export interface QSearchProps {
   openLogin: boolean;
@@ -31,6 +33,17 @@ export const QSearch: React.FC<QSearchProps> = ({
   const labelMapRef = useRef(labelMap);
   const [isLoading, setIsLoading] = useState(false);
   const labelManager = useLabelManager();
+
+  // Add gridObjects state for KGridVisualization
+  const [gridObjects, setGridObjects] = useState<GridObject[]>([]);
+
+  // Add optimization state tracking
+  const [optimizationStartTime, setOptimizationStartTime] = useState<number | null>(null);
+  const [optimizationEndTime, setOptimizationEndTime] = useState<number | null>(null);
+  const [totalExecutionTime, setTotalExecutionTime] = useState<number | null>(null);
+  const [iterationsPerSecond, setIterationsPerSecond] = useState<number | null>(null);
+  const [iterations, setIterations] = useState(0);
+
   const [compressionInfo, setCompressionInfo] = useState<{
     algorithm: CompressionAlgorithm;
     reason: string;
@@ -50,6 +63,11 @@ export const QSearch: React.FC<QSearchProps> = ({
       CompressionService.getInstance()
   );
   const ncdCache = useNCDCache();
+
+  // Add refs for tracking optimization performance
+  const iterationCountRef = useRef(0);
+  const lastUpdateTimeRef = useRef(Date.now());
+  const ipsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Handle QSearch worker messages
   const handleQsearchMessage = (event: MessageEvent) => {
@@ -78,6 +96,11 @@ export const QSearch: React.FC<QSearchProps> = ({
     return () => {
       qSearchWorkerRef.current?.terminate();
       compressionServiceRef.current.terminate();
+
+      // Clean up IPS interval
+      if (ipsIntervalRef.current) {
+        clearInterval(ipsIntervalRef.current);
+      }
     };
   }, []);
 
@@ -144,13 +167,11 @@ export const QSearch: React.FC<QSearchProps> = ({
       }
 
       // Display results
-
-      const response: NCDMatrixResponse =  result as NCDMatrixResponse;
+      const response: NCDMatrixResponse = result as NCDMatrixResponse;
       displayNcdMatrix(response);
       const { labels, ncdMatrix } = response;
       qSearchWorkerRef.current?.postMessage({
         action: "processNcdMatrix",
-        // labels: labels.map(label => labelManager.normalizeId(label)),
         labels: labels,
         ncdMatrix: ncdMatrix,
       });
@@ -186,21 +207,28 @@ export const QSearch: React.FC<QSearchProps> = ({
   // Display matrix and trigger QSearch processing
   const displayNcdMatrix = (response: NCDMatrixResponse) => {
     const { labels: responseLabels, ncdMatrix: matrix } = response;
-    console.log('label from display matrix now: ' + JSON.stringify(labels));
-    // const displayNames = responseLabels
-    //     .filter(label => labelManager.hasDisplayLabel(label))
-    //     .map(label => labelManager.getDisplayLabel(label) || label);
-    // setLabels(displayNames);
-    setLabels(responseLabels)
+    console.log('label from display matrix now: ' + JSON.stringify(responseLabels));
+    setLabels(responseLabels);
     setNcdMatrix(matrix);
     setHasMatrix(true);
 
+    // Create grid objects from the labels
+    console.log('labelManager: ' + JSON.stringify(labelManager.getLabelMapping()));
+    const objects: GridObject[] = responseLabels.map((label, index) => ({
+      id: label,
+      label: labelManager.getDisplayLabel(label) || 'Unknown',
+      content: ncdMatrix[index]
+    }));
+
+    setGridObjects(objects);
   };
+
   // Reset display state
   const resetDisplay = () => {
     setErrorMsg("");
     setNcdMatrix([]);
     setLabels([]);
+    setGridObjects([]);
     labelMapRef.current = new Map();
     setLabelMap(new Map());
     setHasMatrix(false);
@@ -214,7 +242,69 @@ export const QSearch: React.FC<QSearchProps> = ({
       currentPair: null,
       lastNcdScore: null,
     });
+
+    // Reset optimization state
+    setOptimizationStartTime(null);
+    setOptimizationEndTime(null);
+    setTotalExecutionTime(null);
+    setIterationsPerSecond(null);
+    setIterations(0);
+
+    // Clear any interval
+    if (ipsIntervalRef.current) {
+      clearInterval(ipsIntervalRef.current);
+      ipsIntervalRef.current = null;
+    }
   };
+
+  // Optimization handlers for KGridVisualization
+  const handleOptimizationStart = () => {
+    const startTime = Date.now();
+    setOptimizationStartTime(startTime);
+    setOptimizationEndTime(null);
+    iterationCountRef.current = 0;
+    lastUpdateTimeRef.current = startTime;
+
+    // Set up interval to calculate iterations per second
+    ipsIntervalRef.current = setInterval(() => {
+      const currentTime = Date.now();
+      const elapsedSecs = (currentTime - lastUpdateTimeRef.current) / 1000;
+
+      if (elapsedSecs > 0) {
+        const ips = iterationCountRef.current / elapsedSecs;
+        setIterationsPerSecond(ips);
+        iterationCountRef.current = 0;
+        lastUpdateTimeRef.current = currentTime;
+      }
+    }, 1000); // Update metrics every second
+  };
+
+  const handleIterationUpdate = (iteration: number) => {
+    setIterations(iteration);
+    iterationCountRef.current++;
+  };
+
+  const handleOptimizationEnd = () => {
+    if (optimizationStartTime) {
+      const endTime = Date.now();
+      setOptimizationEndTime(endTime);
+      setTotalExecutionTime(endTime - optimizationStartTime);
+
+      // Clear the IPS update interval
+      if (ipsIntervalRef.current) {
+        clearInterval(ipsIntervalRef.current);
+        ipsIntervalRef.current = null;
+      }
+    }
+  };
+
+
+  const getNcdMatrixResponse = (labels: string[], ncdMatrix: number[][]): NCDMatrixResponse => {
+    return {
+      labels,
+      ncdMatrix
+    }
+  }
 
   return (
       <>
@@ -249,16 +339,25 @@ export const QSearch: React.FC<QSearchProps> = ({
 
           {/* Error state */}
           {errorMsg && <div className="text-red-600 my-4">{errorMsg}</div>}
-          { /* FIXME: add the accession ID to the matrix tree so that the unique IDs can be used in the Kgrid*/}
+
           {/* Results */}
-          {!isLoading && (
-              <MatrixTree
-                  labelManager={labelManager}
-                  hasMatrix={hasMatrix}
-                  ncdMatrix={ncdMatrix}
+          {!isLoading && hasMatrix && labels.length > 0 && ncdMatrix.length > 0 && (
+              <KGridVisualization
                   labels={labels}
-                  errorMsg={errorMsg}
+                  labelManager={labelManager}
+                  ncdMatrix={ncdMatrix}
+                  objects={gridObjects}
+                  maxIterations={50000}
+                  onOptimizationStart={handleOptimizationStart}
+                  onOptimizationEnd={handleOptimizationEnd}
+                  onIterationUpdate={handleIterationUpdate}
                   qSearchTreeResult={qSearchTreeResult}
+                  autoStart={true}
+                  optimizationStartTime={optimizationStartTime || undefined}
+                  optimizationEndTime={optimizationEndTime || undefined}
+                  totalExecutionTime={totalExecutionTime || undefined}
+                  iterationsPerSecond={iterationsPerSecond || undefined}
+                  ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
               />
           )}
 

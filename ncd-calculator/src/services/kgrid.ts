@@ -1,8 +1,10 @@
 import {deflate} from "pako";
+import {NCDMatrixResponse} from "@/types/ncd.ts";
+import {LabelManager} from "@/functions/labelUtils.ts";
 
 export interface GridObject {
     id: string;
-    content: string;
+    content: number[];
     label: string;
 }
 
@@ -20,7 +22,6 @@ export interface GridState {
     width: number;
     height: number;
     grid: number[][]; // grid index position
-    ncdMatrix: Record<string, Record<string, number>>;
     numericNcdMatrix: number[][];
     idToIndexMap: Map<string, number>;
     indexToIdMap: Map<number, string>;
@@ -72,35 +73,7 @@ export const calculateNCD = (str1: string, str2: string): number => {
     return Math.max(0, Math.min(1, ncd));
 };
 
-export const precomputeNCDMatrix = (
-    objects: GridObject[]
-): Record<string, Record<string, number>> => {
-    const matrix: Record<string, Record<string, number>> = {};
-
-    for (const obj of objects) {
-        matrix[obj.id] = {};
-    }
-
-    for (let i = 0; i < objects.length; i++) {
-        const obj1 = objects[i];
-
-        matrix[obj1.id][obj1.id] = 0;
-
-        for (let j = i + 1; j < objects.length; j++) {
-            const obj2 = objects[j];
-
-            const ncd = calculateNCD(obj1.content, obj2.content);
-
-            matrix[obj1.id][obj2.id] = ncd;
-            matrix[obj2.id][obj1.id] = ncd;
-        }
-    }
-
-    return matrix;
-}
-
-
-export const createGradualFactorMatrix = (width: number, height: number): number[][] => {
+export const getGradualFactorMatrix = (width: number, height: number): number[][] => {
     const factorMatrix: number[][] = [];
     for(let i = 0; i < height; i++) {
         factorMatrix[i] = [];
@@ -298,7 +271,28 @@ export const normalizeBlock = (block: Block, gridHeight: number, gridWidth: numb
     return normalizedBlock;
 };
 
-export const createSafeInitialGrid = (width: number, height: number, objects: GridObject[]) => {
+
+export const getNCDValue = (index1: number, index2: number, ncdMatrix: number[][]): number => {
+    return ncdMatrix[index1][index2];
+}
+
+
+export const createGridObjectsFromMatrixResponse = (ncdMatrixResponse: NCDMatrixResponse, labelManager: LabelManager) : GridObject[] => {
+    const {labels, ncdMatrix} = ncdMatrixResponse;
+    const displayLabel = (label: string) => {
+        const fullLabel = labelManager.getDisplayLabel(label) || 'Unknown';
+        return fullLabel.length > 15 ? fullLabel.substring(0, Math.min(15, fullLabel.length)) + '...' : fullLabel;
+    }
+    return labels.map((label, index) => ({
+        id: label,
+        label: displayLabel(label),
+        content: ncdMatrix[index]
+    }));
+
+}
+
+
+export const createSafeInitialGrid = (width: number, height: number, objects: GridObject[], ncdMatrixResponse: NCDMatrixResponse) => {
     // Ensure we have unique objects with string IDs
     const processedObjects = objects.map(obj => ({
         ...obj,
@@ -346,9 +340,8 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
         }
     }
 
-    const ncdMatrix = precomputeNCDMatrix(uniqueObjects);
 
-    const numericNcdMatrix = createNumericNcdMatrix(uniqueObjects, idToIndexMap, ncdMatrix);
+    const numericNcdMatrix = ncdMatrixResponse.ncdMatrix;
 
     const factorMatrix = precomputeGradualFactorMatrix(width, height);
 
@@ -356,7 +349,6 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
         width,
         height,
         grid,                  // Contains numeric indices
-        ncdMatrix,             // Original string-based matrix
         numericNcdMatrix,      // Optimized numeric matrix
         idToIndexMap,          // Mapping from string ID to numeric index
         indexToIdMap,          // Mapping from numeric index to string ID
@@ -370,26 +362,6 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
 
     return gridState;
 };
-
-export const createNumericNcdMatrix = (
-    objects: GridObject[],
-    idToIndexMap: Map<string, number>,
-    stringNcdMatrix: Record<string, Record<string, number>>
-): number[][] => {
-    const size = objects.length;
-    const matrix: number[][] = Array(size).fill(null).map(() => Array(size).fill(0));
-
-    for (const obj1 of objects) {
-        const idx1 = idToIndexMap.get(obj1.id)!;
-
-        for (const obj2 of objects) {
-            const idx2 = idToIndexMap.get(obj2.id)!;
-            matrix[idx1][idx2] = stringNcdMatrix[obj1.id][obj2.id];
-        }
-    }
-
-    return matrix;
-}
 
 export const precomputeGradualFactorMatrix = (width: number, height: number): number[][] => {
     const factorMatrix: number[][] = [];
@@ -554,28 +526,51 @@ export const symmetryBreaker = (pos: Position, width: number, height: number) =>
     return Math.pow(baseGradient + primaryVariation + secondaryVariation, powerFactor);
 }
 
-export const calculateObjectiveWithSymmetryBreaking = (grid: GridState, factorMatrix: number[][]): number => {
-    let total = 0;
-    for(let i = 0; i < grid.height; i++) {
-        for(let j = 0; j < grid.width; j++) {
-            let positionNCD = 0;
-            const currentId = grid.indexToIdMap.get(grid.grid[i][j]) || '';
-            const rightJ = (j + 1) % grid.width;
-            const rightNeighborId = grid.indexToIdMap.get(grid.grid[i][rightJ]) || '';
-            if (grid.grid[i][j] !== -1 && grid.grid[i][rightJ] !== -1) {
-                positionNCD += grid.ncdMatrix[currentId][rightNeighborId];
+
+export const getNcdValueByIds = (
+    id1: string,
+    id2: string,
+    ncdMatrix: number[][],
+    idToIndexMap: Map<string, number>
+): number => {
+    const index1 = idToIndexMap.get(id1);
+    const index2 = idToIndexMap.get(id2);
+
+    if (index1 === undefined || index2 === undefined) {
+        throw new Error(`Invalid object IDs: ${id1}, ${id2}`);
+    }
+
+    return ncdMatrix[index1][index2];
+};
+
+export const calculateObjectiveWithSymmetryBreaking = (
+    gridState: GridState,
+    factorMatrix: number[][],
+    ncdMatrix: number[][]
+): number => {
+    const { grid, width, height } = gridState;
+    let totalObjective = 0;
+
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            const objIndex = grid[i][j];
+
+            if (j < width - 1) {
+                const rightIndex = grid[i][j + 1];
+                const ncdValue = getNCDValue(objIndex, rightIndex, ncdMatrix);
+                totalObjective += ncdValue * factorMatrix[i][j] * factorMatrix[i][j + 1];
             }
 
-            const downI = (i + 1) % grid.height;
-            const downNeighborId = grid.indexToIdMap.get(grid.grid[downI][j]) || '';
-            if (grid.grid[i][j] !== -1 && grid.grid[downI][j] !== -1) {
-                positionNCD += grid.ncdMatrix[currentId][downNeighborId];
+            if (i < height - 1) {
+                const bottomIndex = grid[i + 1][j];
+                const ncdValue = getNCDValue(objIndex, bottomIndex, ncdMatrix);
+                totalObjective += ncdValue * factorMatrix[i][j] * factorMatrix[i + 1][j];
             }
-            total += positionNCD * factorMatrix[i][j];
         }
     }
-    return total;
-}
+
+    return totalObjective;
+};
 
 
 export const calculateGridSimilarity = (grid1: GridState, grid2: GridState): number => {

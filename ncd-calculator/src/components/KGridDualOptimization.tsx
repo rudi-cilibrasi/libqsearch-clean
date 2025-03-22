@@ -1,12 +1,16 @@
-import React, {useEffect, useState, useCallback, useMemo, useRef} from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
     GridObject,
     GridState,
     createSafeInitialGrid,
     optimizeStep,
-    calculateObjectiveWithSymmetryBreaking, createGradualFactorMatrix, deepCopy, calculateGridSimilarity,
+    calculateObjectiveWithSymmetryBreaking,
+    getGradualFactorMatrix,
+    deepCopy,
+    calculateGridSimilarity,
 } from "@/services/kgrid.ts";
-import {GridDisplay} from "./GridDisplay";
+import { GridDisplay } from "./GridDisplay";
+import {NCDMatrixResponse} from "@/types/ncd.ts";
 
 interface KGridDualOptimizationProps {
     width: number;
@@ -16,11 +20,16 @@ interface KGridDualOptimizationProps {
     onOptimizationStart?: () => void;
     onOptimizationEnd?: () => void;
     onIterationUpdate?: (iteration: number) => void;
+    onCellSelect?: (gridNumber: 1 | 2, objectId: string, position: [number, number]) => void;
+    colorTheme?: string;
     autoStart?: boolean;
     optimizationEndTime?: number;
     optimizationStartTime?: number;
     totalExecutionTime?: number;
-    iterationsPerSecond?: number
+    iterationsPerSecond?: number;
+    showSingleGrid?: boolean;
+    isRunning?: boolean;
+    ncdMatrixResponse: NCDMatrixResponse;
 }
 
 export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
@@ -31,11 +40,16 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                                                                                 onOptimizationStart,
                                                                                 onOptimizationEnd,
                                                                                 onIterationUpdate,
+                                                                                onCellSelect,
+                                                                                colorTheme = "scientific",
                                                                                 autoStart = false,
                                                                                 optimizationEndTime,
                                                                                 totalExecutionTime,
                                                                                 iterationsPerSecond,
-                                                                                optimizationStartTime
+                                                                                optimizationStartTime,
+                                                                                showSingleGrid = false,
+                                                                                isRunning,
+                                                                                ncdMatrixResponse
                                                                             }) => {
     // Main grid states
     const [gridState1, setGridState1] = useState<GridState | null>(null);
@@ -43,7 +57,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
 
     // Tracking and control states
     const [iterations, setIterations] = useState(0);
-    const [isRunning, setIsRunning] = useState(false);
     const [converged, setConverged] = useState(false);
     const [convergenceType, setConvergenceType] = useState("");
     const [matchPercentage, setMatchPercentage] = useState(0);
@@ -74,7 +87,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
 
     // Create a stable objects by ID mapping
     const objectsById = useMemo(() => {
-        const mapping: Record<string, { label: string; content: string }> = {};
+        const mapping: Record<string, { label: string; content: number[] }> = {};
         objects.forEach((obj) => {
             const stringId = String(obj.id);
             mapping[stringId] = {
@@ -92,8 +105,8 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
             ...obj,
             id: obj.id
         }));
-        const grid = createSafeInitialGrid(width, height, processedObjects);
-        grid.objectiveValue = calculateObjectiveWithSymmetryBreaking(grid, factorMatrix);
+        const grid = createSafeInitialGrid(width, height, processedObjects, ncdMatrixResponse);
+        grid.objectiveValue = calculateObjectiveWithSymmetryBreaking(grid, factorMatrix, ncdMatrixResponse.ncdMatrix);
         return grid;
     }, [width, height, objects]);
 
@@ -125,7 +138,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
             console.log("Grids have converged to identical arrangements");
             setConverged(true);
             setConvergenceType("exact match");
-            setIsRunning(false);
             if (onOptimizationEnd) {
                 onOptimizationEnd();
             }
@@ -136,7 +148,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
             console.log("Maximum iterations reached");
             setConverged(true);
             setConvergenceType("max iterations reached");
-            setIsRunning(false);
             if (onOptimizationEnd) {
                 onOptimizationEnd();
             }
@@ -152,7 +163,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
             console.log("Optimization stalled - no improvement in 10,000 iterations");
             setConverged(true);
             setConvergenceType("optimization stalled");
-            setIsRunning(false);
             if (onOptimizationEnd) {
                 onOptimizationEnd();
             }
@@ -189,36 +199,30 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         };
     }, []);
 
-
     // Main optimization loop using requestAnimationFrame for smoother updates
     useEffect(() => {
         if (!isRunning || !gridState1 || !gridState2) return;
 
         const runOptimizationStep = () => {
-            // Ensure minimum time between updates for UI responsiveness
-            const now = Date.now();
-            const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
-
             // Update grid states with new optimized versions
             const newGrid1 = performOptimizationStep(gridState1, iterations);
             const newGrid2 = performOptimizationStep(gridState2, iterations);
 
-                // Check if grids have actually changed
+            // Check if grids have actually changed
+            setGridState1(newGrid1);
+            setGridState2(newGrid2);
 
-                    setGridState1(newGrid1);
-                    setGridState2(newGrid2);
+            // Update iteration counter and notify parent
+            setIterations(prev => {
+                const newIteration = prev + 1;
+                if (onIterationUpdate) {
+                    onIterationUpdate(newIteration);
+                }
+                return newIteration;
+            });
 
-                // Update iteration counter and notify parent
-                setIterations(prev => {
-                    const newIteration = prev + 1;
-                    if (onIterationUpdate) {
-                        onIterationUpdate(newIteration);
-                    }
-                    return newIteration;
-                });
-
-                // Update the last update time
-                lastUpdateTimeRef.current = now;
+            // Update the last update time
+            lastUpdateTimeRef.current = Date.now();
 
             // Check for convergence
             if (checkConvergence()) {
@@ -250,91 +254,29 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         if (autoStartRef.current && !hasStartedRef.current && gridState1 && gridState2) {
             console.log("Auto-starting optimization");
             hasStartedRef.current = true;
-            setIsRunning(true);
             if (onOptimizationStart) {
                 onOptimizationStart();
             }
         }
     }, [gridState1, gridState2, onOptimizationStart]);
 
-    // Start a new optimization run
-    const startOptimization = () => {
-        try {
-            // Clear any existing animation frame
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-                animationFrameRef.current = null;
-            }
-
-            // Reset all state variables
-            setIterations(0);
-            setConverged(false);
-            setConvergenceType("");
-            setBestObjective1(Number.MAX_VALUE);
-            setBestObjective2(Number.MAX_VALUE);
-            setBestGrid1(null);
-            setBestGrid2(null);
-            setGrid1Version(0);
-            setGrid2Version(0);
-            setLastAcceptedSwap1(null);
-            setLastAcceptedSwap2(null);
-            lastGrid1Ref.current = null;
-            lastGrid2Ref.current = null;
-
-            // Create new initial grids
-            const precomputedGradualFactor = createGradualFactorMatrix(width, height);
-            const initialGrid1 = initializeGrid(precomputedGradualFactor);
-            const initialGrid2 = initializeGrid(precomputedGradualFactor);
-
-            // Update grid states
-            setGridState1(initialGrid1);
-            setGridState2(initialGrid2);
-
-            // Store initial grid layouts
-            lastGrid1Ref.current = initialGrid1.grid.map(row => [...row]);
-            lastGrid2Ref.current = initialGrid2.grid.map(row => [...row]);
-
-            // Start optimization
-            lastUpdateTimeRef.current = Date.now();
-            setIsRunning(true);
-
-            // Notify parent about optimization start
-            if (onOptimizationStart) {
-                onOptimizationStart();
-            }
-
-            console.log("Started new optimization with initial grids:");
-            console.log("Grid 1:", JSON.stringify(initialGrid1.grid));
-            console.log("Grid 2:", JSON.stringify(initialGrid2.grid));
-        } catch (error) {
-            console.error("Error initializing grids:", error);
-            setConvergenceType(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-
-            // Notify parent about optimization end
-            if (onOptimizationEnd) {
-                onOptimizationEnd();
-            }
+    // Cell selection handlers
+    const handleCellSelect1 = useCallback((objectId: string, i: number, j: number) => {
+        if (onCellSelect) {
+            onCellSelect(1, objectId, [i, j]);
         }
-    }
+    }, [onCellSelect]);
 
-    // Stop the current optimization run
-    const stopOptimization = () => {
-        if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
-            animationFrameRef.current = null;
+    const handleCellSelect2 = useCallback((objectId: string, i: number, j: number) => {
+        if (onCellSelect) {
+            onCellSelect(2, objectId, [i, j]);
         }
-        setIsRunning(false);
-
-        // Notify parent about optimization end
-        if (onOptimizationEnd) {
-            onOptimizationEnd();
-        }
-    };
+    }, [onCellSelect]);
 
     // Initialize grids when component mounts
     useEffect(() => {
         try {
-            const precomputedGradualFactor = createGradualFactorMatrix(width, height);
+            const precomputedGradualFactor = getGradualFactorMatrix(width, height);
             const initialGrid1 = initializeGrid(precomputedGradualFactor);
             const initialGrid2 = initializeGrid(precomputedGradualFactor);
 
@@ -360,186 +302,67 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         };
     }, []);
 
-
-    // Format time display - converts ms to a readable format
-    const formatTime = (ms: number | undefined): string => {
-        if (ms === null) return "0:00";
-
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    };
-
     return (
-        <div className="k-grid-content"
-             style={{fontFamily: 'system-ui, sans-serif', width: '100%', height: '100%', minHeight: '500px'}}>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-            }}>
-                <h3 style={{margin: 0}}>K-Grid Dual Optimization</h3>
-
-                <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
-                    <div>
-                        <div style={{fontWeight: 'bold'}}>
-                            Status: {isRunning ? "Running" : converged ? "Converged" : "Ready"}
-                        </div>
-                        {optimizationStartTime && (
-                            <>
-                                <div style={{
-                                    marginRight: "15px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center"
-                                }}>
-                                    <span style={{fontWeight: "bold"}}>Running Time</span>
-                                    <span>{optimizationEndTime ? formatTime(totalExecutionTime) : formatTime(Date.now() - optimizationStartTime)}</span>
-                                </div>
-
-                                {iterationsPerSecond !== null && (
-                                    <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
-                                        <span style={{fontWeight: "bold"}}>Iterations/sec</span>
-                                        <span>{Math.round(iterationsPerSecond || 0).toLocaleString()}</span>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                        {converged && (
-                            <div style={{fontSize: '0.875rem'}}>
-                                Convergence type: {convergenceType}
-                            </div>
-                        )}
-                    </div>
-
-                    <div>
-                        <div style={{fontWeight: 'bold'}}>Iterations: {iterations.toLocaleString()}</div>
-                        <div style={{fontSize: '0.875rem'}}>
-                            Match percentage: {(matchPercentage * 100).toFixed(2)}%
-                        </div>
-                    </div>
-
-                    <div>
-                        <div style={{fontWeight: 'bold'}}>Objective Values</div>
-                        <div style={{fontSize: '0.875rem'}}>
-                            Grid 1: {gridState1?.objectiveValue.toFixed(4) || "N/A"}
-                        </div>
-                        <div style={{fontSize: '0.875rem'}}>
-                            Grid 2: {gridState2?.objectiveValue.toFixed(4) || "N/A"}
-                        </div>
-                        {isRunning && (
-                            <>
-                                <div style={{fontSize: '0.875rem'}}>
-                                    Best 1: {bestObjective1 !== Number.MAX_VALUE ? bestObjective1.toFixed(4) : "N/A"}
-                                </div>
-                                <div style={{fontSize: '0.875rem'}}>
-                                    Best 2: {bestObjective2 !== Number.MAX_VALUE ? bestObjective2.toFixed(4) : "N/A"}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div style={{display: 'flex', gap: '16px', marginBottom: '16px'}}>
-                <button
-                    onClick={startOptimization}
-                    disabled={isRunning}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: isRunning ? '#cccccc' : '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: isRunning ? 'not-allowed' : 'pointer',
-                        flex: '1'
-                    }}
-                >
-                    Start New Optimization
-                </button>
-
-                <button
-                    onClick={stopOptimization}
-                    disabled={!isRunning}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: !isRunning ? '#cccccc' : '#f44336',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: !isRunning ? 'not-allowed' : 'pointer',
-                        flex: '1'
-                    }}
-                >
-                    Stop Optimization
-                </button>
-            </div>
-
-            <div style={{
-                display: 'flex',
-                gap: '24px',
-                marginBottom: '24px',
-                height: 'calc(100% - 200px)',
-                minHeight: '300px'
-            }}>
-                <div style={{flex: '1', display: 'flex', flexDirection: 'column'}}>
-                    <h4 style={{textAlign: 'center', margin: '0 0 8px 0'}}>
-                        Grid 1 {grid1Version > 0 &&
-                        <span style={{fontSize: '0.75rem', color: '#666'}}>v{grid1Version}</span>}
-                    </h4>
-                    <div style={{flex: '1', border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden'}}>
+        <div className="w-full h-full">
+            {/* Grid Display Area */}
+            <div className={`flex ${showSingleGrid ? 'gap-0' : 'gap-4'} mb-4`}>
+                <div className={`${showSingleGrid ? 'w-full' : 'w-1/2'} bg-gray-800 rounded-lg shadow-md overflow-hidden`}>
+                    <h3 className="text-center font-bold p-2 bg-gray-700 border-b border-gray-600 text-white text-lg">
+                        Grid 1
+                        <span className="ml-2 text-sm text-green-300">
+              ({gridState1?.objectiveValue.toFixed(4) || "N/A"})
+            </span>
+                    </h3>
+                    <div className="h-96 border-b border-gray-600">
                         {gridState1 ? (
                             <GridDisplay
                                 key={`grid1-${grid1Version}-${iterations}`}
                                 grid={gridState1}
                                 objectsById={objectsById}
                                 iterations={iterations}
+                                colorTheme={colorTheme}
+                                onCellSelect={handleCellSelect1}
                             />
                         ) : (
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                height: '100%',
-                                backgroundColor: '#f9f9f9',
-                                color: '#666'
-                            }}>
-                                Initializing grid...
+                            <div className="flex items-center justify-center h-full bg-gray-900 text-gray-300">
+                                <div className="text-center">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                                    <p>Initializing grid...</p>
+                                </div>
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div style={{flex: '1', display: 'flex', flexDirection: 'column'}}>
-                    <h4 style={{textAlign: 'center', margin: '0 0 8px 0'}}>
-                        Grid 2 {grid2Version > 0 &&
-                        <span style={{fontSize: '0.75rem', color: '#666'}}>v{grid2Version}</span>}
-                    </h4>
-                    <div style={{flex: '1', border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden'}}>
-                        {gridState2 ? (
-                            <GridDisplay
-                                key={`grid2-${grid2Version}-${iterations}`}
-                                grid={gridState2}
-                                objectsById={objectsById}
-                                iterations={iterations}
-                            />
-                        ) : (
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                height: '100%',
-                                backgroundColor: '#f9f9f9',
-                                color: '#666'
-                            }}>
-                                Initializing grid...
-                            </div>
-                        )}
+                {!showSingleGrid && (
+                    <div className="w-1/2 bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                        <h3 className="text-center font-bold p-2 bg-gray-700 border-b border-gray-600 text-white text-lg">
+                            Grid 2
+                            <span className="ml-2 text-sm text-green-300">
+                ({gridState2?.objectiveValue.toFixed(4) || "N/A"})
+              </span>
+                        </h3>
+                        <div className="h-96 border-b border-gray-600">
+                            {gridState2 ? (
+                                <GridDisplay
+                                    key={`grid2-${grid2Version}-${iterations}`}
+                                    grid={gridState2}
+                                    objectsById={objectsById}
+                                    iterations={iterations}
+                                    colorTheme={colorTheme}
+                                    onCellSelect={handleCellSelect2}
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full bg-gray-900 text-gray-300">
+                                    <div className="text-center">
+                                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                                        <p>Initializing grid...</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );
