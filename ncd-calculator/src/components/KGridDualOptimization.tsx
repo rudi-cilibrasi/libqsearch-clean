@@ -1,375 +1,405 @@
-// KGridDualOptimization.tsx
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import {createSafeInitialGrid, deepCopy, GridObject, GridState,} from "@/services/kgrid";
+import {GridDisplay} from "./GridDisplay";
+// @ts-ignore
+import OptimizationWorker from '../workers/kgridWorker.js?worker';
+import {NCDMatrixResponse} from "@/types/ncd.ts";
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import {
-    GridObject,
-    GridState,
-    createSafeInitialGrid,
-    optimizeStep,
-    calculateObjectiveWithSymmetryBreaking,
-    getGradualFactorMatrix,
-    deepCopy,
-    calculateGridSimilarity,
-} from "@/services/kgrid.ts";
-import { GridDisplay } from "./GridDisplay";
 
-export const KGridDualOptimization = ({
-                                          width = 3,
-                                          height = 3,
-                                          objects,
-                                          maxIterations = 50000,
-                                          onOptimizationStart,
-                                          onOptimizationEnd,
-                                          onIterationUpdate,
-                                          onCellSelect,
-                                          colorTheme = "scientific",
-                                          autoStart = false,
-                                          optimizationEndTime,
-                                          totalExecutionTime,
-                                          iterationsPerSecond,
-                                          optimizationStartTime,
-                                          showSingleGrid = false,
-                                          isRunning,
-                                          ncdMatrixResponse,
-                                         onMatchPercentageUpdate,
-                                      }) => {
+interface OptimizationImprovements {
+    grid1Improved: boolean;
+    grid2Improved: boolean;
+    similarityImproved: boolean;
+}
+
+interface IterationStatus {
+    currentIteration: number;
+    bestObjective1: number;
+    bestObjective2: number;
+    bestSimilarity: number;
+    noImprovementCount: number;
+}
+
+// Update the worker response types
+interface WorkerResponse {
+    type: 'optimization_improved' | 'status_update' | 'initialized' | 'reset_confirmed' |
+        'optimization_started' | 'optimization_stopped' | 'optimization_complete' | 'error';
+    grid1?: GridState;
+    grid2?: GridState;
+    similarity?: number;
+    iteration?: number;
+    improvement?: OptimizationImprovements;
+    status?: IterationStatus;
+    error?: string;
+}
+
+interface KGridDualOptimizationProps {
+    width?: number;
+    height?: number;
+    objects?: GridObject[];
+    maxIterations?: number;
+    onOptimizationStart?: () => void;
+    onOptimizationEnd?: () => void;
+    onIterationUpdate?: (iteration: number) => void;
+    colorTheme?: string;
+    autoStart?: boolean;
+    showSingleGrid?: boolean;
+    isRunning?: boolean;
+    ncdMatrixResponse?: NCDMatrixResponse;
+    onMatchPercentageUpdate?: (number: number) => void;
+}
+
+
+export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
+                                                                                width = 3,
+                                                                                height = 3,
+                                                                                objects,
+                                                                                maxIterations = 50000,
+                                                                                onOptimizationStart,
+                                                                                onOptimizationEnd,
+                                                                                onIterationUpdate,
+                                                                                colorTheme = "scientific",
+                                                                                autoStart = false,
+                                                                                showSingleGrid = false,
+                                                                                isRunning = false,
+                                                                                ncdMatrixResponse,
+                                                                                onMatchPercentageUpdate
+                                                                            }) => {
     // Main grid states
-    const [gridState1, setGridState1] = useState(null);
-    const [gridState2, setGridState2] = useState(null);
+    const [gridState1, setGridState1] = useState<GridState | null>(null);
+    const [gridState2, setGridState2] = useState<GridState | null>(null);
 
     // Display objective values - separate from internal grid state objectives
-    const [displayObjective1, setDisplayObjective1] = useState(null);
-    const [displayObjective2, setDisplayObjective2] = useState(null);
+    const [displayObjective1, setDisplayObjective1] = useState<number | null>(null);
+    const [displayObjective2, setDisplayObjective2] = useState<number | null>(null);
 
     // Tracking and control states
-    const [iterations, setIterations] = useState(0);
-    const [converged, setConverged] = useState(false);
-    const [convergenceType, setConvergenceType] = useState("");
-    const [matchPercentage, setMatchPercentage] = useState(0);
-    const bestMatchPercentageRef = useRef(0);
+    const [iterations, setIterations] = useState<number>(0);
+    // @ts-ignore
+    const [converged, setConverged] = useState<boolean>(false);
+    // @ts-ignore
+    const [convergenceType, setConvergenceType] = useState<string>("");
+    // @ts-ignore
+    const [matchPercentage, setMatchPercentage] = useState<number>(0);
+    const bestMatchPercentageRef = useRef<number>(0);
 
     // Best state tracking
-    const [bestObjective1, setBestObjective1] = useState(Number.MAX_VALUE);
-    const [bestObjective2, setBestObjective2] = useState(Number.MAX_VALUE);
-    const [bestGrid1, setBestGrid1] = useState(null);
-    const [bestGrid2, setBestGrid2] = useState(null);
+    // @ts-ignore
+    const [bestObjective1, setBestObjective1] = useState<number>(Number.MAX_VALUE);
+    // @ts-ignore
+    const [bestObjective2, setBestObjective2] = useState<number>(Number.MAX_VALUE);
+    const [bestGrid1, setBestGrid1] = useState<GridState | null>(null);
+    const [bestGrid2, setBestGrid2] = useState<GridState | null>(null);
 
-    // Performance tracking
-    const [lastAcceptedSwap1, setLastAcceptedSwap1] = useState(null);
-    const [lastAcceptedSwap2, setLastAcceptedSwap2] = useState(null);
 
-    // Use refs for interval timers to avoid closure issues
-    const animationFrameRef = useRef(null);
-    const lastUpdateTimeRef = useRef(Date.now());
+    // Reference to the web worker
+    const workerRef = useRef<Worker | null>(null);
+
+    // State tracking refs
+    const isRunningRef = useRef(isRunning);
+    const optimizationActive = useRef(false);
     const autoStartRef = useRef(autoStart);
     const hasStartedRef = useRef(false);
-    const isRunningRef = useRef(isRunning);
-
-    // Ref to track if initialization has occurred
     const initializedRef = useRef(false);
 
     // Create a stable objects by ID mapping
     const objectsById = useMemo(() => {
-        const mapping = {};
-        objects.forEach((obj) => {
+        const mapping: Record<string, { label: string, content: number[] }> = {};
+        objects?.forEach((obj: GridObject) => {
             const stringId = String(obj.id);
             mapping[stringId] = {
                 label: obj.label || "Unknown",
-                content: obj.content || "",
+                content: obj.content
             };
         });
         return mapping;
     }, [objects]);
 
     // Initialize a new grid - only called once per component lifecycle
-    const initializeGrid = useCallback((factorMatrix) => {
-        console.log("Initializing grid with objects:", objects.length);
-        const processedObjects = objects.map(obj => ({
+    const initializeGrid = useCallback((objects: GridObject[], ncdMatrixResponse: NCDMatrixResponse) => {
+        console.log("Initializing grid with objects:", objects?.length);
+        const processedObjects = objects?.map(obj => ({
             ...obj,
             id: obj.id
         }));
-        const grid = createSafeInitialGrid(width, height, processedObjects, ncdMatrixResponse);
-        grid.objectiveValue = calculateObjectiveWithSymmetryBreaking(grid, factorMatrix, ncdMatrixResponse.ncdMatrix);
-        return grid;
+        return createSafeInitialGrid(width, height, processedObjects, ncdMatrixResponse);
     }, [width, height, objects, ncdMatrixResponse]);
 
-    // Check for convergence between the two grids
-    const checkConvergence = useCallback(() => {
-        if (!gridState1 || !gridState2) return false;
+    useEffect(() => {
+        if (!workerRef.current) {
+            console.log("Creating worker instance (one-time)");
+            workerRef.current = new OptimizationWorker();
 
-        // Update best states if needed
-        if (gridState1.objectiveValue < bestObjective1) {
-            setBestObjective1(gridState1.objectiveValue);
-            setBestGrid1(deepCopy(gridState1));
-            setLastAcceptedSwap1(iterations);
-            // Only update display objective when a better value is found
-            setDisplayObjective1(gridState1.objectiveValue);
-            console.log(`New best for Grid 1: ${gridState1.objectiveValue.toFixed(4)}`);
-        }
-
-        if (gridState2.objectiveValue < bestObjective2) {
-            setBestObjective2(gridState2.objectiveValue);
-            setBestGrid2(deepCopy(gridState2));
-            setLastAcceptedSwap2(iterations);
-            // Only update display objective when a better value is found
-            setDisplayObjective2(gridState2.objectiveValue);
-            console.log(`New best for Grid 2: ${gridState2.objectiveValue.toFixed(4)}`);
-        }
-
-        // Calculate similarity between grids - properly handle empty grids
-        if (gridState1?.grid && gridState2?.grid) {
-            const currentSimilarity = calculateGridSimilarity(gridState1, gridState2);
-            // Convert to percentage (0-100)
-            const percentage = currentSimilarity * 100;
-
-            // Only update if the match percentage improves
-            if (percentage > matchPercentage) {
-                setMatchPercentage(percentage);
-
-                // Pass match percentage up to parent component
-                if (onMatchPercentageUpdate) {
-                    onMatchPercentageUpdate(percentage);
-                }
-
-                // Track best match percentage
-                bestMatchPercentageRef.current = percentage;
+            const initMessage = {
+                command: 'initialize'
+            };
+            if (workerRef.current) {
+                workerRef.current.postMessage(initMessage);
             }
         }
 
-        // Check for termination conditions
-        if (matchPercentage === 100) {
+        // Clean up the worker when component unmounts
+        return () => {
+            if (workerRef.current) {
+                console.log("Terminating worker");
+                workerRef.current.terminate();
+                workerRef.current = null;
+            }
+        };
+    }, []);
+
+    // Set up the message handler for worker responses
+    useEffect(() => {
+        if (!workerRef.current) return;
+
+        // Set the message handler
+        workerRef.current.onmessage = (e: MessageEvent<WorkerResponse>) => {
+            const {type, grid1, grid2, similarity, iteration, improvement, status, error} = e.data;
+
+            if (iteration !== undefined) {
+                setIterations(iteration);
+                if (onIterationUpdate) {
+                    onIterationUpdate(iteration);
+                }
+            }
+
+            console.log(`Received worker message: ${type}, iteration: ${iteration || 'N/A'}`);
+            switch (type) {
+                case 'optimization_improved':
+                    if (grid1 && grid2 && similarity !== undefined && improvement) {
+                        processImprovement(grid1, grid2, similarity, improvement);
+                    }
+                    break;
+
+                case 'status_update':
+                    if (status) {
+                        checkTerminationConditions(status);
+                    }
+                    break;
+
+                case 'optimization_complete':
+                    console.log("Optimization complete - reached maximum iterations");
+                    setConverged(true);
+                    setConvergenceType("max iterations reached");
+                    stopOptimization();
+                    break;
+
+                case 'optimization_stopped':
+                    console.log("Optimization stopped by worker");
+                    break;
+
+                case 'optimization_started':
+                    console.log("Optimization started in worker");
+                    break;
+
+                case 'initialized':
+                    console.log('Worker initialized');
+                    break;
+
+                case 'reset_confirmed':
+                    console.log('Worker state reset');
+                    break;
+
+                case 'error':
+                    console.error('Worker error:', error);
+                    break;
+
+                default:
+                    console.warn(`Unknown message type: ${type}`);
+            }
+        };
+
+    }, [onIterationUpdate]);
+
+    // Process improvement received from worker
+    const processImprovement = useCallback((
+        newGrid1: GridState,
+        newGrid2: GridState,
+        similarity: number,
+        improvement: OptimizationImprovements
+    ) => {
+        if (!isRunningRef.current) return;
+
+        // Apply updates based on improvements
+        if (improvement.grid1Improved) {
+            setGridState1(newGrid1);
+            setBestObjective1(newGrid1.objectiveValue);
+            setBestGrid1(deepCopy(newGrid1));
+            setDisplayObjective1(newGrid1.objectiveValue);
+            console.log(`New best for Grid 1: ${newGrid1.objectiveValue.toFixed(4)}`);
+        }
+
+        if (improvement.grid2Improved) {
+            setGridState2(newGrid2);
+            setBestObjective2(newGrid2.objectiveValue);
+            setBestGrid2(deepCopy(newGrid2));
+            setDisplayObjective2(newGrid2.objectiveValue);
+            console.log(`New best for Grid 2: ${newGrid2.objectiveValue.toFixed(4)}`);
+        }
+
+        if (improvement.similarityImproved) {
+            setMatchPercentage(similarity);
+            if (onMatchPercentageUpdate) {
+                onMatchPercentageUpdate(similarity);
+            }
+            bestMatchPercentageRef.current = similarity;
+        }
+
+        if (similarity >= 100) {
             console.log("Grids have converged to identical arrangements");
             setConverged(true);
             setConvergenceType("exact match");
-            if (onOptimizationEnd) {
-                onOptimizationEnd();
-            }
-            return true;
+            stopOptimization();
         }
+    }, [onMatchPercentageUpdate]);
 
-        if (iterations >= maxIterations) {
+    // Check for termination conditions
+    const checkTerminationConditions = useCallback((status: IterationStatus) => {
+        const {currentIteration, noImprovementCount} = status;
+
+        if (currentIteration >= maxIterations) {
             console.log("Maximum iterations reached");
             setConverged(true);
             setConvergenceType("max iterations reached");
-            if (onOptimizationEnd) {
-                onOptimizationEnd();
-            }
+            stopOptimization();
             return true;
         }
 
-        // Check if we've gone too long without improvement
-        const iterationsSinceLastImprovement1 = lastAcceptedSwap1 !== null ? iterations - lastAcceptedSwap1 : 0;
-        const iterationsSinceLastImprovement2 = lastAcceptedSwap2 !== null ? iterations - lastAcceptedSwap2 : 0;
-
-        // If both grids haven't improved in 10,000 iterations, consider convergence
-        if (iterationsSinceLastImprovement1 > 10000 && iterationsSinceLastImprovement2 > 10000) {
+        if (noImprovementCount > 10000) {
             console.log("Optimization stalled - no improvement in 10,000 iterations");
             setConverged(true);
             setConvergenceType("optimization stalled");
-            if (onOptimizationEnd) {
-                onOptimizationEnd();
-            }
+            stopOptimization();
             return true;
         }
 
         return false;
-    }, [
-        gridState1,
-        gridState2,
-        iterations,
-        maxIterations,
-        bestObjective1,
-        bestObjective2,
-        lastAcceptedSwap1,
-        lastAcceptedSwap2,
-        onOptimizationEnd,
-        matchPercentage
-    ]);
+    }, [maxIterations]);
 
-    // Perform one optimization step for a grid
-    const performOptimizationStep = useCallback((gridState, iteration) => {
-        if (!gridState) return null;
+    const startOptimization = useCallback(() => {
+        if (!gridState1 || !gridState2 || !workerRef.current) {
+            console.error("Cannot start optimization: missing required data");
+            return;
+        }
 
-        // Perform the optimization step (which returns a new grid state)
-        const updatedGrid = optimizeStep(gridState, iteration);
+        console.log("Starting optimization with new grids");
 
-        // Always return a new object to ensure React detects the change
-        return {
-            ...updatedGrid,
-            grid: [...updatedGrid.grid.map(row => [...row])],
-            // Use new map objects to ensure reference change
-            idToIndexMap: new Map(updatedGrid.idToIndexMap),
-            indexToIdMap: new Map(updatedGrid.indexToIdMap)
-        };
-    }, []);
+        workerRef.current.postMessage({command: 'reset'});
 
-    // Synchronize running state with ref
+        isRunningRef.current = true;
+        optimizationActive.current = true;
+
+        setConverged(false);
+        setConvergenceType("");
+        setIterations(0);
+
+        setTimeout(() => {
+            if (!workerRef.current || !gridState1 || !gridState2) return;
+
+            const message = {
+                command: 'start_optimization',
+                data: {
+                    gridState1: gridState1,
+                    gridState2: gridState2,
+                    ncdMatrix: ncdMatrixResponse?.ncdMatrix,
+                    maxIterations: maxIterations
+                }
+            };
+
+            workerRef.current.postMessage(message);
+
+            if (onOptimizationStart) {
+                onOptimizationStart();
+            }
+        }, 100);
+    }, [gridState1, gridState2, ncdMatrixResponse, maxIterations, onOptimizationStart]);
+
+    const stopOptimization = useCallback(() => {
+        isRunningRef.current = false;
+        optimizationActive.current = false;
+
+        if (workerRef.current) {
+            workerRef.current.postMessage({command: 'stop_optimization'});
+        }
+
+        if (onOptimizationEnd) {
+            onOptimizationEnd();
+        }
+
+        console.log(`Optimization ended with best match: ${bestMatchPercentageRef.current.toFixed(2)}%`);
+    }, [onOptimizationEnd]);
+
+    // Sync with external isRunning prop
     useEffect(() => {
         isRunningRef.current = isRunning;
-    }, [isRunning]);
 
-    // Main optimization loop using requestAnimationFrame for smoother updates
-    useEffect(() => {
-        if (!isRunning || !gridState1 || !gridState2) return;
+        if (isRunning && !optimizationActive.current && gridState1 && gridState2) {
+            startOptimization();
+        } else if (!isRunning && optimizationActive.current) {
+            stopOptimization();
+        }
+    }, [isRunning, gridState1, gridState2, startOptimization, stopOptimization]);
 
-        // Only allow the optimization to run when explicitly set to running
-        if (!isRunningRef.current) return;
-
-        const runOptimizationStep = () => {
-            // Check again inside the function to ensure we have the latest value
-            if (!isRunningRef.current) return;
-
-            // Update grid states with new optimized versions
-            const newGrid1 = performOptimizationStep(gridState1, iterations);
-            const newGrid2 = performOptimizationStep(gridState2, iterations);
-
-            // Check if grids have actually changed
-            setGridState1(newGrid1);
-            setGridState2(newGrid2);
-
-            // Update iteration counter and notify parent
-            setIterations(prev => {
-                const newIteration = prev + 1;
-                if (onIterationUpdate) {
-                    onIterationUpdate(newIteration);
-                }
-                return newIteration;
-            });
-
-            // Update the last update time
-            lastUpdateTimeRef.current = Date.now();
-
-            // Check for convergence
-            if (checkConvergence()) {
-                if (animationFrameRef.current) {
-                    cancelAnimationFrame(animationFrameRef.current);
-                    animationFrameRef.current = null;
-                }
-                return;
-            }
-
-            // Schedule the next frame only if still running
-            if (isRunningRef.current) {
-                animationFrameRef.current = requestAnimationFrame(runOptimizationStep);
-            }
-        };
-
-        // Start the animation loop
-        animationFrameRef.current = requestAnimationFrame(runOptimizationStep);
-
-        // Cleanup on unmount or when optimization stops
-        return () => {
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-                animationFrameRef.current = null;
-            }
-        };
-    }, [isRunning, gridState1, gridState2, iterations, performOptimizationStep, checkConvergence, onIterationUpdate]);
-
-    // Handle auto-start - make sure it only happens once
+    // Auto-start effect
     useEffect(() => {
         if (autoStartRef.current && !hasStartedRef.current && gridState1 && gridState2) {
             console.log("Auto-starting optimization");
             hasStartedRef.current = true;
-            if (onOptimizationStart) {
-                onOptimizationStart();
-            }
+            startOptimization();
         }
-    }, [gridState1, gridState2, onOptimizationStart]);
-
-    // Cell selection handlers
-    const handleCellSelect1 = useCallback((objectId, i, j) => {
-        if (onCellSelect) {
-            onCellSelect(1, objectId, [i, j]);
-        }
-    }, [onCellSelect]);
-
-    const handleCellSelect2 = useCallback((objectId, i, j) => {
-        if (onCellSelect) {
-            onCellSelect(2, objectId, [i, j]);
-        }
-    }, [onCellSelect]);
+    }, [gridState1, gridState2, startOptimization]);
 
     // Initialize grids when component mounts - ONLY ONCE
     useEffect(() => {
-        // Only initialize once, using the initializedRef to prevent duplicate initializations
-        if (!initializedRef.current && objects.length > 0 && ncdMatrixResponse) {
+        if (!initializedRef.current && objects && objects.length > 0 && ncdMatrixResponse) {
             try {
-                const precomputedGradualFactor = getGradualFactorMatrix(width, height);
-                const initialGrid1 = initializeGrid(precomputedGradualFactor);
-                const initialGrid2 = initializeGrid(precomputedGradualFactor);
+                const initialGrid1 = initializeGrid(objects, ncdMatrixResponse);
+                const initialGrid2 = initializeGrid(objects, ncdMatrixResponse);
 
                 setGridState1(initialGrid1);
                 setGridState2(initialGrid2);
 
-                // Set initial display objectives - only when animation is stopped
                 if (!isRunning) {
                     setDisplayObjective1(initialGrid1.objectiveValue);
                     setDisplayObjective2(initialGrid2.objectiveValue);
                 }
 
-                // Set initial best objectives
                 setBestObjective1(initialGrid1.objectiveValue);
                 setBestObjective2(initialGrid2.objectiveValue);
 
                 console.log("Initial grids created");
 
-                // Mark as initialized to prevent re-initialization
                 initializedRef.current = true;
             } catch (error) {
                 console.error("Error creating initial grids:", error);
             }
         }
-    }, [width, height, initializeGrid, objects, ncdMatrixResponse, isRunning]);
+    }, [width, height, initializeGrid, objects, ncdMatrixResponse]);
 
     // Update display objectives and show best grids when the animation is stopped
     useEffect(() => {
         if (!isRunning) {
-            // When animation stops, show the grids with the lowest objective values
             if (bestGrid1 && bestGrid2) {
                 console.log(`Showing best objective grids with values: ${bestGrid1.objectiveValue.toFixed(4)} and ${bestGrid2.objectiveValue.toFixed(4)}`);
 
-                // Update the display with the best objective grids
                 setGridState1(bestGrid1);
                 setGridState2(bestGrid2);
 
-                // Set the objective values from best grids
                 setDisplayObjective1(bestGrid1.objectiveValue);
                 setDisplayObjective2(bestGrid2.objectiveValue);
             } else if (gridState1 && gridState2) {
-                // If no best grids, just show current objective values
                 setDisplayObjective1(gridState1.objectiveValue);
                 setDisplayObjective2(gridState2.objectiveValue);
             }
         }
     }, [isRunning, gridState1, gridState2, bestGrid1, bestGrid2]);
 
-    // Clean up when component unmounts
-    useEffect(() => {
-        return () => {
-            // Reset initializedRef if component is unmounting
-            initializedRef.current = false;
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-                animationFrameRef.current = null;
-            }
-        };
-    }, []);
-
-    // Calculate the grid cell size based on the available dimensions to prevent flickering
-    const calculateCellDimensions = () => {
-        const cellWidth = `${100 / width}%`;
-        const cellHeight = `${100 / height}%`;
-        return { width: cellWidth, height: cellHeight };
-    };
-
-    const cellDimensions = useMemo(calculateCellDimensions, [width, height]);
-
     return (
         <div className="w-full h-full">
             {/* Grid Display Area */}
             <div className={`flex ${showSingleGrid ? 'gap-0' : 'gap-4'} mb-4`}>
-                <div className={`${showSingleGrid ? 'w-full' : 'w-1/2'} bg-gray-800 rounded-lg shadow-md overflow-hidden`}>
+                <div
+                    className={`${showSingleGrid ? 'w-full' : 'w-1/2'} bg-gray-800 rounded-lg shadow-md overflow-hidden`}>
                     <h3 className="text-center font-bold p-2 bg-gray-700 border-b border-gray-600 text-white text-lg">
                         Grid 1
                         {!isRunning && displayObjective1 !== null && (
@@ -381,17 +411,17 @@ export const KGridDualOptimization = ({
                     <div className="h-96 border-b border-gray-600 overflow-hidden">
                         {gridState1 ? (
                             <GridDisplay
-                                key="grid1-display" // Fixed key to prevent recreation
+                                key="grid1-display"
                                 grid={gridState1}
                                 objectsById={objectsById}
                                 iterations={iterations}
                                 colorTheme={colorTheme}
-                                onCellSelect={handleCellSelect1}
                             />
                         ) : (
                             <div className="flex items-center justify-center h-full bg-gray-900 text-gray-300">
                                 <div className="text-center">
-                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                                    <div
+                                        className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-4"></div>
                                     <p>Initializing grid...</p>
                                 </div>
                             </div>
@@ -412,17 +442,17 @@ export const KGridDualOptimization = ({
                         <div className="h-96 border-b border-gray-600 overflow-hidden">
                             {gridState2 ? (
                                 <GridDisplay
-                                    key="grid2-display" // Fixed key to prevent recreation
+                                    key="grid2-display"
                                     grid={gridState2}
                                     objectsById={objectsById}
                                     iterations={iterations}
                                     colorTheme={colorTheme}
-                                    onCellSelect={handleCellSelect2}
                                 />
                             ) : (
                                 <div className="flex items-center justify-center h-full bg-gray-900 text-gray-300">
                                     <div className="text-center">
-                                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                                        <div
+                                            className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-4"></div>
                                         <p>Initializing grid...</p>
                                     </div>
                                 </div>
@@ -431,6 +461,12 @@ export const KGridDualOptimization = ({
                     </div>
                 )}
             </div>
+            {isRunning && (
+                <div className="text-xs text-gray-400 p-2 text-center">
+                    Optimization in progress. Updates occur when better arrangements are found.
+                    Current iteration: {iterations.toLocaleString()}
+                </div>
+            )}
         </div>
     );
 };

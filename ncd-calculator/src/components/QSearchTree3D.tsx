@@ -6,18 +6,19 @@ import { saveAs } from "file-saver";
 import createGraph from "../functions/graphExport";
 
 // Types for the graph data
-interface GraphNode {
+export interface QTreeNode {
   index: number;
   label: string;
   connections: number[];
 }
 
-interface GraphData {
-  nodes: GraphNode[];
+export interface QTreeResponse {
+  nodes: QTreeNode[];
 }
 
-interface QSearchTree3DProps {
-  data: GraphData;
+export interface QSearchTree3DProps {
+  data: QTreeResponse;
+  darkThemeOnly?: boolean;
 }
 
 interface ContainerStyle {
@@ -106,7 +107,7 @@ export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({ data }) => {
 
 // Types for the QSearchTree component
 interface QSearchTreeProps {
-  data: GraphData;
+  data: QTreeResponse;
   scaleFactor: number;
   theme: "light" | "dark";
 }
@@ -149,7 +150,7 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor, theme }) =
   }, [data, theme]);
 
   const calculateInitialPositions = (
-      nodes: GraphNode[]
+      nodes: QTreeNode[]
   ): Map<number, THREE.Vector3> => {
     const positions = new Map<number, THREE.Vector3>();
     const visited = new Set<number>();
@@ -163,7 +164,7 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor, theme }) =
 
     // Recursive function to position nodes in a tree-like structure
     const positionNode = (
-        node: GraphNode,
+        node: QTreeNode,
         angle: number,
         radius: number,
         level: number
@@ -342,7 +343,7 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor, theme }) =
     springsRef.current.forEach(updateSpring);
   });
 
-  const loadGraph = (graph: GraphData): void => {
+  const loadGraph = (graph: QTreeResponse): void => {
     ballsRef.current = [];
     springsRef.current = [];
 
@@ -396,9 +397,6 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({ data, scaleFactor, theme }) =
               material-depthTest={false}
               outlineColor={theme === "dark" ? "#000000" : "#ffffff"}
               outlineWidth={0.05}
-              backgroundColor={theme === "dark" ? "#000000" : "#ffffff"}
-              backgroundOpacity={0.6}
-              padding={[0.2, 0.3, 0.2, 0.3]}
           >
             {node.label}
           </Text>

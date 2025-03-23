@@ -1,6 +1,12 @@
-export const MatrixTable = ({ ncdMatrix, labels }) => {
+import React from "react";
+
+interface MatrixTableProps {
+    ncdMatrix: number[][];
+    labels: string[]
+}
+export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) => {
     // Generate color for cells with high contrast, but with more pleasant colors
-    const getCellStyle = (value) => {
+    const getCellStyle = (value: number) => {
         // Use a softer color gradient based on value
         // Lower values (more similar) = softer blue
         // Higher values (more different) = lighter blue-gray

@@ -1,15 +1,16 @@
 import React, {useEffect, useRef, useState} from "react";
+// @ts-ignore
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
 import ListEditor from "./ListEditor";
 import Header from "./Header";
 import {NCDProgress} from "./NCDProgress";
-import type {CompressionStats, NCDInput, NCDMatrixResponse, WorkerResultMessage} from "@/types/ncd";
+import type {CompressionStats, NCDInput, NCDMatrixResponse} from "@/types/ncd";
 import {useNCDCache} from "@/hooks/useNCDCache";
-import {type CompressionAlgorithm, CompressionService} from "@/services/CompressionService";
+import {CompressionResponse, CompressionService} from "@/services/CompressionService";
 import {useLabelManager} from "@/hooks/useLabelManager.ts";
 import KGridVisualization from "@/components/KGridVisualization.tsx";
 import {GridObject} from "@/services/kgrid.ts";
-import {createMeshesFromInstancedMesh} from "three/examples/jsm/utils/SceneUtils";
+import {QTreeNode, QTreeResponse} from "@/components/QSearchTree3D.tsx";
 
 export interface QSearchProps {
   openLogin: boolean;
@@ -28,7 +29,7 @@ export const QSearch: React.FC<QSearchProps> = ({
   const [labels, setLabels] = useState<string[]>([]);
   const [hasMatrix, setHasMatrix] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [qSearchTreeResult, setQSearchTreeResult] = useState<any[] | null>([]);
+  const [qSearchTreeResult, setQSearchTreeResult] = useState<QTreeResponse | undefined>();
   const [labelMap, setLabelMap] = useState(new Map());
   const labelMapRef = useRef(labelMap);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,16 +40,15 @@ export const QSearch: React.FC<QSearchProps> = ({
 
   // Add optimization state tracking
   const [optimizationStartTime, setOptimizationStartTime] = useState<number | null>(null);
+  // @ts-ignore
   const [optimizationEndTime, setOptimizationEndTime] = useState<number | null>(null);
   const [totalExecutionTime, setTotalExecutionTime] = useState<number | null>(null);
   const [iterationsPerSecond, setIterationsPerSecond] = useState<number | null>(null);
+  // @ts-ignore
   const [iterations, setIterations] = useState(0);
 
-  const [compressionInfo, setCompressionInfo] = useState<{
-    algorithm: CompressionAlgorithm;
-    reason: string;
-  } | null>(null);
-  const [compressionStats, setCompressionStats] = useState({
+  const [compressionInfo, setCompressionInfo] = useState<CompressionResponse | null>(null);
+  const [compressionStats, setCompressionStats] = useState<CompressionStats>({
     processedPairs: 0,
     totalPairs: 0,
     bytesProcessed: 0,
@@ -74,10 +74,10 @@ export const QSearch: React.FC<QSearchProps> = ({
     if (event.data.action === "treeJSON") {
       try {
         const result = JSON.parse(event.data.result);
-        result.nodes = result.nodes.map(node => ({
+        result.nodes = result.nodes.map((node: QTreeNode) => ({
           ...node,
           label: labelManager.getDisplayLabel(node.label) || ""
-        }));
+        })) as QTreeResponse;
         setQSearchTreeResult(result);
       } catch (error) {
         console.error("Error processing QSearch result:", error);
@@ -232,7 +232,7 @@ export const QSearch: React.FC<QSearchProps> = ({
     labelMapRef.current = new Map();
     setLabelMap(new Map());
     setHasMatrix(false);
-    setQSearchTreeResult(null);
+    setQSearchTreeResult(undefined);
     setCompressionInfo(null);
     setCompressionStats({
       processedPairs: 0,
@@ -343,9 +343,7 @@ export const QSearch: React.FC<QSearchProps> = ({
           {/* Results */}
           {!isLoading && hasMatrix && labels.length > 0 && ncdMatrix.length > 0 && (
               <KGridVisualization
-                  labels={labels}
                   labelManager={labelManager}
-                  ncdMatrix={ncdMatrix}
                   objects={gridObjects}
                   maxIterations={50000}
                   onOptimizationStart={handleOptimizationStart}
@@ -353,8 +351,6 @@ export const QSearch: React.FC<QSearchProps> = ({
                   onIterationUpdate={handleIterationUpdate}
                   qSearchTreeResult={qSearchTreeResult}
                   autoStart={true}
-                  optimizationStartTime={optimizationStartTime || undefined}
-                  optimizationEndTime={optimizationEndTime || undefined}
                   totalExecutionTime={totalExecutionTime || undefined}
                   iterationsPerSecond={iterationsPerSecond || undefined}
                   ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
@@ -366,7 +362,7 @@ export const QSearch: React.FC<QSearchProps> = ({
               <div className="mt-2 mb-4 flex items-center justify-center gap-2 text-sm">
                 <div
                     className={`px-3 py-1 rounded-full ${
-                        compressionInfo.algorithm === "gzip"
+                        compressionInfo.algorithm === "zstd"
                             ? "bg-blue-100 text-blue-700"
                             : compressionInfo.algorithm === "lzma"
                                 ? "bg-purple-100 text-purple-700"
