@@ -105,30 +105,6 @@ export const gradualFactor = (pos: Position, width: number, height: number): num
     return Math.pow(baseGradient + secondaryPattern, 0.4);
 };
 
-export const calculateObjective = (grid: GridState): number => {
-    let total = 0;
-
-    for (let i = 0; i < grid.height; i++) {
-        for (let j = 0; j < grid.width; j++) {
-            const currentId = grid.indexToIdMap.get(grid.grid[i][j]) || '';
-            let positionNCD = 0;
-
-            const rightJ = (j + 1) % grid.width;
-            const rightNeighborId = grid.indexToIdMap.get(grid.grid[i][rightJ]) || '';
-
-            positionNCD += grid.ncdMatrix[currentId][rightNeighborId];
-
-            const downI = (i + 1) % grid.height;
-            const downNeighborId = grid.indexToIdMap.get(grid.grid[downI][j]) || '';
-            positionNCD += grid.ncdMatrix[currentId][downNeighborId];
-
-            const factor = gradualFactor({i, j}, grid.width, grid.height);
-            total += positionNCD * factor;
-
-        }
-    }
-    return total;
-}
 
 export const deepCopy = (gridState: GridState): GridState => {
     const newGrid: number[][] = [];
@@ -143,7 +119,6 @@ export const deepCopy = (gridState: GridState): GridState => {
         width: gridState.width,
         height: gridState.height,
         grid: newGrid,
-        ncdMatrix: gridState.ncdMatrix,
         objectiveValue: gridState.objectiveValue,
         numericNcdMatrix: gridState.numericNcdMatrix,
         factorMatrix: gridState.factorMatrix,
@@ -177,64 +152,6 @@ export const extractBlock = (grid: GridState, block: Block): number[][] => {
         JSON.stringify(blockContent));
     return blockContent;
 }
-export const reflectHorizontally = (block: string[][]): void => {
-    if (!block || block.length === 0) return;
-
-    for (let i = 0; i < block.length; i++) {
-        if (Array.isArray(block[i])) {
-            block[i].reverse();
-        }
-    }
-}
-
-export const reflectVertically = (block: string[][]): void => {
-    if (!block || block.length === 0) return;
-    block.reverse();
-}
-
-export const placeBlock = (grid: GridState, block: Block, blockContent: number[][]): void => {
-    const normalizedBlock = normalizeBlock(block, grid.height, grid.width);
-    const {topLeft, bottomRight} = normalizedBlock;
-
-    const expectedHeight = bottomRight.i - topLeft.i + 1;
-    const expectedWidth = bottomRight.j - topLeft.j + 1;
-
-    const actualHeight = blockContent.length;
-    const actualWidth = actualHeight > 0 ? blockContent[0].length : 0;
-
-    console.log(`Placing block: expected ${expectedWidth}×${expectedHeight}, actual ${actualWidth}×${actualHeight}`);
-
-    if (expectedHeight !== actualHeight || expectedWidth !== actualWidth) {
-        console.warn(`Block dimension mismatch: expected ${expectedWidth}×${expectedHeight}, got ${actualWidth}×${actualHeight}`);
-
-        const adjustedBlock = {
-            topLeft: normalizedBlock.topLeft,
-            bottomRight: {
-                i: normalizedBlock.topLeft.i + actualHeight - 1,
-                j: normalizedBlock.topLeft.j + actualWidth - 1
-            }
-        };
-
-        Object.assign(normalizedBlock, adjustedBlock);
-    }
-
-    for (let i = 0; i < blockContent.length; i++) {
-        for (let j = 0; j < blockContent[i].length; j++) {
-            // Apply toroidal wraparound
-            const gridI = (topLeft.i + i) % grid.height;
-            const gridJ = (topLeft.j + j) % grid.width;
-
-            if (gridI >= 0 && gridI < grid.height && gridJ >= 0 && gridJ < grid.width) {
-                grid.grid[gridI][gridJ] = blockContent[i][j];
-            } else {
-                console.error(`Invalid grid position (${gridI},${gridJ}) when placing block`);
-            }
-        }
-    }
-}
-
-
-
 
 export const normalizeBlock = (block: Block, gridHeight: number, gridWidth: number): Block => {
     const topLeftI = Math.min(Math.max(0, Math.floor(block.topLeft.i)), gridHeight - 1);
@@ -310,7 +227,6 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
 
     // Calculate optimal grid dimensions based on actual number of objects
     const itemCount = uniqueObjects.length;
-    const minGridSize = Math.max(2, Math.min(itemCount, 4)); // Minimum viable grid size (at least 2x2)
 
     // Adjust width and height based on available objects
     const optimalWidth = Math.ceil(Math.sqrt(itemCount));
@@ -543,22 +459,6 @@ export const symmetryBreaker = (pos: Position, width: number, height: number) =>
 }
 
 
-export const getNcdValueByIds = (
-    id1: string,
-    id2: string,
-    ncdMatrix: number[][],
-    idToIndexMap: Map<string, number>
-): number => {
-    const index1 = idToIndexMap.get(id1);
-    const index2 = idToIndexMap.get(id2);
-
-    if (index1 === undefined || index2 === undefined) {
-        throw new Error(`Invalid object IDs: ${id1}, ${id2}`);
-    }
-
-    return ncdMatrix[index1][index2];
-};
-
 export const calculateObjectiveWithSymmetryBreaking = (
     gridState: GridState,
     factorMatrix: number[][],
@@ -593,7 +493,6 @@ export const calculateGridSimilarity = (grid1: GridState, grid2: GridState): num
     if (grid1.width !== grid2.width || grid1.height !== grid2.height) {
         throw new Error("Grids must have the same dimensions to calculate similarity");
     }
-    console.log('grid1 now: ' + JSON.stringify(grid1) + ", grid 2: " + JSON.stringify(grid2));
 
     let matches = 0;
     const totalCells = grid1.height * grid1.width;

@@ -67,8 +67,10 @@ export class CompressionService {
   private async loadWorkerModule(algorithm: CompressionAlgorithm) {
     switch (algorithm) {
       case "lzma":
+        // @ts-ignore
         return import("../workers/lzmaWorker?worker");
       case "zstd":
+        // @ts-ignore
         return import("../workers/zstdWorker?worker");
       default:
         throw new Error(`Unsupported compression algorithm: ${algorithm}`);

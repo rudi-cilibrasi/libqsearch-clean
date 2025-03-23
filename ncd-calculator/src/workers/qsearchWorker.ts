@@ -23,7 +23,7 @@ interface ConsoleMessage {
   message: string;
 }
 
-interface TreeJSONMessage {
+export interface TreeJSONMessage {
   action: "treeJSON";
   result: string;
 }
