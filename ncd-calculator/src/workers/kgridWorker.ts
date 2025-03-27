@@ -1,7 +1,4 @@
-import {
-    calculateGridSimilarity, GridState,
-    optimizeStep
-} from "@/services/kgrid.ts";
+import {calculateGridSimilarity, GridState, optimizeStep} from "@/services/kgrid.ts";
 
 
 interface WorkerMessage {
@@ -196,8 +193,6 @@ const runOptimizationStep = () => {
                 currentIteration < CONFIG.initialStatusUpdates || // Always send first few iterations
                 currentIteration % CONFIG.updateInterval === 0 || // Regular interval updates
                 noImprovementCount >= CONFIG.maxNoImprovement;    // Force update after many iterations with no improvement
-
-            // Reset the counter if we've hit the max
             if (noImprovementCount >= CONFIG.maxNoImprovement) {
                 noImprovementCount = 0;
             }
@@ -230,7 +225,7 @@ const runOptimizationStep = () => {
         currentIteration++;
         optimizationTimer = setTimeout(runOptimizationStep, 0);
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("[Worker] Error during optimization:", error);
 
         ctx.postMessage({
@@ -245,7 +240,6 @@ const runOptimizationStep = () => {
             },
             iteration: currentIteration
         } as WorkerResponse);
-
         currentIteration++;
         optimizationTimer = setTimeout(runOptimizationStep, 0);
     }
@@ -255,7 +249,7 @@ const ctx: Worker = self as any;
 
 ctx.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
     try {
-        const { command, data } = event.data;
+        const {command, data} = event.data;
 
         switch (command) {
             case "initialize": {
@@ -312,7 +306,7 @@ ctx.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
                 console.error(`[Worker] Unknown command: ${command}`);
             }
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("[Worker] Unhandled error:", error);
 
         ctx.postMessage({

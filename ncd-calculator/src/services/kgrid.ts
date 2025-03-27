@@ -85,26 +85,30 @@ export const getGradualFactorMatrix = (width: number, height: number): number[][
 }
 
 export const gradualFactor = (pos: Position, width: number, height: number): number => {
-    // Normalize position coordinates to [0,1] range
-    const normalizedI = pos.i / (height - 1);
-    const normalizedJ = pos.j / (width - 1);
+    // For true wraparound, we want a more circular/toroidal pattern
+    // Calculate distance from center (normalized)
+    const centerI = height / 2;
+    const centerJ = width / 2;
 
-    // Create a two-component symmetry breaker:
-    // 1. Primary gradient: exponential increase toward bottom-right with different coefficients
-    // 2. Secondary pattern: subtle sinusoidal variation to break additional symmetries
+    // Calculate normalized circular distance from center
+    const distI = Math.min(Math.abs(pos.i - centerI), Math.abs(pos.i - centerI - height), Math.abs(pos.i - centerI + height)) / (height / 2);
+    const distJ = Math.min(Math.abs(pos.j - centerJ), Math.abs(pos.j - centerJ - width), Math.abs(pos.j - centerJ + width)) / (width / 2);
 
-    // Base component with carefully calibrated parameters
-    const baseGradient = 1.15 + 0.25 * normalizedI + 0.35 * normalizedJ;
+    // Combined distance (circular)
+    const dist = Math.sqrt(distI * distI + distJ * distJ);
 
-    // Subtle secondary pattern to break remaining symmetries
-    const secondaryPattern = 0.03 * Math.sin(normalizedI * 3.14) * Math.sin(normalizedJ * 2.71);
+    // Base value
+    const base = 1.15;
 
-    // Combine components with carefully chosen exponent (0.4)
-    // - Higher than 0.2 (your original) for more differentiation
-    // - Lower than 0.6 to avoid overwhelming the NCD relationships
-    return Math.pow(baseGradient + secondaryPattern, 0.4);
+    // Radial pattern with slight variation
+    const radialFactor = 0.2 * (1 - dist);
+
+    // Add some asymmetry with a small sinusoidal component
+    const asymFactor = 0.05 * Math.sin(pos.i * Math.PI / height) * Math.sin(pos.j * Math.PI / width);
+
+    // Combine and apply power scaling
+    return Math.pow(base + radialFactor + asymFactor, 0.4);
 };
-
 
 export const deepCopy = (gridState: GridState): GridState => {
     const newGrid: number[][] = [];
@@ -195,7 +199,6 @@ export const getNCDValue = (index1: number, index2: number, ncdMatrix: number[][
 }
 
 
-// Fixed getAdjacentEmptyCells function
 export const getAdjacentEmptyCells = (grid: number[][], visited: Set<string>, emptyIndex: number = -1): [number, number][] => {
     if (!grid || grid.length === 0) return [];
 
@@ -203,37 +206,29 @@ export const getAdjacentEmptyCells = (grid: number[][], visited: Set<string>, em
     const height = grid.length;
     const width = grid[0].length;
 
-    // Check every cell in the grid
     for (let i = 0; i < height; i++) {
         for (let j = 0; j < width; j++) {
-            // Only consider non-empty cells that we haven't already processed
             if (grid[i][j] !== emptyIndex && !visited.has(`${i}-${j}`)) {
-                // Mark this cell as visited to avoid rechecking
                 visited.add(`${i}-${j}`);
 
-                // Check all four neighboring directions
                 const neighbors = [
-                    [i - 1, j], // Up
-                    [i, j + 1], // Right
-                    [i + 1, j], // Down
-                    [i, j - 1]  // Left
+                    [i - 1, j], // up
+                    [i, j + 1], // right,
+                    [i + 1, j], // down
+                    [i, j - 1], // left
                 ];
 
-                // For each neighboring position
-                for (const [ni, nj] of neighbors) {
-                    // Check if it's within bounds
-                    if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
-                        // Check if the neighboring cell is empty
-                        if (grid[ni][nj] === emptyIndex) {
-                            // Add this empty cell to our list
-                            adjacent.push([ni, nj]);
-                        }
+                for (const [ni_raw, nj_raw] of neighbors) {
+                    const ni = (ni_raw + height) % height;
+                    const nj = (nj_raw + width) % width;
+
+                    if (grid[ni][nj] === emptyIndex) {
+                        adjacent.push([ni, nj]);
                     }
                 }
             }
         }
     }
-
     return adjacent;
 };
 
@@ -418,8 +413,8 @@ export const wouldBreakConnectivity = (grid: GridState, cell1: Position, cell2: 
 
         const directions = [[-1, 0], [0, 1], [1, 0], [0, -1]];
         for (const [di, dj] of directions) {
-            const ni = i + di;
-            const nj = j + dj;
+            const ni = (i + di + height) % height;
+            const nj = (j + dj + width) % width;
 
             if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
                 if (tempGrid[ni][nj] !== emptyIndex && !visited[ni][nj]) {
@@ -480,34 +475,20 @@ export const calculateObjectiveWithSlackSpace = (gridState: GridState): number =
     }
 
     for (let i = 0; i < height; i++) {
-        if (!grid[i]) {
-            console.warn(`Row ${i} does not exist in grid of height ${grid.length}`);
-            continue;
-        }
         for (let j = 0; j < width; j++) {
-            if (j >= grid[i].length) {
-                console.warn(`Column ${j} does not exist in row ${i} of length ${grid[i].length}`);
-                continue;
-            }
             const currentIdx = grid[i][j];
             if (currentIdx === emptyIndex) continue;
-            let positionNCD = 0;
-            const rightJ = (j + 1) % width;
-            if (grid[i] && rightJ < grid[i].length) {
-                const rightNeighborIdx = grid[i][rightJ];
-                if (rightNeighborIdx !== emptyIndex) {
-                    positionNCD += numericNcdMatrix[currentIdx][rightNeighborIdx];
-                }
-            }
-            const downI = (i + 1) % height;
-            if (grid[downI] && j < grid[downI].length) {
-                const downNeighborIdx = grid[downI][j];
-                if (downNeighborIdx !== emptyIndex) {
-                    positionNCD += numericNcdMatrix[currentIdx][downNeighborIdx];
-                }
-            }
+            const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
 
-            total += positionNCD * factorMatrix[i][j];
+            for (const [di, dj] of directions) {
+                const ni = (i + di + height) % height; // wrap around
+                const nj = (j + dj + width) % width;
+
+                const neighborIdx = grid[ni][nj];
+                if (neighborIdx !== emptyIndex) {
+                    total += numericNcdMatrix[currentIdx][neighborIdx] * factorMatrix[i][j];
+                }
+            }
         }
     }
     return total;
@@ -563,7 +544,6 @@ const OPTIMIZE_STEP_OPTIONS = {
     swapsPerStep: 1,           // Number of swaps to try per step
 }
 
-// Updated swapCells function to ensure it returns a completely new object
 export const swapCells = (grid: GridState, pos1: Position, pos2: Position): GridState => {
     console.log(`Swapping cells: (${pos1.i},${pos1.j}) with (${pos2.i},${pos2.j})`);
 

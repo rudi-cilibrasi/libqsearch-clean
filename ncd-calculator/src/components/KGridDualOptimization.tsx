@@ -79,13 +79,17 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
 
     // Tracking and control states
     const [iterations, setIterations] = useState<number>(0);
+    //@ts-ignore
     const [converged, setConverged] = useState<boolean>(false);
+    //@ts-ignore
     const [convergenceType, setConvergenceType] = useState<string>("");
     const [matchPercentage, setMatchPercentage] = useState<number>(0);
     const bestMatchPercentageRef = useRef<number>(0);
 
     // Best state tracking
+    //@ts-ignore
     const [bestObjective1, setBestObjective1] = useState<number>(Number.MAX_VALUE);
+    //@ts-ignore
     const [bestObjective2, setBestObjective2] = useState<number>(Number.MAX_VALUE);
     const [bestGrid1, setBestGrid1] = useState<GridState | null>(null);
     const [bestGrid2, setBestGrid2] = useState<GridState | null>(null);
