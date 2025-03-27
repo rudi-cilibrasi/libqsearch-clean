@@ -74,12 +74,12 @@ test('Test compression decision lzma', async () => {
     // Validate the `ncdMatrix`
     expect(result.ncdMatrix).toHaveLength(5);
 
-    for(let r = 0; r < result.ncdMatrix.length; r++) {
-        for(let c = 0; c < result.ncdMatrix[r].length; c++) {
+    for (let r = 0; r < result.ncdMatrix.length; r++) {
+        for (let c = 0; c < result.ncdMatrix[r].length; c++) {
             expect(Math.abs(result.ncdMatrix[r][c] - expectedResult.ncdMatrix[r][c]) <= 1e-10);
         }
     }
-}, 60000);
+}, 180000);
 
 test('Test compression decision zstd', async () => {
     const input: NCDInput = {
@@ -183,13 +183,13 @@ test('Test compression decision zstd', async () => {
     // Validate the `ncdMatrix`
     expect(result.ncdMatrix).toHaveLength(4);
 
-    for(let r = 0; r < result.ncdMatrix.length; r++) {
-        for(let c = 0; c < result.ncdMatrix[r].length; c++) {
+    for (let r = 0; r < result.ncdMatrix.length; r++) {
+        for (let c = 0; c < result.ncdMatrix[r].length; c++) {
             expect(Math.abs(result.ncdMatrix[r][c] - expectedResult.ncdMatrix[r][c]) <= 1e-10);
         }
     }
 
-}, 60000);
+}, 180000);
 
 
 

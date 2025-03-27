@@ -1,6 +1,5 @@
 import {deflate} from "pako";
 import {NCDMatrixResponse} from "@/types/ncd.ts";
-import {LabelManager} from "@/functions/labelUtils.ts";
 
 export interface GridObject {
     id: string;
@@ -27,6 +26,7 @@ export interface GridState {
     indexToIdMap: Map<number, string>;
     factorMatrix: number[][];
     objectiveValue: number;
+    emptyIndex: number;
 }
 
 /**
@@ -75,9 +75,9 @@ export const calculateNCD = (str1: string, str2: string): number => {
 
 export const getGradualFactorMatrix = (width: number, height: number): number[][] => {
     const factorMatrix: number[][] = [];
-    for(let i = 0; i < height; i++) {
+    for (let i = 0; i < height; i++) {
         factorMatrix[i] = [];
-        for(let j = 0; j < width; j++) {
+        for (let j = 0; j < width; j++) {
             factorMatrix[i][j] = gradualFactor({i, j}, width, height);
         }
     }
@@ -85,30 +85,34 @@ export const getGradualFactorMatrix = (width: number, height: number): number[][
 }
 
 export const gradualFactor = (pos: Position, width: number, height: number): number => {
-    // Normalize position coordinates to [0,1] range
-    const normalizedI = pos.i / (height - 1);
-    const normalizedJ = pos.j / (width - 1);
+    // For true wraparound, we want a more circular/toroidal pattern
+    // Calculate distance from center (normalized)
+    const centerI = height / 2;
+    const centerJ = width / 2;
 
-    // Create a two-component symmetry breaker:
-    // 1. Primary gradient: exponential increase toward bottom-right with different coefficients
-    // 2. Secondary pattern: subtle sinusoidal variation to break additional symmetries
+    // Calculate normalized circular distance from center
+    const distI = Math.min(Math.abs(pos.i - centerI), Math.abs(pos.i - centerI - height), Math.abs(pos.i - centerI + height)) / (height / 2);
+    const distJ = Math.min(Math.abs(pos.j - centerJ), Math.abs(pos.j - centerJ - width), Math.abs(pos.j - centerJ + width)) / (width / 2);
 
-    // Base component with carefully calibrated parameters
-    const baseGradient = 1.15 + 0.25 * normalizedI + 0.35 * normalizedJ;
+    // Combined distance (circular)
+    const dist = Math.sqrt(distI * distI + distJ * distJ);
 
-    // Subtle secondary pattern to break remaining symmetries
-    const secondaryPattern = 0.03 * Math.sin(normalizedI * 3.14) * Math.sin(normalizedJ * 2.71);
+    // Base value
+    const base = 1.15;
 
-    // Combine components with carefully chosen exponent (0.4)
-    // - Higher than 0.2 (your original) for more differentiation
-    // - Lower than 0.6 to avoid overwhelming the NCD relationships
-    return Math.pow(baseGradient + secondaryPattern, 0.4);
+    // Radial pattern with slight variation
+    const radialFactor = 0.2 * (1 - dist);
+
+    // Add some asymmetry with a small sinusoidal component
+    const asymFactor = 0.05 * Math.sin(pos.i * Math.PI / height) * Math.sin(pos.j * Math.PI / width);
+
+    // Combine and apply power scaling
+    return Math.pow(base + radialFactor + asymFactor, 0.4);
 };
-
 
 export const deepCopy = (gridState: GridState): GridState => {
     const newGrid: number[][] = [];
-    for(let i = 0; i < gridState.height; i++) {
+    for (let i = 0; i < gridState.height; i++) {
         newGrid[i] = [...gridState.grid[i]];
     }
 
@@ -123,7 +127,8 @@ export const deepCopy = (gridState: GridState): GridState => {
         numericNcdMatrix: gridState.numericNcdMatrix,
         factorMatrix: gridState.factorMatrix,
         indexToIdMap: newIndexToIdMap,
-        idToIndexMap: newIdToIndexMap
+        idToIndexMap: newIdToIndexMap,
+        emptyIndex: -1
     }
 };
 
@@ -194,20 +199,38 @@ export const getNCDValue = (index1: number, index2: number, ncdMatrix: number[][
 }
 
 
-export const createGridObjectsFromMatrixResponse = (ncdMatrixResponse: NCDMatrixResponse, labelManager: LabelManager) : GridObject[] => {
-    const {labels, ncdMatrix} = ncdMatrixResponse;
-    const displayLabel = (label: string) => {
-        const fullLabel = labelManager.getDisplayLabel(label) || 'Unknown';
-        return fullLabel.length > 15 ? fullLabel.substring(0, Math.min(15, fullLabel.length)) + '...' : fullLabel;
+export const getAdjacentEmptyCells = (grid: number[][], visited: Set<string>, emptyIndex: number = -1): [number, number][] => {
+    if (!grid || grid.length === 0) return [];
+
+    const adjacent: [number, number][] = [];
+    const height = grid.length;
+    const width = grid[0].length;
+
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            if (grid[i][j] !== emptyIndex && !visited.has(`${i}-${j}`)) {
+                visited.add(`${i}-${j}`);
+
+                const neighbors = [
+                    [i - 1, j], // up
+                    [i, j + 1], // right,
+                    [i + 1, j], // down
+                    [i, j - 1], // left
+                ];
+
+                for (const [ni_raw, nj_raw] of neighbors) {
+                    const ni = (ni_raw + height) % height;
+                    const nj = (nj_raw + width) % width;
+
+                    if (grid[ni][nj] === emptyIndex) {
+                        adjacent.push([ni, nj]);
+                    }
+                }
+            }
+        }
     }
-    return labels.map((label, index) => ({
-        id: label,
-        label: displayLabel(label),
-        content: ncdMatrix[index]
-    }));
-
-}
-
+    return adjacent;
+};
 
 export const createSafeInitialGrid = (width: number, height: number, objects: GridObject[], ncdMatrixResponse: NCDMatrixResponse) => {
     // Process objects to ensure unique IDs as strings
@@ -216,85 +239,261 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
         id: String(obj.id)
     }));
 
-    // Filter to unique objects
-    const uniqueIdsMap = new Map();
-    processedObjects.forEach(object => {
-        if (!uniqueIdsMap.has(object.id)) {
-            uniqueIdsMap.set(object.id, object);
-        }
-    });
-    const uniqueObjects = Array.from(uniqueIdsMap.values());
-
-    // Calculate optimal grid dimensions based on actual number of objects
-    const itemCount = uniqueObjects.length;
-
-    // Adjust width and height based on available objects
-    const optimalWidth = Math.ceil(Math.sqrt(itemCount));
-    const optimalHeight = Math.ceil(itemCount / optimalWidth);
-
-    // Use provided dimensions or calculate optimal ones
-    const gridWidth = width || optimalWidth;
-    const gridHeight = height || optimalHeight;
-
-    // Ensure minimum viable grid size
+    const itemCount = processedObjects.length;
     if (itemCount < 4) {
-        throw new Error(`Need at least 4 unique objects, found only ${itemCount}`);
+        throw new Error("Needs at least 4 objects to create the initial grid");
     }
 
-    // Create mappings between string IDs and numeric indices
-    const idToIndexMap = new Map<string, number>();
-    const indexToIdMap = new Map<number, string>();
-    uniqueObjects.forEach((obj, index) => {
-        idToIndexMap.set(obj.id, index);
+    console.log(`Creating grid for ${itemCount} objects`);
+
+    // Calculate grid dimensions with slack space
+    const baseWidth = Math.ceil(Math.sqrt(itemCount));
+    const baseHeight = Math.ceil(itemCount / baseWidth);
+    const gridWidth = (width || baseWidth) + 1;
+    const gridHeight = (height || baseHeight) + 1;
+
+    console.log(`Grid dimensions: ${gridWidth}x${gridHeight}`);
+
+    // Create ID mappings
+    const idToIndexMap: Map<string, number> = new Map();
+    const indexToIdMap: Map<number, string> = new Map();
+    const EMPTY_CELL_INDEX = -1;
+
+    processedObjects.forEach((obj: GridObject, index: number) => {
         indexToIdMap.set(index, obj.id);
+        idToIndexMap.set(obj.id, index);
     });
 
-    // Shuffle objects for random initial placement
-    const shuffledObjects = [...uniqueObjects];
-    for (let i = shuffledObjects.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffledObjects[i], shuffledObjects[j]] = [shuffledObjects[j], shuffledObjects[i]];
+    // Initialize grid with empty cells
+    const grid: number[][] = [];
+    for (let i = 0; i < gridHeight; i++) {
+        grid[i] = Array(gridWidth).fill(EMPTY_CELL_INDEX);
     }
 
-    // Select objects needed for the grid, up to grid capacity
-    const cellCount = gridWidth * gridHeight;
-    const selected = shuffledObjects.slice(0, Math.min(itemCount, cellCount));
+    // Place first object in center
+    const centerI = Math.floor(gridHeight / 2);
+    const centerJ = Math.floor(gridWidth / 2);
+    const firstObjectIdx = idToIndexMap.get(processedObjects[0].id);
+    grid[centerI][centerJ] = firstObjectIdx !== undefined ? firstObjectIdx : EMPTY_CELL_INDEX;
 
-    // Fill grid with selected objects, repeating if necessary
-    const grid: number[][] = [];
-    let index = 0;
+    console.log(`Placed first object (index ${firstObjectIdx}) at center (${centerI},${centerJ})`);
 
-    for (let i = 0; i < gridHeight; i++) {
-        grid[i] = [];
-        for (let j = 0; j < gridWidth; j++) {
-            // If we have more cells than objects, cycle through objects
-            const objIndex = index % selected.length;
-            const obj = selected[objIndex];
-            grid[i][j] = idToIndexMap.get(obj.id)!;
-            index++;
+    // Place remaining objects
+    let placedCount = 1; // We've placed the first object
+    let attempts = 0;
+    const maxAttempts = itemCount * 10; // Avoid infinite loops
+
+    while (placedCount < itemCount && attempts < maxAttempts) {
+        attempts++;
+
+        const visited = new Set<string>();
+        const adjacentEmptyCells = getAdjacentEmptyCells(grid, visited, EMPTY_CELL_INDEX);
+
+        if (adjacentEmptyCells.length === 0) {
+            console.warn("No adjacent empty cells available. Grid connectivity constraint might prevent placing all objects.");
+            break;
+        }
+
+        const randomIndex = Math.floor(Math.random() * adjacentEmptyCells.length);
+        const [i, j] = adjacentEmptyCells[randomIndex];
+
+        const nextObjectIdx = idToIndexMap.get(processedObjects[placedCount].id);
+        if (nextObjectIdx !== undefined) {
+            grid[i][j] = nextObjectIdx;
+            placedCount++;
+            console.log(`Placed object ${placedCount} (index ${nextObjectIdx}) at (${i},${j})`);
         }
     }
 
-    // Create and return grid state
-    const numericNcdMatrix = ncdMatrixResponse.ncdMatrix;
-    const factorMatrix = precomputeGradualFactorMatrix(gridWidth, gridHeight);
+    if (placedCount < itemCount) {
+        console.warn(`Could only place ${placedCount} out of ${itemCount} objects while maintaining connectivity`);
+    } else {
+        console.log(`Successfully placed all ${itemCount} objects`);
+    }
 
-    const gridState = {
+    const numericNcdMatrix = ncdMatrixResponse.ncdMatrix;
+    const factorMatrix = getGradualFactorMatrix(gridWidth, gridHeight);
+
+    const gridState: GridState = {
         width: gridWidth,
         height: gridHeight,
-        grid,
         numericNcdMatrix,
+        factorMatrix,
+        emptyIndex: EMPTY_CELL_INDEX,
+        grid: grid,
         idToIndexMap,
         indexToIdMap,
-        factorMatrix,
         objectiveValue: 0
     };
 
-    gridState.objectiveValue = calculateObjectiveWithNumericMatrix(gridState);
-    console.log(`Created initial grid ${gridWidth}×${gridHeight} with ${itemCount} unique objects`);
+    gridState.objectiveValue = calculateObjectiveWithSlackSpace(gridState);
 
     return gridState;
 };
+
+export const optimizeStep = (grid: GridState, iterationCount: number): GridState => {
+    const {
+        initialTemperature,
+        finalTemperature,
+        coolingRate,
+        swapsPerStep
+    } = OPTIMIZE_STEP_OPTIONS;
+
+    let currentGrid = deepCopy(grid);
+    const temperature = initialTemperature * Math.pow(coolingRate, iterationCount);
+    const inExploitationMode = temperature <= finalTemperature;
+
+    const actualSwaps = inExploitationMode ? 1 : swapsPerStep;
+    for (let i = 0; i < actualSwaps; i++) {
+        const cell1 = selectRandomNonEmptyCell(grid);
+        let cell2;
+        if (Math.random() < 0.8) {
+            cell2 = selectRandomNonEmptyCell(grid);
+        } else {
+            cell2 = selectRandomEmptyCell(grid);
+            if (!cell2) {
+                cell2 = selectRandomNonEmptyCell(grid);
+            }
+        }
+        if (cell1.i === cell2.i && cell1.j === cell2.j) {
+            continue;
+        }
+        if (wouldBreakConnectivity(currentGrid, cell1, cell2)) {
+            continue;
+        }
+        const proposedGrid = swapCells(currentGrid, cell1, cell2);
+
+        const delta = proposedGrid.objectiveValue - grid.objectiveValue;
+        const acceptanceProbability = delta <= 0 ? 1 : Math.exp(-delta / temperature);
+        if (Math.random() < acceptanceProbability) {
+            currentGrid = proposedGrid;
+            console.log(`[Iteration ${iterationCount}] Accepted swap at (${cell1.i},${cell1.j})⟷(${cell2.i},${cell2.j}), new objective: ${currentGrid.objectiveValue.toFixed(6)}`);
+        }
+    }
+    return currentGrid;
+}
+
+
+export const wouldBreakConnectivity = (grid: GridState, cell1: Position, cell2: Position): boolean => {
+    const {width, height, grid: gridArray, emptyIndex = -1} = grid;
+
+    const tempGrid = gridArray.map(row => [...row]);
+    [tempGrid[cell1.i][cell1.j], tempGrid[cell2.i][cell2.j]] = [tempGrid[cell2.i][cell2.j], tempGrid[cell1.i][cell1.j]];
+
+    const needToCheck = tempGrid[cell1.i][cell1.j] === emptyIndex || tempGrid[cell2.i][cell2.j] === emptyIndex;
+    if (!needToCheck) return false;
+
+    // Find the first non-empty cell to start BFS
+    let startI = -1, startJ = -1;
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            if (tempGrid[i][j] !== emptyIndex) {
+                startI = i;
+                startJ = j;
+                break;
+            }
+        }
+        if (startI !== -1) break;
+    }
+    if (startI === -1) return false;
+    let totalNonemptyCells = 0;
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            if (tempGrid[i][j] !== emptyIndex) {
+                totalNonemptyCells++;
+            }
+        }
+    }
+    const visited = Array(height).fill(0).map(() => Array(width).fill(false));
+    const queue = [[startI, startJ]];
+    visited[startI][startJ] = true;
+    let visitedCount = 1;
+    while (queue.length > 0) {
+        const [i, j] = queue.shift() as [number, number];
+
+        const directions = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+        for (const [di, dj] of directions) {
+            const ni = (i + di + height) % height;
+            const nj = (j + dj + width) % width;
+
+            if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
+                if (tempGrid[ni][nj] !== emptyIndex && !visited[ni][nj]) {
+                    visited[ni][nj] = true;
+                    queue.push([ni, nj]);
+                    visitedCount++;
+                }
+            }
+        }
+    }
+    return visitedCount !== totalNonemptyCells;
+}
+
+export const selectRandomNonEmptyCell = (grid: GridState): Position => {
+    const {width, height, grid: gridArray, emptyIndex = -1} = grid;
+    const nonEmptyCells: Position[] = [];
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            if (gridArray[i][j] !== emptyIndex) {
+                nonEmptyCells.push({i, j});
+            }
+        }
+    }
+    if (nonEmptyCells.length === 0) {
+        nonEmptyCells.push({i: 0, j: 0});
+    }
+    const len = nonEmptyCells.length;
+    const randIdx = Math.floor((Math.random() * len))
+    return nonEmptyCells[randIdx];
+}
+
+
+export const selectRandomEmptyCell = (grid: GridState): Position => {
+    const {width, height, grid: gridArray, emptyIndex = -1} = grid;
+    const emptyCells: Position[] = [];
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            if (gridArray[i][j] === emptyIndex) {
+                emptyCells.push({i, j});
+            }
+        }
+    }
+    if (emptyCells.length === 0) {
+        emptyCells.push({i: 0, j: 0});
+    }
+    const len = emptyCells.length;
+    const randIdx = Math.floor(Math.random() * len);
+    return emptyCells[randIdx];
+}
+
+export const calculateObjectiveWithSlackSpace = (gridState: GridState): number => {
+    let total = 0;
+    const {grid, numericNcdMatrix, factorMatrix, width, height, emptyIndex} = gridState;
+
+    if (!grid || grid.length === 0) {
+        console.error("Invalid grid data in calculateObjectiveWithSlackSpace");
+        return 0;
+    }
+
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            const currentIdx = grid[i][j];
+            if (currentIdx === emptyIndex) continue;
+            const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
+            for (const [di, dj] of directions) {
+                const ni = (i + di + height) % height; // wrap around
+                const nj = (j + dj + width) % width;
+
+                const neighborIdx = grid[ni][nj];
+                if (neighborIdx !== emptyIndex) {
+                    total += numericNcdMatrix[currentIdx][neighborIdx] * factorMatrix[i][j];
+                }
+            }
+        }
+    }
+    return total;
+};
+
 export const precomputeGradualFactorMatrix = (width: number, height: number): number[][] => {
     const factorMatrix: number[][] = [];
 
@@ -311,7 +510,7 @@ export const precomputeGradualFactorMatrix = (width: number, height: number): nu
 
 export const calculateObjectiveWithNumericMatrix = (gridState: GridState): number => {
     let total = 0;
-    const { grid, numericNcdMatrix, factorMatrix, width, height } = gridState;
+    const {grid, numericNcdMatrix, factorMatrix, width, height} = gridState;
 
     for (let i = 0; i < height; i++) {
         for (let j = 0; j < width; j++) {
@@ -345,61 +544,6 @@ const OPTIMIZE_STEP_OPTIONS = {
     swapsPerStep: 1,           // Number of swaps to try per step
 }
 
-
-export const optimizeStep = (grid: GridState, iterationCount: number): GridState => {
-    const {
-        initialTemperature,
-        finalTemperature,
-        coolingRate,
-        swapsPerStep
-    } = OPTIMIZE_STEP_OPTIONS;
-
-    // Create a completely new grid state to ensure immutability
-    let currentGrid = deepCopy(grid);
-
-    // Calculate current temperature based on iteration count
-    const temperature = initialTemperature * Math.pow(coolingRate, iterationCount);
-    const inExploitationMode = temperature <= finalTemperature;
-
-    // Determine how many swaps to attempt this step
-    const actualSwaps = inExploitationMode ? 1 : swapsPerStep;
-
-    // Attempt swaps
-    for (let i = 0; i < actualSwaps; i++) {
-        const cell1 = selectRandomCell(currentGrid);
-        const cell2 = selectRandomCell(currentGrid);
-
-        // Skip if trying to swap a cell with itself
-        if (cell1.i === cell2.i && cell1.j === cell2.j) {
-            continue;
-        }
-
-        // Create a completely new grid with the proposed swap
-        const proposedGrid = swapCells(currentGrid, cell1, cell2);
-
-        // Calculate the change in objective function
-        const delta = proposedGrid.objectiveValue - currentGrid.objectiveValue;
-
-        // Accept or reject the swap based on simulated annealing rules
-        const acceptanceProbability = delta <= 0 ? 1 : Math.exp(-delta / temperature);
-
-        if (Math.random() < acceptanceProbability) {
-            // Accept the swap - replace the current grid with the swapped version
-            currentGrid = proposedGrid;
-            console.log(`[Iteration ${iterationCount}] Accepted swap at (${cell1.i},${cell1.j})⟷(${cell2.i},${cell2.j}), new objective: ${currentGrid.objectiveValue.toFixed(6)}`);
-        }
-    }
-
-    // Log progress periodically
-    if (iterationCount % 100 === 0) {
-        console.log(`[Iteration ${iterationCount}] Temperature: ${temperature.toFixed(6)}, Objective: ${currentGrid.objectiveValue.toFixed(6)}`);
-    }
-
-    // Return the new grid state (always a different object from the input)
-    return currentGrid;
-};
-
-// Updated swapCells function to ensure it returns a completely new object
 export const swapCells = (grid: GridState, pos1: Position, pos2: Position): GridState => {
     console.log(`Swapping cells: (${pos1.i},${pos1.j}) with (${pos2.i},${pos2.j})`);
 
@@ -415,7 +559,7 @@ export const swapCells = (grid: GridState, pos1: Position, pos2: Position): Grid
     newGrid.grid[pos2.i][pos2.j] = value1;
 
     // Recalculate the objective value for the new grid
-    newGrid.objectiveValue = calculateObjectiveWithNumericMatrix(newGrid);
+    newGrid.objectiveValue = calculateObjectiveWithSlackSpace(newGrid);
 
     console.log(`Swapped ${value1} at (${pos1.i},${pos1.j}) with ${value2} at (${pos2.i},${pos2.j})`);
     console.log(`New objective value: ${newGrid.objectiveValue.toFixed(6)}`);
@@ -424,14 +568,14 @@ export const swapCells = (grid: GridState, pos1: Position, pos2: Position): Grid
 }
 
 const SYMMETRY_BREAKER_OPTIONS = {
-    alpha : 0.25,        // Primary gradient i-coefficient
-    beta : 0.35,         // Primary gradient j-coefficient
-    baseValue : 1.15,    // Base value to ensure positive factors
-    varAmplitude1 : 0.03, // Primary variation amplitude
-    varAmplitude2 : 0.02, // Secondary variation amplitude
-    varFreq1 : Math.PI,  // Primary variation frequency
-    varFreq2 : 2.71,     // Secondary variation frequency (using e for irrationality)
-    powerFactor : 0.4    // Power to control overall effect magnitude
+    alpha: 0.25,        // Primary gradient i-coefficient
+    beta: 0.35,         // Primary gradient j-coefficient
+    baseValue: 1.15,    // Base value to ensure positive factors
+    varAmplitude1: 0.03, // Primary variation amplitude
+    varAmplitude2: 0.02, // Secondary variation amplitude
+    varFreq1: Math.PI,  // Primary variation frequency
+    varFreq2: 2.71,     // Secondary variation frequency (using e for irrationality)
+    powerFactor: 0.4    // Power to control overall effect magnitude
 }
 
 export const symmetryBreaker = (pos: Position, width: number, height: number) => {
@@ -464,7 +608,7 @@ export const calculateObjectiveWithSymmetryBreaking = (
     factorMatrix: number[][],
     ncdMatrix: number[][]
 ): number => {
-    const { grid, width, height } = gridState;
+    const {grid, width, height} = gridState;
     let totalObjective = 0;
 
     for (let i = 0; i < height; i++) {
@@ -496,14 +640,14 @@ export const calculateGridSimilarity = (grid1: GridState, grid2: GridState): num
 
     let matches = 0;
     const totalCells = grid1.height * grid1.width;
-    for(let i = 0; i < grid1.height; i++) {
-        for(let j = 0; j < grid1.width; j++) {
+    for (let i = 0; i < grid1.height; i++) {
+        for (let j = 0; j < grid1.width; j++) {
             if (grid1.grid[i][j] === grid2.grid[i][j]) {
                 matches++;
             }
         }
     }
     console.log('matches now: ' + matches);
-    console.log('matches/total cells: ' + (matches/totalCells));
+    console.log('matches/total cells: ' + (matches / totalCells));
     return matches / totalCells;
 }
