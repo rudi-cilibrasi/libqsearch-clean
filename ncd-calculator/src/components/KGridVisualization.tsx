@@ -1,13 +1,10 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {KGridDualOptimization} from './KGridDualOptimization';
 import {QSearchTree3D, QTreeResponse} from './QSearchTree3D';
-import {
-    Download,
-    Upload,
-} from 'lucide-react';
+import {Download, Upload,} from 'lucide-react';
 import {MatrixTable} from "@/components/MatrixTable.tsx";
 import {NCDMatrixResponse} from "@/types/ncd.ts";
-import {GridObject} from "@/services/kgrid.ts";
+import {GridObject} from "@/datastructures/kgrid.ts";
 import {LabelManager} from "@/functions/labelUtils.ts";
 
 // Visualization types enum for better type safety

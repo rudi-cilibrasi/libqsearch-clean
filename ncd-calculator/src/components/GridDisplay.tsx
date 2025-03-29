@@ -1,39 +1,60 @@
-import React, {useEffect, useMemo, useState} from "react";
-import {GridState} from "@/services/kgrid.ts";
+import React, {useEffect, useMemo, useRef, useState} from "react";
+import {GridState} from "@/datastructures/kgrid.ts";
 
 interface GridDisplayProps {
     grid: GridState;
     objectsById: Record<string, { label: string; content: number[] }>;
     iterations: number;
+    iterationsPerSecond?: number;
     colorTheme?: string;
     onCellSelect?: (objectId: string, i: number, j: number) => void;
     cellDimensions?: { width: string; height: string };
     showEmptyCells?: boolean;
     fitToContainer?: boolean;
-    clusterThreshold?: number; // Threshold for considering items as part of the same cluster
+    clusterThreshold?: number;
+    highlightCells?: { i: number, j: number }[];
 }
 
-// Custom type for cluster information
 interface ClusterInfo {
     clusterId: number;
     memberCount: number;
     color: string;
 }
 
+// Get colorblind-friendly colors
+const getColorblindFriendlyColor = (index: number) => {
+    const colorblindPalette = [
+        '#cce6ff', '#dae8c3', '#f2dfeb', '#f4e1d2', '#e0e0e0',
+        '#f9e8c9', '#deebf7', '#e2e2f0', '#edf8fb', '#fde9e0'
+    ];
+    return colorblindPalette[index % colorblindPalette.length];
+};
+
 export const GridDisplay: React.FC<GridDisplayProps> = ({
                                                             grid,
                                                             objectsById,
                                                             iterations,
+                                                            iterationsPerSecond = 0,
                                                             colorTheme = "scientific",
                                                             onCellSelect,
                                                             cellDimensions,
                                                             showEmptyCells = true,
-                                                            fitToContainer = false,
-                                                            clusterThreshold = 0.3, // Default threshold for NCD similarity
+                                                            fitToContainer = true,
+                                                            clusterThreshold = 0.25,
+                                                            highlightCells = [],
                                                         }) => {
     const [selectedCell, setSelectedCell] = useState<{ i: number; j: number } | null>(null);
+    const [zoomedCell, setZoomedCell] = useState<{ i: number; j: number } | null>(null);
+    const [zoomedCluster, setZoomedCluster] = useState<number | null>(null);
     const [containerDimensions, setContainerDimensions] = useState({width: 0, height: 0});
-    const containerRef = React.useRef<HTMLDivElement>(null);
+    const [activeHighlights, setActiveHighlights] = useState<{ i: number, j: number }[]>([]);
+    const [showClusterInfo, setShowClusterInfo] = useState(false);
+    const [zoomLevel, setZoomLevel] = useState(1);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
+    const resizeObserverRef = useRef<ResizeObserver | null>(null);
+    const highlightTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Handle empty cells
     const EMPTY_CELL_INDEX = grid.emptyIndex || -1;
@@ -43,63 +64,80 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
         return grid.grid[i * grid.width + j];
     };
 
-    // Track container size for responsive layout
+    // Update active highlights when the prop changes
+    useEffect(() => {
+        if (highlightCells && highlightCells.length > 0) {
+            setActiveHighlights(highlightCells);
+
+            if (highlightTimerRef.current) {
+                clearTimeout(highlightTimerRef.current);
+            }
+
+            highlightTimerRef.current = setTimeout(() => {
+                setActiveHighlights([]);
+            }, 1500);
+        }
+
+        return () => {
+            if (highlightTimerRef.current) {
+                clearTimeout(highlightTimerRef.current);
+            }
+        };
+    }, [highlightCells]);
+
+    // Use ResizeObserver for reliable container size tracking
     useEffect(() => {
         if (fitToContainer && containerRef.current) {
             const updateDimensions = () => {
                 if (containerRef.current) {
-                    setContainerDimensions({
-                        width: containerRef.current.offsetWidth,
-                        height: containerRef.current.offsetHeight
-                    });
+                    const {width, height} = containerRef.current.getBoundingClientRect();
+                    setContainerDimensions({width, height});
                 }
             };
 
             updateDimensions();
+
+            if (!resizeObserverRef.current) {
+                resizeObserverRef.current = new ResizeObserver(updateDimensions);
+                resizeObserverRef.current.observe(containerRef.current);
+            }
+
             window.addEventListener('resize', updateDimensions);
 
             return () => {
+                if (resizeObserverRef.current) {
+                    resizeObserverRef.current.disconnect();
+                    resizeObserverRef.current = null;
+                }
                 window.removeEventListener('resize', updateDimensions);
             };
         }
     }, [fitToContainer]);
 
     // Identify clusters using NCD matrix
-    // This uses a simple approach to group items with similar NCD values
     const clusterInfo = useMemo(() => {
         if (!grid || !grid.numericNcdMatrix) return new Map<number, ClusterInfo>();
 
-        // Maps item indices to cluster IDs
         const itemClusters = new Map<number, number>();
-        // Maps cluster IDs to cluster information
         const clusters = new Map<number, ClusterInfo>();
-
-        // First pass: identify clusters
         let currentClusterId = 0;
 
-        // Helper function to check if two items are similar
         const areSimilar = (idx1: number, idx2: number) => {
             if (idx1 === EMPTY_CELL_INDEX || idx2 === EMPTY_CELL_INDEX) return false;
-            // Lower NCD values mean MORE similarity
             return grid.numericNcdMatrix[idx1][idx2] < clusterThreshold;
         };
 
-        // Process all items to create clusters
         for (let i = 0; i < grid.height; i++) {
             for (let j = 0; j < grid.width; j++) {
                 const cellIndex = i * grid.width + j;
                 const itemIdx = grid.grid[cellIndex];
                 if (itemIdx === EMPTY_CELL_INDEX) continue;
-
-                // If already assigned to a cluster, skip
                 if (itemClusters.has(itemIdx)) continue;
 
-                // Check neighbors with wraparound to see if they're in clusters
-                const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]]; // Right, down, left, up
+                const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
                 let assignedToExistingCluster = false;
 
                 for (const [di, dj] of directions) {
-                    // Use modulo for proper wraparound
                     const ni = (i + di + grid.height) % grid.height;
                     const nj = (j + dj + grid.width) % grid.width;
                     const neighborCellIndex = ni * grid.width + nj;
@@ -107,28 +145,22 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
 
                     if (neighborIdx === EMPTY_CELL_INDEX) continue;
 
-                    // If neighbor is already in a cluster and is similar
                     if (itemClusters.has(neighborIdx) && areSimilar(itemIdx, neighborIdx)) {
                         const neighborCluster = itemClusters.get(neighborIdx)!;
                         itemClusters.set(itemIdx, neighborCluster);
-
-                        // Update cluster member count
                         const cluster = clusters.get(neighborCluster)!;
                         cluster.memberCount++;
-
                         assignedToExistingCluster = true;
                         break;
                     }
                 }
 
-                // If not assigned to an existing cluster, create a new one
                 if (!assignedToExistingCluster) {
                     itemClusters.set(itemIdx, currentClusterId);
 
-                    // Generate a cluster color based on the cluster ID
-                    const h = (currentClusterId * 137) % 360; // Golden ratio to distribute colors
-                    const s = 70 + (currentClusterId % 3) * 10; // Vary saturation
-                    const l = 65 + (currentClusterId % 5) * 5; // Vary lightness
+                    const h = (currentClusterId * 137) % 360;
+                    const s = 70 + (currentClusterId % 3) * 10;
+                    const l = 65 + (currentClusterId % 5) * 5;
 
                     clusters.set(currentClusterId, {
                         clusterId: currentClusterId,
@@ -143,7 +175,6 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
             }
         }
 
-        // Return a map from item index to cluster info
         const itemToClusterInfo = new Map<number, ClusterInfo>();
         for (const [itemIdx, clusterId] of itemClusters.entries()) {
             itemToClusterInfo.set(itemIdx, clusters.get(clusterId)!);
@@ -152,34 +183,85 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
         return itemToClusterInfo;
     }, [grid, EMPTY_CELL_INDEX, clusterThreshold, colorTheme]);
 
+    // Get a list of items in the selected cluster
+    const clusterItems = useMemo(() => {
+        if (zoomedCluster === null || !grid) return [];
+
+        const items: { i: number, j: number, id: string, label: string }[] = [];
+
+        for (let i = 0; i < grid.height; i++) {
+            for (let j = 0; j < grid.width; j++) {
+                const cellIndex = i * grid.width + j;
+                const itemIdx = grid.grid[cellIndex];
+
+                if (itemIdx !== EMPTY_CELL_INDEX) {
+                    const clusterData = clusterInfo.get(itemIdx);
+                    if (clusterData && clusterData.clusterId === zoomedCluster) {
+                        const objectId = grid.indexToIdMap.get(itemIdx) || '';
+                        const object = objectsById[objectId];
+
+                        items.push({
+                            i, j,
+                            id: objectId,
+                            label: object?.label || 'Unknown'
+                        });
+                    }
+                }
+            }
+        }
+
+        return items;
+    }, [zoomedCluster, grid, clusterInfo, objectsById, EMPTY_CELL_INDEX]);
+
+    // Function to zoom in
+    const zoomIn = () => {
+        setZoomLevel(prev => Math.min(prev + 0.2, 3));
+    };
+
+    // Function to zoom out
+    const zoomOut = () => {
+        setZoomLevel(prev => Math.max(prev - 0.2, 0.5));
+    };
+
+    // Function to reset zoom
+    const resetZoom = () => {
+        setZoomLevel(1);
+    };
+
     // Handle cell click
+// Handle cell click
     const handleCellClick = (indexId: number, i: number, j: number) => {
+        // Skip handling if clicking on an empty cell when they're not shown
         if (indexId === EMPTY_CELL_INDEX && !showEmptyCells) return;
 
+        // Always update the selected cell state
         setSelectedCell({i, j});
 
+        // Toggle zoomed state if clicking the same cell again
+        if (zoomedCell?.i === i && zoomedCell?.j === j) {
+            setZoomedCell(null);
+            setZoomedCluster(null);
+            setShowClusterInfo(false);
+        } else {
+            // Set new zoomed cell
+            setZoomedCell({i, j});
+
+            // Get and set cluster information
+            const clusterData = clusterInfo.get(indexId);
+            if (clusterData) {
+                setZoomedCluster(clusterData.clusterId);
+                setShowClusterInfo(true);
+            } else {
+                setZoomedCluster(null);
+                setShowClusterInfo(false);
+            }
+        }
+
+        // Always call the cell select callback if provided
         const objectId = grid.indexToIdMap.get(indexId);
         if (objectId && onCellSelect) {
             onCellSelect(objectId, i, j);
         }
-    };
-
-    // Get colorblind-friendly colors
-    const getColorblindFriendlyColor = (index: number) => {
-        // Colorblind-friendly palette with better contrast
-        const colorblindPalette = [
-            '#cce6ff', // light blue
-            '#dae8c3', // light green
-            '#f2dfeb', // light pink
-            '#f4e1d2', // light orange
-            '#e0e0e0', // light gray
-            '#f9e8c9', // light yellow
-            '#deebf7', // pale blue
-            '#e2e2f0', // pale purple
-            '#edf8fb', // pale cyan
-            '#fde9e0'  // pale red
-        ];
-        return colorblindPalette[index % colorblindPalette.length];
     };
 
     // Check if two adjacent cells are highly similar
@@ -190,8 +272,6 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
         const idx2 = getGridValue(i2, j2);
 
         if (idx1 === EMPTY_CELL_INDEX || idx2 === EMPTY_CELL_INDEX) return false;
-
-        // Lower NCD values mean MORE similarity
         return grid.numericNcdMatrix[idx1][idx2] < clusterThreshold;
     };
 
@@ -204,182 +284,290 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
         );
     }
 
-    // Calculate dimensions for fitting the grid to container
-    const calculateCellDimensions = () => {
-        if (!fitToContainer || !containerDimensions.width || !containerDimensions.height) {
-            return cellDimensions;
-        }
-
-        const cellWidth = `${(containerDimensions.width / grid.width) - 8}px`; // Subtract gap
-        const cellHeight = `${(containerDimensions.height / grid.height) - 8}px`; // Subtract gap
-
-        return {width: cellWidth, height: cellHeight};
-    };
-
-    const dynamicCellDimensions = calculateCellDimensions();
-
-    // Determine if we should use fixed or auto dimensions
-    const gridTemplateStyle = dynamicCellDimensions ?
-        {} : // Will use cell dimensions through inline styles
-        {
-            gridTemplateColumns: `repeat(${grid.width}, 1fr)`,
-            gridTemplateRows: `repeat(${grid.height}, 1fr)`
-        };
-
-    // Calculate if a cell is part of the "slack space" (extra row/column)
+    // Check if a cell is part of the "slack space"
     const isSlackSpace = (i: number, j: number) => {
         return i === grid.height - 1 || j === grid.width - 1;
     };
 
-    // Create a grid of cells to display
+    // Check if a cell should be highlighted
+    const isHighlighted = (i: number, j: number) => {
+        return activeHighlights.some(cell => cell.i === i && cell.j === j);
+    };
+
+    // Render only non-empty cells if showEmptyCells is false
+// Render only non-empty cells if showEmptyCells is false
     const renderGridCells = () => {
         const cells = [];
+        const nonEmptyCells = [];
 
-        for (let i = 0; i < grid.height; i++) {
-            for (let j = 0; j < grid.width; j++) {
-                const cellIndex = i * grid.width + j;
-                const indexId = grid.grid[cellIndex];
+        // First collect all non-empty cells if we're not showing empty ones
+        if (!showEmptyCells) {
+            for (let i = 0; i < grid.height; i++) {
+                for (let j = 0; j < grid.width; j++) {
+                    const cellIndex = i * grid.width + j;
+                    const indexId = grid.grid[cellIndex];
 
-                // Handle empty cells
-                if (indexId === EMPTY_CELL_INDEX) {
-                    if (!showEmptyCells) continue;
-
-                    cells.push(
-                        <div
-                            key={`empty-${i}-${j}-${iterations}`}
-                            className={`
-                                rounded border border-dashed border-gray-300 bg-gray-50 opacity-40
-                                ${isSlackSpace(i, j) ? 'border-blue-300 bg-blue-50' : ''}
-                            `}
-                            style={dynamicCellDimensions}
-                        >
-                            <div className="flex items-center justify-center h-full text-xs text-gray-400">
-                                <span>({i},{j})</span>
-                            </div>
-                        </div>
-                    );
-                    continue;
+                    if (indexId !== EMPTY_CELL_INDEX) {
+                        nonEmptyCells.push({i, j, indexId});
+                    }
                 }
+            }
+        }
 
-                const objectId = grid.indexToIdMap.get(indexId) || '';
-                const object = objectsById[objectId];
+        // Determine which cells to render
+        const cellsToRender = showEmptyCells
+            ? Array.from({length: grid.height * grid.width}, (_, idx) => {
+                const i = Math.floor(idx / grid.width);
+                const j = idx % grid.width;
+                return {i, j, indexId: grid.grid[idx]};
+            })
+            : nonEmptyCells;
 
-                if (!object) {
-                    cells.push(
-                        <div
-                            key={`cell-${i}-${j}-${indexId}-${iterations}`}
-                            className="flex flex-col items-center justify-center rounded p-2 border border-red-300 bg-red-100"
-                            style={dynamicCellDimensions}
-                        >
-                            <div className="font-bold text-red-600">Error</div>
-                            <div className="text-xs text-red-500">Missing: {indexId}</div>
+        // Render each cell
+        for (const {i, j, indexId} of cellsToRender) {
+            // Skip rendering empty cells if not showing them
+            if (indexId === EMPTY_CELL_INDEX && !showEmptyCells) continue;
+
+            const cellIsHighlighted = isHighlighted(i, j);
+            const isCellZoomed = zoomedCell?.i === i && zoomedCell?.j === j;
+
+            // For empty cells, render minimal content but fill the space
+            if (indexId === EMPTY_CELL_INDEX) {
+                cells.push(
+                    <div
+                        key={`empty-${i}-${j}-${iterations}`}
+                        className={`
+                        w-full h-full flex items-center justify-center
+                        ${isSlackSpace(i, j) ? 'bg-blue-50 bg-opacity-20 border-blue-200 border-r border-b' : 'bg-transparent'}
+                        ${cellIsHighlighted ? 'bg-blue-100 bg-opacity-20' : ''}
+                    `}
+                        style={{
+                            gridRow: i + 1,
+                            gridColumn: j + 1,
+                            margin: 0,
+                            padding: 0
+                        }}
+                    >
+                        <div className="flex items-center justify-center text-xxs text-gray-400 opacity-40">
+                            ({i},{j})
                         </div>
-                    );
-                    continue;
-                }
+                    </div>
+                );
+                continue;
+            }
 
-                const shortContent = object.label?.length > 20
-                    ? object.label.substring(0, 40) + "..."
-                    : object.label || "";
+            // Non-empty cells
+            const objectId = grid.indexToIdMap.get(indexId) || '';
+            const object = objectsById[objectId];
 
-                const isSelected = selectedCell?.i === i && selectedCell?.j === j;
-
-                // Get cluster color for this cell (or fallback to basic color)
-                const clusterData = clusterInfo.get(indexId);
-                const cellColor = clusterData?.color ||
-                    (colorTheme === "scientific" ? `hsl(200, 30%, 85%)` : getColorblindFriendlyColor(0));
-
-                // Check for similar neighbors to draw connection indicators
-                const hasRightSimilar = j < grid.width - 1 &&
-                    areSimilarCells(i, j, i, (j + 1) % grid.width);
-                const hasBottomSimilar = i < grid.height - 1 &&
-                    areSimilarCells(i, j, (i + 1) % grid.height, j);
-                const hasLeftSimilar = areSimilarCells(i, j, i, (j - 1 + grid.width) % grid.width);
-                const hasTopSimilar = areSimilarCells(i, j, (i - 1 + grid.height) % grid.height, j);
-
+            if (!object) {
                 cells.push(
                     <div
                         key={`cell-${i}-${j}-${indexId}-${iterations}`}
-                        className={`
-                            flex flex-col items-center justify-center rounded p-2 relative
-                            cursor-pointer hover:shadow-md text-center text-gray-700
-                            ${isSelected ? 'ring-2 ring-blue-500 shadow-md' : ''}
-                            ${isSlackSpace(i, j) ? 'ring-1 ring-blue-400' : ''}
-                        `}
+                        className="w-full h-full flex flex-col items-center justify-center border border-red-300 bg-red-100"
                         style={{
-                            backgroundColor: cellColor,
-                            transition: 'all 0.2s ease-in-out',
-                            ...(dynamicCellDimensions || {})
+                            gridRow: i + 1,
+                            gridColumn: j + 1,
+                            margin: 0,
+                            padding: 0
                         }}
-                        onClick={() => handleCellClick(indexId, i, j)}
                     >
-                        {/* Position indicator */}
-                        <div className="absolute top-1 right-1 text-xs text-gray-500 opacity-60">
-                            ({i},{j})
+                        <div className="font-bold text-red-600 text-xs">Error</div>
+                        <div className="text-xxs text-red-500">Missing: {indexId}</div>
+                    </div>
+                );
+                continue;
+            }
+
+            const shortContent = object.label?.length > 20
+                ? object.label.substring(0, 20) + "..."
+                : object.label || "";
+
+            const isSelected = selectedCell?.i === i && selectedCell?.j === j;
+
+            // Get cluster color for this cell
+            const clusterData = clusterInfo.get(indexId);
+            const cellColor = clusterData?.color ||
+                (colorTheme === "scientific" ? `hsl(200, 30%, 85%)` : getColorblindFriendlyColor(0));
+
+            // Check for similar neighbors
+            const hasRightSimilar = j < grid.width - 1 &&
+                areSimilarCells(i, j, i, (j + 1) % grid.width);
+            const hasBottomSimilar = i < grid.height - 1 &&
+                areSimilarCells(i, j, (i + 1) % grid.height, j);
+            const hasLeftSimilar = areSimilarCells(i, j, i, (j - 1 + grid.width) % grid.width);
+            const hasTopSimilar = areSimilarCells(i, j, (i - 1 + grid.height) % grid.height, j);
+
+            // Check if this cell is part of the zoomed cluster
+            const isClusterZoomed = clusterData && zoomedCluster === clusterData.clusterId;
+
+            cells.push(
+                <div
+                    key={`cell-${i}-${j}-${indexId}-${iterations}`}
+                    className={`
+                    w-full h-full flex flex-col items-center justify-center
+                    cursor-pointer hover:shadow-md text-center text-gray-700
+                    ${isSelected ? 'ring-2 ring-inset ring-blue-500 shadow-sm' : ''}
+                    ${isSlackSpace(i, j) ? 'ring-1 ring-inset ring-blue-400' : ''}
+                    ${cellIsHighlighted ? 'ring-2 ring-inset ring-blue-400 animate-pulse' : ''}
+                    ${isCellZoomed ? 'ring-3 ring-inset ring-yellow-500 shadow-md z-20' : ''}
+                    ${isClusterZoomed && !isCellZoomed ? 'ring-2 ring-inset ring-yellow-400 z-10' : ''}
+                    relative overflow-hidden
+                    transition-all duration-150
+                `}
+                    style={{
+                        backgroundColor: cellColor,
+                        gridRow: i + 1,
+                        gridColumn: j + 1,
+                        margin: 0,
+                        padding: 0,
+                        boxShadow: isCellZoomed ? '0 0 8px rgba(255, 200, 0, 0.5)' : 'none'
+                    }}
+                    onClick={() => handleCellClick(indexId, i, j)}
+                >
+                    {/* Position indicator with improved visibility */}
+                    <div
+                        className="absolute top-0.5 right-0.5 text-xxs font-medium bg-black bg-opacity-20 px-0.5 rounded text-white z-10">
+                        ({i},{j})
+                    </div>
+
+                    {/* Cluster indicator with improved visibility */}
+                    {clusterData && (
+                        <div
+                            className="absolute bottom-0.5 left-0.5 text-xxs font-bold opacity-90 px-1 py-0.5 rounded z-10"
+                            style={{
+                                color: getContrastColor(cellColor),
+                                backgroundColor: `${cellColor}EE`
+                            }}>
+                            C{clusterData.clusterId}
                         </div>
+                    )}
 
-                        {/* Cluster indicator (if part of a cluster) - moved to bottom left */}
-                        {clusterData && (
-                            <div className="absolute bottom-1 left-1 text-xs font-bold opacity-80 px-1 rounded"
-                                 style={{
-                                     color: getContrastColor(cellColor),
-                                     backgroundColor: `${cellColor}CC` // Add semi-transparent background to improve readability
-                                 }}>
-                                C{clusterData.clusterId}
-                            </div>
-                        )}
+                    {/* Connection indicators for similar neighbors */}
+                    {hasRightSimilar && (
+                        <div className="absolute right-0 top-1/2 w-1 h-0.5 bg-blue-600 opacity-70 z-10"
+                             style={{transform: 'translateY(-50%)'}}></div>
+                    )}
+                    {hasBottomSimilar && (
+                        <div className="absolute bottom-0 left-1/2 w-0.5 h-1 bg-blue-600 opacity-70 z-10"
+                             style={{transform: 'translateX(-50%)'}}></div>
+                    )}
+                    {hasLeftSimilar && (
+                        <div className="absolute left-0 top-1/2 w-1 h-0.5 bg-blue-600 opacity-70 z-10"
+                             style={{transform: 'translateY(-50%)'}}></div>
+                    )}
+                    {hasTopSimilar && (
+                        <div className="absolute top-0 left-1/2 w-0.5 h-1 bg-blue-600 opacity-70 z-10"
+                             style={{transform: 'translateX(-50%)'}}></div>
+                    )}
 
-                        {/* Connection indicators for similar neighbors */}
-                        {hasRightSimilar && (
-                            <div className="absolute right-0 top-1/2 w-2 h-1 bg-blue-600 opacity-70 rounded-full"
-                                 style={{transform: 'translateY(-50%)'}}></div>
-                        )}
-                        {hasBottomSimilar && (
-                            <div className="absolute bottom-0 left-1/2 w-1 h-2 bg-blue-600 opacity-70 rounded-full"
-                                 style={{transform: 'translateX(-50%)'}}></div>
-                        )}
-                        {hasLeftSimilar && (
-                            <div className="absolute left-0 top-1/2 w-2 h-1 bg-blue-600 opacity-70 rounded-full"
-                                 style={{transform: 'translateY(-50%)'}}></div>
-                        )}
-                        {hasTopSimilar && (
-                            <div className="absolute top-0 left-1/2 w-1 h-2 bg-blue-600 opacity-70 rounded-full"
-                                 style={{transform: 'translateX(-50%)'}}></div>
-                        )}
-
+                    {/* Content container with minimal padding */}
+                    <div className="flex flex-col items-center justify-center w-full h-full p-1">
                         {/* Main content */}
-                        <div className="font-semibold text-sm mb-1 truncate w-full">
+                        <div className="font-semibold text-xs mb-0.5 truncate w-full">
                             {object.label}
                         </div>
 
                         <div
-                            className="text-xs text-gray-600 opacity-75 line-clamp-2 w-full overflow-hidden text-ellipsis">
+                            className="text-xxs text-gray-600 opacity-75 line-clamp-2 w-full overflow-hidden text-ellipsis">
                             {shortContent}
                         </div>
 
-                        {/* ID indicator */}
-                        <div className="text-xs text-gray-500 mt-1">
-                            ID: {objectId.substring(0, 8)}
+                        {/* ID indicator - simplified */}
+                        <div className="text-xxs text-gray-500 mt-0.5 truncate w-full">
+                            ID: {objectId.substring(0, 6)}...
                         </div>
                     </div>
-                );
-            }
+                </div>
+            );
         }
 
         return cells;
     };
-
     return (
         <div
             ref={containerRef}
-            className="grid gap-2 p-2 bg-gray-100 w-full h-full overflow-auto"
-            style={{
-                ...gridTemplateStyle,
-                gridTemplateColumns: `repeat(${grid.width}, 1fr)`,
-                gridTemplateRows: `repeat(${grid.height}, 1fr)`
-            }}
+            className="h-full w-full flex flex-col items-center justify-center overflow-hidden bg-gray-100 relative p-0"
         >
-            {renderGridCells()}
+            {/* Zoom Controls */}
+            <div className="absolute top-1 right-1 bg-gray-800 bg-opacity-75 rounded z-30 flex items-center">
+                <button
+                    className="text-white px-2 py-1 text-lg font-bold hover:bg-gray-700"
+                    onClick={zoomIn}
+                >
+                    +
+                </button>
+                <button
+                    className="text-white px-2 py-1 text-lg font-bold hover:bg-gray-700"
+                    onClick={zoomOut}
+                >
+                    -
+                </button>
+                <button
+                    className="text-white px-2 py-1 text-sm hover:bg-gray-700"
+                    onClick={resetZoom}
+                >
+                    Reset
+                </button>
+            </div>
+
+            <div
+                ref={gridRef}
+                className="grid w-full h-full transition-transform duration-200"
+                style={{
+                    gridTemplateColumns: `repeat(${grid.width}, 1fr)`,
+                    gridTemplateRows: `repeat(${grid.height}, 1fr)`,
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    gap: 0,
+                    margin: 0,
+                    padding: 0,
+                    transform: `scale(${zoomLevel})`,
+                    transformOrigin: 'center center',
+                    overflow: 'visible'
+                }}
+            >
+                {renderGridCells()}
+            </div>
+
+            {/* Cluster information panel */}
+            {showClusterInfo && zoomedCluster !== null && (
+                <div
+                    className="absolute bottom-2 right-2 bg-gray-800 bg-opacity-90 p-2 rounded-lg shadow-lg text-white z-40 max-w-xs">
+                    <div className="flex justify-between items-center mb-1">
+                        <h3 className="text-xs font-bold">Cluster {zoomedCluster}</h3>
+                        <button
+                            className="text-xxs bg-gray-700 hover:bg-gray-600 text-white px-2 py-0.5 rounded"
+                            onClick={() => {
+                                setShowClusterInfo(false);
+                                setZoomedCluster(null);
+                                setZoomedCell(null);
+                            }}
+                        >
+                            Close
+                        </button>
+                    </div>
+
+                    <div className="text-xxs mb-1">
+                        <span className="text-gray-300">Items in cluster: </span>
+                        <span className="font-bold">{clusterItems.length}</span>
+                    </div>
+
+                    {clusterItems.length > 0 && (
+                        <div className="max-h-24 overflow-y-auto">
+                            <div className="text-xxs font-medium mb-0.5 text-gray-300">Items:</div>
+                            <ul className="text-xxs space-y-0.5">
+                                {clusterItems.map((item, index) => (
+                                    <li key={index} className="flex items-center justify-between">
+                                        <span className="truncate mr-1">{item.label}</span>
+                                        <span className="text-gray-400 whitespace-nowrap">({item.i},{item.j})</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
