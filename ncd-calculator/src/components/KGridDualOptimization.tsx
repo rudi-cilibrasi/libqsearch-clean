@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {createSafeInitialGrid, deepCopy, GridObject, GridState,} from "@/services/kgrid";
+import {createSafeInitialGrid, GridObject, GridState,} from "@/services/kgrid";
 import {GridDisplay} from "./GridDisplay";
 // @ts-ignore
 import OptimizationWorker from '../workers/kgridWorker.js?worker';
@@ -8,14 +8,12 @@ import {NCDMatrixResponse} from "@/types/ncd.ts";
 
 interface OptimizationImprovements {
     grid1Improved: boolean;
-    grid2Improved: boolean;
     similarityImproved: boolean;
 }
 
 interface IterationStatus {
     currentIteration: number;
     bestObjective1: number;
-    bestObjective2: number;
     bestSimilarity: number;
     noImprovementCount: number;
 }
@@ -25,7 +23,6 @@ interface WorkerResponse {
     type: 'optimization_improved' | 'status_update' | 'initialized' | 'reset_confirmed' |
         'optimization_started' | 'optimization_stopped' | 'optimization_complete' | 'error';
     grid1?: GridState;
-    grid2?: GridState;
     similarity?: number;
     iteration?: number;
     improvement?: OptimizationImprovements;
@@ -90,9 +87,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
     //@ts-ignore
     const [bestObjective1, setBestObjective1] = useState<number>(Number.MAX_VALUE);
     //@ts-ignore
-    const [bestObjective2, setBestObjective2] = useState<number>(Number.MAX_VALUE);
     const [bestGrid1, setBestGrid1] = useState<GridState | null>(null);
-    const [bestGrid2, setBestGrid2] = useState<GridState | null>(null);
 
     // Reference to the web worker
     const workerRef = useRef<Worker | null>(null);
@@ -124,8 +119,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
             ...obj,
             id: obj.id
         }));
-        let gridState = createSafeInitialGrid(width, height, processedObjects, ncdMatrixResponse);
-        return gridState;
+        return createSafeInitialGrid(width, height, processedObjects, ncdMatrixResponse);
     }, [width, height, objects, ncdMatrixResponse]);
 
     useEffect(() => {
@@ -157,7 +151,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
 
         // Set the message handler
         workerRef.current.onmessage = (e: MessageEvent<WorkerResponse>) => {
-            const {type, grid1, grid2, similarity, iteration, improvement, status, error} = e.data;
+            const {type, grid1, similarity, iteration, improvement, status, error} = e.data;
 
             if (iteration !== undefined) {
                 setIterations(iteration);
@@ -169,8 +163,8 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
             console.log(`Received worker message: ${type}, iteration: ${iteration || 'N/A'}`);
             switch (type) {
                 case 'optimization_improved':
-                    if (grid1 && grid2 && similarity !== undefined && improvement) {
-                        processImprovement(grid1, grid2, similarity, improvement);
+                    if (grid1 && similarity !== undefined && improvement) {
+                        processImprovement(grid1, similarity, improvement);
                     }
                     break;
 
@@ -217,7 +211,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
     // Process improvement received from worker
     const processImprovement = useCallback((
         newGrid1: GridState,
-        newGrid2: GridState,
         similarity: number,
         improvement: OptimizationImprovements
     ) => {
@@ -227,17 +220,9 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         if (improvement.grid1Improved) {
             setGridState1(newGrid1);
             setBestObjective1(newGrid1.objectiveValue);
-            setBestGrid1(deepCopy(newGrid1));
+            setBestGrid1(structuredClone(newGrid1));
             setDisplayObjective1(newGrid1.objectiveValue);
             console.log(`New best for Grid 1: ${newGrid1.objectiveValue.toFixed(4)}`);
-        }
-
-        if (improvement.grid2Improved) {
-            setGridState2(newGrid2);
-            setBestObjective2(newGrid2.objectiveValue);
-            setBestGrid2(deepCopy(newGrid2));
-            setDisplayObjective2(newGrid2.objectiveValue);
-            console.log(`New best for Grid 2: ${newGrid2.objectiveValue.toFixed(4)}`);
         }
 
         if (improvement.similarityImproved) {
@@ -368,7 +353,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                 }
 
                 setBestObjective1(initialGrid1.objectiveValue);
-                setBestObjective2(initialGrid2.objectiveValue);
 
                 console.log("Initial grids created");
 
@@ -382,20 +366,18 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
     // Update display objectives and show best grids when the animation is stopped
     useEffect(() => {
         if (!isRunning) {
-            if (bestGrid1 && bestGrid2) {
-                console.log(`Showing best objective grids with values: ${bestGrid1.objectiveValue.toFixed(4)} and ${bestGrid2.objectiveValue.toFixed(4)}`);
+            if (bestGrid1) {
+                console.log(`Showing best objective grids with values: ${bestGrid1.objectiveValue.toFixed(4)}`);
 
                 setGridState1(bestGrid1);
-                setGridState2(bestGrid2);
 
                 setDisplayObjective1(bestGrid1.objectiveValue);
-                setDisplayObjective2(bestGrid2.objectiveValue);
             } else if (gridState1 && gridState2) {
                 setDisplayObjective1(gridState1.objectiveValue);
                 setDisplayObjective2(gridState2.objectiveValue);
             }
         }
-    }, [isRunning, gridState1, gridState2, bestGrid1, bestGrid2]);
+    }, [isRunning, gridState1, gridState2, bestGrid1]);
 
     return (
         <div className="w-full h-full">
@@ -507,7 +489,8 @@ const countEmptyCells = (grid: GridState): number => {
 
     for (let i = 0; i < grid.height; i++) {
         for (let j = 0; j < grid.width; j++) {
-            if (grid.grid[i][j] === EMPTY_CELL_INDEX) {
+            const index = i * grid.width + j;
+            if (grid.grid[index] === EMPTY_CELL_INDEX) {
                 count++;
             }
         }

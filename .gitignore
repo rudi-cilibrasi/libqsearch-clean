@@ -10,4 +10,6 @@ qsearch_worker_react/src/wasm/qsearch.js
 *.env
 
 **/package-lock.json
+ncd-calculator/src/wasm/build-zstd-wasm
+complearn-genbank/dist
 
