@@ -249,7 +249,7 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
     // Calculate grid dimensions with slack space
     const baseWidth = Math.ceil(Math.sqrt(itemCount));
     const baseHeight = Math.ceil(itemCount / baseWidth);
-    const gridWidth = (width || baseWidth) + 1;
+    const gridWidth = (width || baseWidth);
     const gridHeight = (height || baseHeight) + 1;
 
     console.log(`Grid dimensions: ${gridWidth}x${gridHeight}`);
