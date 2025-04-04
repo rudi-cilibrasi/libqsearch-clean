@@ -1,8 +1,7 @@
-import {adaptiveOptimizeStep, calculateGridSimilarity, efficientCopy, GridState,} from "@/datastructures/kgrid.ts";
-
+import {calculateGridSimilarity, GridState, optimizeStep} from "@/datastructures/kgrid.ts";
 
 interface WorkerMessage {
-    command: 'initialize' | 'start_optimization' | 'stop_optimization' | 'reset';
+    command: 'initialize' | 'start_optimization' | 'stop_optimization' | 'reset' | 'pause_optimization' | 'resume_optimization';
     data?: {
         gridState1: GridState;
         gridState2: GridState;
@@ -31,37 +30,23 @@ interface WorkerResponse {
         bestObjective2: number;
         bestSimilarity: number;
         noImprovementCount: number;
+        iterationsPerSecond?: number; // Added field for iterations per second
     };
     error?: string;
 }
 
+// Configuration options
 const CONFIG = {
-    // Status update frequencies
-    updateInterval: 50,              // Regular update interval without improvements
-    initialStatusUpdates: 10,        // Always send updates for first N iterations
-    maxNoImprovement: 1000,           // Force update after many iterations without improvement
-    loggingInterval: 100,            // Console logging frequency
-
-    // Performance parameters
-    batchSize: 30,                   // Iterations per batch
-    minUpdateInterval: 100,          // Minimum ms between updates to main thread
-
-    // Early termination conditions
-    minImprovementRate: 0.0001,      // Minimum improvement rate to continue
-    stagnationCheckWindow: 2000,     // Window for checking stagnation
-
-    // Optimization parameters
-    adaptiveOptimizationEnabled: true, // Use adaptive optimization
-
-    // Default constraints
-    maxIterations: 50000,            // Default max iterations
-
-    // Performance tracking
-    performanceWindowSize: 100       // Window size for performance metrics
+    updateInterval: 20,         // How many iterations between status updates with no improvements
+    initialStatusUpdates: 10,   // Always send updates for first N iterations
+    maxNoImprovement: 500,      // Force update after this many iterations without improvement
+    maxIterations: 50000,       // Default max iterations (can be overridden)
+    loggingInterval: 100,       // How often to log progress (iterations)
+    performanceWindow: 100      // Window size for calculating iterations per second
 };
 
-// Worker internal state with enhanced tracking
-let state = {
+// Unified worker state object
+const state = {
     // Optimization tracking
     bestObjective1: Number.MAX_VALUE,
     bestObjective2: Number.MAX_VALUE,
@@ -70,67 +55,71 @@ let state = {
     currentIteration: 0,
 
     // Performance tracking
-    lastUpdateTime: 0,
     startTime: 0,
-    iterationTimestamps: [] as number[],
-    objectiveHistory: [] as number[],
-    similarityHistory: [] as number[],
+    lastUpdateTime: 0,
+    iterationHistory: [] as number[],
 
-    // Best grid tracking
-    bestGrid1Overall: null as GridState | null,
-    bestGrid2Overall: null as GridState | null,
-
-    // State flags
+    // Status flags
     isRunning: false,
+    isPaused: false,
+    wasRunningBeforePause: false,
 
-    // Current grid states
+    // Grid states
     currentGridState1: null as GridState | null,
     currentGridState2: null as GridState | null,
 
     // Scheduler
     optimizationTimer: null as any,
 
-    // Configuration
+    // User configuration
     userMaxIterations: CONFIG.maxIterations
+};
+
+// Calculate iterations per second based on recent history
+const calculateIterationsPerSecond = () => {
+    const recentIterations = state.iterationHistory.slice(-CONFIG.performanceWindow);
+    if (recentIterations.length < 2) return 0;
+
+    const firstTimestamp = recentIterations[0];
+    const lastTimestamp = recentIterations[recentIterations.length - 1];
+    const timeSpan = (lastTimestamp - firstTimestamp) / 1000; // Convert to seconds
+
+    if (timeSpan <= 0) return 0;
+    return (recentIterations.length - 1) / timeSpan;
 };
 
 // Reset the worker state
 const resetState = () => {
     console.log("[Worker] Resetting state");
-    // clear all state variables
-    state = {
-        bestObjective1: Number.MAX_VALUE,
-        bestObjective2: Number.MAX_VALUE,
-        bestSimilarity: 0,
-        noImprovementCount: 0,
-        currentIteration: 0,
 
-        lastUpdateTime: 0,
-        startTime: 0,
-        iterationTimestamps: [],
-        objectiveHistory: [],
-        similarityHistory: [],
+    // Reset optimization tracking
+    state.bestObjective1 = Number.MAX_VALUE;
+    state.bestObjective2 = Number.MAX_VALUE;
+    state.bestSimilarity = 0;
+    state.noImprovementCount = 0;
+    state.currentIteration = 0;
 
-        bestGrid1Overall: null,
-        bestGrid2Overall: null,
+    // Reset performance tracking
+    state.startTime = 0;
+    state.lastUpdateTime = 0;
+    state.iterationHistory = [];
 
-        isRunning: false,
+    // Reset status flags
+    state.isRunning = false;
 
-        currentGridState1: null,
-        currentGridState2: null,
+    // Reset grid states
+    state.currentGridState1 = null;
+    state.currentGridState2 = null;
 
-        optimizationTimer: null,
-
-        userMaxIterations: CONFIG.maxIterations
-    }
-
-    // clear any existing timer
+    // Clear any existing timer
     if (state.optimizationTimer !== null) {
         clearTimeout(state.optimizationTimer);
         state.optimizationTimer = null;
     }
-}
 
+    // Reset user configuration
+    state.userMaxIterations = CONFIG.maxIterations;
+}
 
 // Start the optimization loop
 const startOptimization = (gridState1: GridState, gridState2: GridState, matrix: number[][], maxIter: number) => {
@@ -138,197 +127,23 @@ const startOptimization = (gridState1: GridState, gridState2: GridState, matrix:
         console.error("[Worker] Cannot start optimization: missing required data");
         return false;
     }
+
     state.currentGridState1 = gridState1;
     state.currentGridState2 = gridState2;
     state.userMaxIterations = maxIter || CONFIG.maxIterations;
     state.currentIteration = 0;
     state.isRunning = true;
 
-    // initialize performance tracking
+    // Initialize performance tracking
     state.startTime = performance.now();
     state.lastUpdateTime = state.startTime;
-    state.iterationTimestamps = [];
-    state.objectiveHistory = [];
-    state.similarityHistory = [];
-
-    // initialize best grid tracking
-    state.bestGrid1Overall = structuredClone(gridState1);
-    state.bestGrid2Overall = structuredClone(gridState2);
-
-    state.bestObjective1 = gridState1.objectiveValue;
-    state.bestObjective2 = gridState2.objectiveValue;
+    state.iterationHistory = [state.startTime];
 
     console.log(`[Worker] Starting optimization with max ${state.userMaxIterations} iterations`);
+
     runOptimizationStep();
     return true;
 }
-
-// The main optimization step function - completely rewritten
-const runOptimizationStep = () => {
-    if (!state.isRunning || !state.currentGridState1 || !state.currentGridState2) {
-        return;
-    }
-
-    try {
-        // process batch of iterations
-        let grid1Improved = false;
-        let grid2Improved = false;
-        let similarityImproved = false;
-
-        const batchEndIterations = Math.min(state.currentIteration + CONFIG.batchSize, state.userMaxIterations);
-        for (let i = state.currentIteration; i < batchEndIterations; i++) {
-            if (i >= state.userMaxIterations) {
-                // Reached max iterations
-                console.log(`[Worker] Reached maximum iterations (${state.userMaxIterations})`);
-                state.isRunning = false;
-
-                // Send final best grid
-                ctx.postMessage({
-                    type: 'optimization_complete',
-                    grid1: state.bestGrid1Overall,
-                    grid2: state.bestGrid2Overall,
-                    similarity: state.bestSimilarity,
-                    status: {
-                        currentIteration: i,
-                        bestObjective1: state.bestObjective1,
-                        bestObjective2: state.bestObjective2,
-                        bestSimilarity: state.bestSimilarity,
-                        noImprovementCount: state.noImprovementCount,
-                        ...calculatePerformanceMetrics()
-                    },
-                    iteration: i
-                });
-                return;
-            }
-
-
-            // record timestamp for performance tracking
-            state.iterationTimestamps.push(performance.now());
-
-            // use the adaptive optimization if enabled
-            const updateGrid1: GridState = CONFIG.adaptiveOptimizationEnabled
-                ? adaptiveOptimizeStep(state.currentGridState1, i)
-                : adaptiveOptimizeStep(state.currentGridState1, i);
-
-            const updateGrid2: GridState = CONFIG.adaptiveOptimizationEnabled
-                ? adaptiveOptimizeStep(state.currentGridState2, i)
-                : adaptiveOptimizeStep(state.currentGridState2, i);
-
-            state.currentGridState1 = updateGrid1;
-            state.currentGridState2 = updateGrid2;
-
-            const currentSimilarity = calculateGridSimilarity(updateGrid1, updateGrid2);
-            const similarityPercentage = currentSimilarity * 100;
-
-            // track history for performance analysis
-            state.objectiveHistory.push(updateGrid1.objectiveValue);
-            state.similarityHistory.push(similarityPercentage);
-
-            if (i % CONFIG.loggingInterval === 0) {
-                const perfMetrics = calculatePerformanceMetrics();
-                console.log(
-                    `[Worker] Iteration ${i}, Similarity: ${similarityPercentage.toFixed(2)}%, ` +
-                    `Objective1: ${updateGrid1.objectiveValue.toFixed(4)}, ` +
-                    `Speed: ${perfMetrics.iterationsPerSecond.toFixed(1)} it/s, ` +
-                    `Est. remaining: ${Math.round(perfMetrics.estimatedTimeRemaining)}s`
-                );
-            }
-
-            if (updateGrid1.objectiveValue < state.bestObjective1) {
-                state.bestObjective1 = updateGrid1.objectiveValue;
-                state.bestGrid1Overall = efficientCopy(updateGrid1);
-                grid1Improved = true;
-            }
-
-            if (updateGrid2.objectiveValue < state.bestObjective2) {
-                state.bestObjective2 = updateGrid2.objectiveValue;
-                state.bestGrid2Overall = efficientCopy(updateGrid2);
-                grid2Improved = true;
-            }
-
-            if (similarityPercentage > state.bestSimilarity) {
-                state.bestSimilarity = similarityPercentage;
-                similarityImproved = true;
-            }
-
-            if (grid1Improved || grid2Improved || similarityImproved) {
-                state.noImprovementCount = 0;
-            } else {
-                state.noImprovementCount++;
-            }
-            state.currentIteration++;
-        }
-
-        // Check if we should send an update
-        const now = performance.now();
-        const timeSinceLastUpdate = now - state.lastUpdateTime;
-
-        const shouldSendUpdate =
-            grid1Improved ||
-            grid2Improved ||
-            similarityImproved ||
-            state.currentIteration < CONFIG.initialStatusUpdates ||
-            state.currentIteration % CONFIG.updateInterval === 0 ||
-            state.noImprovementCount >= CONFIG.maxNoImprovement ||
-            timeSinceLastUpdate >= CONFIG.minUpdateInterval;
-
-        if (shouldSendUpdate) {
-            state.lastUpdateTime = now;
-
-            ctx.postMessage({
-                type: grid1Improved || grid2Improved || similarityImproved
-                    ? 'optimization_improved'
-                    : 'status_update',
-                grid1: state.bestGrid1Overall,
-                grid2: state.bestGrid2Overall,
-                similarity: state.bestSimilarity,
-                improvement: {
-                    grid1Improved,
-                    grid2Improved,
-                    similarityImproved
-                },
-                status: {
-                    currentIteration: state.currentIteration,
-                    bestObjective1: state.bestObjective1,
-                    bestObjective2: state.bestObjective2,
-                    bestSimilarity: state.bestSimilarity,
-                    noImprovementCount: state.noImprovementCount,
-                    ...calculatePerformanceMetrics()
-                },
-                iteration: state.currentIteration
-            });
-
-            if (state.noImprovementCount >= CONFIG.maxNoImprovement) {
-                state.noImprovementCount = 0;
-            }
-        }
-
-        // schedule next batch with more adaptive timing based on performance
-        const batchTime = performance.now() - now;
-        const minDelay = Math.max(0, CONFIG.minUpdateInterval - batchTime);
-        state.optimizationTimer = setTimeout(runOptimizationStep, minDelay);
-    } catch (error: any) {
-        console.error("[Worker] Error during optimization:", error);
-
-        ctx.postMessage({
-            type: "error",
-            error: error.message,
-            status: {
-                currentIteration: state.currentIteration,
-                bestObjective1: state.bestObjective1,
-                bestObjective2: state.bestObjective2,
-                bestSimilarity: state.bestSimilarity,
-                noImprovementCount: state.noImprovementCount
-            },
-            iteration: state.currentIteration
-        });
-
-        // Try to continue despite error
-        state.currentIteration++;
-        state.optimizationTimer = setTimeout(runOptimizationStep, 100);
-    }
-};
-
 
 // Stop the optimization loop
 const stopOptimization = () => {
@@ -341,57 +156,173 @@ const stopOptimization = () => {
         state.optimizationTimer = null;
     }
 
-    // Send final status with best grid
+    // Calculate final iterations per second
+    const iterationsPerSecond = calculateIterationsPerSecond();
+
+    // Send final status
     ctx.postMessage({
         type: 'optimization_stopped',
-        grid1: state.bestGrid1Overall,
-        grid2: state.bestGrid2Overall,
-        similarity: state.bestSimilarity,
         status: {
             currentIteration: state.currentIteration,
             bestObjective1: state.bestObjective1,
             bestObjective2: state.bestObjective2,
             bestSimilarity: state.bestSimilarity,
             noImprovementCount: state.noImprovementCount,
-            ...calculatePerformanceMetrics()
+            iterationsPerSecond
         },
         iteration: state.currentIteration
     });
-};
+}
 
-
-const calculatePerformanceMetrics = () => {
-    const now = performance.now();
-    const recentTimestamps = state.iterationTimestamps.slice(-CONFIG.performanceWindowSize);
-    let iterationsPerSecond = 0;
-    if (recentTimestamps.length > 5) { // Ensure we have enough data points
-        const timeWindow = recentTimestamps[recentTimestamps.length - 1] - recentTimestamps[0];
-        iterationsPerSecond = (recentTimestamps.length - 1) / (timeWindow / 1000);
-        iterationsPerSecond = Math.round(iterationsPerSecond * 10) / 10;
-    }
-    let estimatedTimeRemaining = 0;
-    if (iterationsPerSecond > 0) {
-        const remainingIterations = state.userMaxIterations - state.currentIteration;
-        estimatedTimeRemaining = remainingIterations / iterationsPerSecond;
-        estimatedTimeRemaining *= 1.1;
+const runOptimizationStep = () => {
+    if (!state.isRunning || !state.currentGridState1 || !state.currentGridState2) {
+        return;
     }
 
-    let recentImprovementRate = 0;
-    const recentObjectives = state.objectiveHistory.slice(-CONFIG.stagnationCheckWindow);
+    try {
+        // Record timestamp for performance tracking
+        const now = performance.now();
+        state.iterationHistory.push(now);
 
-    if (recentObjectives.length > 1) {
-        const oldestObjective = recentObjectives[0];
-        const newestObjective = recentObjectives[recentObjectives.length - 1];
-        recentImprovementRate = Math.abs((oldestObjective - newestObjective) / oldestObjective);
+        // Limit the history array size to prevent memory growth
+        if (state.iterationHistory.length > CONFIG.performanceWindow * 2) {
+            state.iterationHistory = state.iterationHistory.slice(-CONFIG.performanceWindow);
+        }
+
+        if (state.currentIteration >= state.userMaxIterations) {
+            console.log(`[Worker] Reached maximum iterations (${state.userMaxIterations})`);
+            state.isRunning = false;
+
+            const iterationsPerSecond = calculateIterationsPerSecond();
+
+            ctx.postMessage({
+                type: 'optimization_complete',
+                status: {
+                    currentIteration: state.currentIteration,
+                    bestObjective1: state.bestObjective1,
+                    bestObjective2: state.bestObjective2,
+                    bestSimilarity: state.bestSimilarity,
+                    noImprovementCount: state.noImprovementCount,
+                    iterationsPerSecond
+                },
+                iteration: state.currentIteration
+            });
+
+            return;
+        }
+
+        const updatedGrid1 = optimizeStep(state.currentGridState1, state.currentIteration);
+        const updatedGrid2 = optimizeStep(state.currentGridState2, state.currentIteration);
+
+        state.currentGridState1 = updatedGrid1;
+        state.currentGridState2 = updatedGrid2;
+
+        const currentSimilarity = calculateGridSimilarity(updatedGrid1, updatedGrid2);
+        const similarityPercentage = currentSimilarity * 100;
+
+        if (state.currentIteration % CONFIG.loggingInterval === 0) {
+            const iterationsPerSecond = calculateIterationsPerSecond();
+            console.log(
+                `[Worker] Iteration ${state.currentIteration}, ` +
+                `Similarity: ${similarityPercentage.toFixed(2)}%, ` +
+                `Objective1: ${updatedGrid1.objectiveValue.toFixed(4)}, ` +
+                `Speed: ${iterationsPerSecond.toFixed(1)} it/s`
+            );
+        }
+
+        // Check for improvements
+        let grid1Improved = false;
+        let grid2Improved = false;
+        let similarityImproved = false;
+
+        if (similarityPercentage > state.bestSimilarity) {
+            state.bestSimilarity = similarityPercentage;
+            similarityImproved = true;
+        }
+
+        if (updatedGrid1.objectiveValue < state.bestObjective1) {
+            state.bestObjective1 = updatedGrid1.objectiveValue;
+            grid1Improved = true;
+        }
+
+        if (updatedGrid2.objectiveValue < state.bestObjective2) {
+            state.bestObjective2 = updatedGrid2.objectiveValue;
+            grid2Improved = true;
+        }
+
+        let shouldSendUpdate = false;
+
+        if (grid1Improved || grid2Improved || similarityImproved) {
+            shouldSendUpdate = true;
+            state.noImprovementCount = 0;
+        } else {
+            state.noImprovementCount++;
+
+            shouldSendUpdate =
+                state.currentIteration < CONFIG.initialStatusUpdates || // Always send first few iterations
+                state.currentIteration % CONFIG.updateInterval === 0 || // Regular interval updates
+                state.noImprovementCount >= CONFIG.maxNoImprovement;    // Force update after many iterations with no improvement
+            if (state.noImprovementCount >= CONFIG.maxNoImprovement) {
+                state.noImprovementCount = 0;
+            }
+        }
+
+        if (shouldSendUpdate) {
+            // Calculate iterations per second
+            const iterationsPerSecond = calculateIterationsPerSecond();
+
+            ctx.postMessage({
+                type: grid1Improved || grid2Improved || similarityImproved
+                    ? 'optimization_improved'
+                    : 'status_update',
+                grid1: updatedGrid1,
+                grid2: updatedGrid2,
+                similarity: similarityPercentage,
+                improvement: {
+                    grid1Improved,
+                    grid2Improved,
+                    similarityImproved
+                },
+                status: {
+                    currentIteration: state.currentIteration,
+                    bestObjective1: state.bestObjective1,
+                    bestObjective2: state.bestObjective2,
+                    bestSimilarity: state.bestSimilarity,
+                    noImprovementCount: state.noImprovementCount,
+                    iterationsPerSecond
+                },
+                iteration: state.currentIteration
+            } as WorkerResponse);
+
+            state.lastUpdateTime = now;
+        }
+
+        state.currentIteration++;
+        state.optimizationTimer = setTimeout(runOptimizationStep, 0);
+
+    } catch (error: any) {
+        console.error("[Worker] Error during optimization:", error);
+
+        const iterationsPerSecond = calculateIterationsPerSecond();
+
+        ctx.postMessage({
+            type: "error",
+            error: error.message,
+            status: {
+                currentIteration: state.currentIteration,
+                bestObjective1: state.bestObjective1,
+                bestObjective2: state.bestObjective2,
+                bestSimilarity: state.bestSimilarity,
+                noImprovementCount: state.noImprovementCount,
+                iterationsPerSecond
+            },
+            iteration: state.currentIteration
+        } as WorkerResponse);
+        state.currentIteration++;
+        state.optimizationTimer = setTimeout(runOptimizationStep, 0);
     }
+}
 
-    return {
-        iterationsPerSecond,
-        estimatedTimeRemaining,
-        recentImprovementRate,
-        totalElapsedTime: (now - state.startTime) / 1000
-    };
-};
 const ctx: Worker = self as any;
 
 ctx.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
@@ -446,6 +377,31 @@ ctx.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
                     type: 'reset_confirmed'
                 });
                 console.log("[Worker] State reset completed");
+                break;
+            }
+
+
+            case "pause_optimization": {
+                console.log("[Worker] Pausing optimization");
+                state.wasRunningBeforePause = state.isRunning;
+                state.isPaused = true;
+
+                // Clear any existing timer
+                if (state.optimizationTimer !== null) {
+                    clearTimeout(state.optimizationTimer);
+                    state.optimizationTimer = null;
+                }
+                break;
+            }
+
+            case "resume_optimization": {
+                console.log("[Worker] Resuming optimization");
+                state.isPaused = false;
+                if (state.wasRunningBeforePause) {
+                    // Only resume if it was running before
+                    state.isRunning = true;
+                    runOptimizationStep();
+                }
                 break;
             }
 

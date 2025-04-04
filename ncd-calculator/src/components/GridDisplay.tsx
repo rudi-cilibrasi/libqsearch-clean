@@ -34,10 +34,8 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                                                             grid,
                                                             objectsById,
                                                             iterations,
-                                                            iterationsPerSecond = 0,
                                                             colorTheme = "scientific",
                                                             onCellSelect,
-                                                            cellDimensions,
                                                             showEmptyCells = true,
                                                             fitToContainer = true,
                                                             clusterThreshold = 0.25,
@@ -61,7 +59,7 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
 
     // Helper function to get grid value at position (i,j)
     const getGridValue = (i: number, j: number): number => {
-        return grid.grid[i * grid.width + j];
+        return grid.grid[i][j];
     };
 
     // Update active highlights when the prop changes
@@ -129,8 +127,7 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
 
         for (let i = 0; i < grid.height; i++) {
             for (let j = 0; j < grid.width; j++) {
-                const cellIndex = i * grid.width + j;
-                const itemIdx = grid.grid[cellIndex];
+                const itemIdx = grid.grid[i][j];
                 if (itemIdx === EMPTY_CELL_INDEX) continue;
                 if (itemClusters.has(itemIdx)) continue;
 
@@ -140,8 +137,7 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                 for (const [di, dj] of directions) {
                     const ni = (i + di + grid.height) % grid.height;
                     const nj = (j + dj + grid.width) % grid.width;
-                    const neighborCellIndex = ni * grid.width + nj;
-                    const neighborIdx = grid.grid[neighborCellIndex];
+                    const neighborIdx = grid.grid[ni][nj];
 
                     if (neighborIdx === EMPTY_CELL_INDEX) continue;
 
@@ -191,8 +187,7 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
 
         for (let i = 0; i < grid.height; i++) {
             for (let j = 0; j < grid.width; j++) {
-                const cellIndex = i * grid.width + j;
-                const itemIdx = grid.grid[cellIndex];
+                const itemIdx = grid.grid[i][j];
 
                 if (itemIdx !== EMPTY_CELL_INDEX) {
                     const clusterData = clusterInfo.get(itemIdx);
@@ -304,8 +299,7 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
         if (!showEmptyCells) {
             for (let i = 0; i < grid.height; i++) {
                 for (let j = 0; j < grid.width; j++) {
-                    const cellIndex = i * grid.width + j;
-                    const indexId = grid.grid[cellIndex];
+                    const indexId = grid.grid[i][j];
 
                     if (indexId !== EMPTY_CELL_INDEX) {
                         nonEmptyCells.push({i, j, indexId});
@@ -319,7 +313,7 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
             ? Array.from({length: grid.height * grid.width}, (_, idx) => {
                 const i = Math.floor(idx / grid.width);
                 const j = idx % grid.width;
-                return {i, j, indexId: grid.grid[idx]};
+                return {i, j, indexId: grid.grid[i][j]};
             })
             : nonEmptyCells;
 
@@ -443,22 +437,38 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                         </div>
                     )}
 
-                    {/* Connection indicators for similar neighbors */}
+                    {/* Update the connection indicators for similar neighbors */}
                     {hasRightSimilar && (
-                        <div className="absolute right-0 top-1/2 w-1 h-0.5 bg-blue-600 opacity-70 z-10"
-                             style={{transform: 'translateY(-50%)'}}></div>
+                        <div
+                            className="absolute right-0 top-1/2 w-2 h-1.5 bg-blue-500 opacity-90 z-10 rounded-full shadow-glow"
+                            style={{
+                                transform: 'translateY(-50%) translateX(50%)',
+                                boxShadow: '0 0 3px 1px rgba(59, 130, 246, 0.6)'
+                            }}></div>
                     )}
                     {hasBottomSimilar && (
-                        <div className="absolute bottom-0 left-1/2 w-0.5 h-1 bg-blue-600 opacity-70 z-10"
-                             style={{transform: 'translateX(-50%)'}}></div>
+                        <div
+                            className="absolute bottom-0 left-1/2 w-1.5 h-2 bg-blue-500 opacity-90 z-10 rounded-full shadow-glow"
+                            style={{
+                                transform: 'translateX(-50%) translateY(50%)',
+                                boxShadow: '0 0 3px 1px rgba(59, 130, 246, 0.6)'
+                            }}></div>
                     )}
                     {hasLeftSimilar && (
-                        <div className="absolute left-0 top-1/2 w-1 h-0.5 bg-blue-600 opacity-70 z-10"
-                             style={{transform: 'translateY(-50%)'}}></div>
+                        <div
+                            className="absolute left-0 top-1/2 w-2 h-1.5 bg-blue-500 opacity-90 z-10 rounded-full shadow-glow"
+                            style={{
+                                transform: 'translateY(-50%) translateX(-50%)',
+                                boxShadow: '0 0 3px 1px rgba(59, 130, 246, 0.6)'
+                            }}></div>
                     )}
                     {hasTopSimilar && (
-                        <div className="absolute top-0 left-1/2 w-0.5 h-1 bg-blue-600 opacity-70 z-10"
-                             style={{transform: 'translateX(-50%)'}}></div>
+                        <div
+                            className="absolute top-0 left-1/2 w-1.5 h-2 bg-blue-500 opacity-90 z-10 rounded-full shadow-glow"
+                            style={{
+                                transform: 'translateX(-50%) translateY(-50%)',
+                                boxShadow: '0 0 3px 1px rgba(59, 130, 246, 0.6)'
+                            }}></div>
                     )}
 
                     {/* Content container with minimal padding */}

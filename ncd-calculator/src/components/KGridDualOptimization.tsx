@@ -36,6 +36,7 @@ interface KGridDualOptimizationProps {
     width?: number;
     height?: number;
     objects?: GridObject[];
+    currentIterations?: number;
     maxIterations?: number;
     onOptimizationStart?: () => void;
     onOptimizationEnd?: () => void;
@@ -68,6 +69,8 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                                                                                 showEmptyCells = true,
                                                                                 fitToContainer = true,
                                                                                 onError,
+                                                                                currentIterations,
+                                                                                currentObjectiveValue
                                                                             }) => {
     // Add global styles for custom text size
     React.useEffect(() => {
@@ -78,6 +81,11 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                 line-height: 0.85rem;
             }
         `;
+        style.textContent += `
+    .shadow-glow {
+        box-shadow: 0 0 3px 1px rgba(59, 130, 246, 0.6);
+    }
+`;
         document.head.appendChild(style);
         return () => {
             document.head.removeChild(style);
@@ -457,24 +465,9 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         setTimeout(() => {
             if (!workerRef.current || !gridState1 || !gridState2) return;
 
-            // Prepare grid states for worker
             const gridState1Clone = structuredClone(gridState1);
             const gridState2Clone = structuredClone(gridState2);
 
-            // Convert Maps to serializable objects for transfer to worker
-            if (gridState1Clone.idToIndexMap instanceof Map) {
-                gridState1Clone.idToIndexMap = mapToObject(gridState1Clone.idToIndexMap);
-            }
-            if (gridState1Clone.indexToIdMap instanceof Map) {
-                gridState1Clone.indexToIdMap = mapToObject(gridState1Clone.indexToIdMap);
-            }
-
-            if (gridState2Clone.idToIndexMap instanceof Map) {
-                gridState2Clone.idToIndexMap = mapToObject(gridState2Clone.idToIndexMap);
-            }
-            if (gridState2Clone.indexToIdMap instanceof Map) {
-                gridState2Clone.indexToIdMap = mapToObject(gridState2Clone.indexToIdMap);
-            }
 
             const message = {
                 command: 'start_optimization',
@@ -482,7 +475,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                     gridState1: gridState1Clone,
                     gridState2: gridState2Clone,
                     ncdMatrix: ncdMatrixResponse?.ncdMatrix,
-                    maxIterations: maxIterations
+                    maxIterations: Number.MAX_SAFE_INTEGER
                 }
             };
 
@@ -605,13 +598,12 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                             <span className="text-green-300 font-mono">{iterationsPerSecond.toFixed(1)} it/s</span>
                         </div>
                         <div>
-                            <span className="text-gray-400 mr-1">Est. remaining:</span>
-                            <span className="text-green-300 font-mono">{formatTime(estimatedTimeRemaining)}</span>
+                            <span className="text-gray-400 mr-1">Iterations:</span>
+                            <span className="text-green-300 font-mono">{currentIterations}</span>
                         </div>
                         <div>
-                            <span className="text-gray-400 mr-1">Progress:</span>
-                            <span
-                                className="text-green-300 font-mono">{Math.min(100, Math.round((iterations / maxIterations) * 100))}%</span>
+                            <span className="text-gray-400 mr-1">Objective value:</span>
+                            <span className="text-green-300 font-mono">{gridState1?.objectiveValue.toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
@@ -728,7 +720,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                 {isRunning ? (
                     <div className="text-xs text-gray-400 p-2">
                         Optimization in progress. Updates occur when better arrangements are found.
-                        Current iteration: {iterations.toLocaleString()} / {maxIterations.toLocaleString()}
                     </div>
                 ) : (
                     <div className="text-xs text-gray-400 p-2">
@@ -740,38 +731,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
             </div>
 
             {/* Optimization Statistics */}
-            {isRunning && (
-                <div className="mt-2 bg-gray-800 rounded-lg p-3">
-                    <h4 className="text-white text-sm font-semibold mb-2">Optimization Progress</h4>
-                    <div className="w-full bg-gray-700 rounded-full h-2.5 mb-4 overflow-hidden">
-                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                             style={{width: `${Math.min(100, Math.round((iterations / maxIterations) * 100))}%`}}></div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-gray-700 rounded p-2">
-                            <div className="text-xs text-gray-400">Objective Value</div>
-                            <div className="text-lg font-mono text-green-300">
-                                {displayObjective1 !== null ? displayObjective1.toFixed(4) : "N/A"}
-                            </div>
-                        </div>
-                        <div className="bg-gray-700 rounded p-2">
-                            <div className="text-xs text-gray-400">Match %</div>
-                            <div className="text-lg font-mono text-green-300">
-                                {matchPercentage.toFixed(2)}%
-                            </div>
-                        </div>
-                        <div className="bg-gray-700 rounded p-2">
-                            <div className="text-xs text-gray-400">Iterations</div>
-                            <div className="text-lg font-mono text-green-300">
-                                {iterations.toLocaleString()}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Convergence Status - show when optimization is complete */}
             {converged && !isRunning && (
                 <div className="mt-2 bg-green-800 rounded-lg p-3 text-white">
                     <h4 className="text-white text-sm font-semibold mb-1">Optimization Complete</h4>
@@ -796,8 +755,7 @@ const countEmptyCells = (grid: GridState): number => {
 
     for (let i = 0; i < grid.height; i++) {
         for (let j = 0; j < grid.width; j++) {
-            const index = i * grid.width + j;
-            if (grid.grid[index] === EMPTY_CELL_INDEX) {
+            if (grid.grid[i][j] === EMPTY_CELL_INDEX) {
                 count++;
             }
         }

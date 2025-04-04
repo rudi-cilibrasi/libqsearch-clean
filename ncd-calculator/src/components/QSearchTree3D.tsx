@@ -39,7 +39,6 @@ export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({data, darkThemeOnly
     useEffect(() => {
         treeKey.current = Math.random().toString(36);
     }, [data]);
-
     const containerStyle: ContainerStyle = {
         width: "100%",
         height: "600px", // Fixed height
@@ -298,7 +297,7 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({data, scaleFactor, theme}) => 
 
         const cameraDistance = camera.position.length();
         const labelScaleFactor = Math.max(
-            0.5,
+            1.0,
             cameraDistance / (100 * scaleFactor)
         );
 
@@ -446,10 +445,10 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({data, scaleFactor, theme}) => 
                     ref={labelRef}
                     position={[
                         position.x,
-                        position.y + (isLeaf ? 6 : 4) * scaleFactor,
+                        position.y + (isLeaf ? 8 : 6) * scaleFactor, // Increased offset
                         position.z,
                     ]}
-                    fontSize={1.5 * scaleFactor}
+                    fontSize={2.2 * scaleFactor} // Increased font size
                     color={textColor}
                     anchorX="center"
                     anchorY="middle"
@@ -457,7 +456,11 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({data, scaleFactor, theme}) => 
                     renderOrder={1}
                     material-depthTest={false}
                     outlineColor={theme === "dark" ? "#000000" : "#ffffff"}
-                    outlineWidth={0.05}
+                    outlineWidth={0.1} // Thicker outline
+                    backgroundColor={theme === "dark" ? "#00000080" : "#ffffff80"} // Semi-transparent background
+                    padding={0.5 * scaleFactor} // Add padding
+                    maxWidth={20 * scaleFactor} // Limit width for long labels
+                    overflowWrap="break-word" // Break long words if needed
                 >
                     {node.label}
                 </Text>

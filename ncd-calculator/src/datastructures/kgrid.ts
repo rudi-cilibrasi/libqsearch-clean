@@ -1,6 +1,5 @@
 import {deflate} from "pako";
 import {NCDMatrixResponse} from "@/types/ncd.ts";
-import {UnionFind} from "@/datastructures/unionFind.ts";
 
 export interface GridObject {
     id: string;
@@ -13,17 +12,21 @@ export interface Position {
     j: number;
 }
 
+export interface Block {
+    topLeft: Position;
+    bottomRight: Position;
+}
+
 export interface GridState {
     width: number;
     height: number;
-    grid: number[]; // grid index position, just using 1D grid instead of 2 for better performance
+    grid: number[][]; // grid index position
     numericNcdMatrix: number[][];
     idToIndexMap: Map<string, number>;
     indexToIdMap: Map<number, string>;
-    factorMatrix: number[];
+    factorMatrix: number[][];
     objectiveValue: number;
     emptyIndex: number;
-    optimizationHistory: OptimizationHistory;
 }
 
 /**
@@ -70,16 +73,16 @@ export const calculateNCD = (str1: string, str2: string): number => {
     return Math.max(0, Math.min(1, ncd));
 };
 
-export const getFlatGradualFactorMatrix = (width: number, height: number): number[] => {
-    const factorMatrix: number[] = [];
+export const getGradualFactorMatrix = (width: number, height: number): number[][] => {
+    const factorMatrix: number[][] = [];
     for (let i = 0; i < height; i++) {
+        factorMatrix[i] = [];
         for (let j = 0; j < width; j++) {
-            factorMatrix[i * width + j] = gradualFactor({i, j}, width, height);
+            factorMatrix[i][j] = gradualFactor({i, j}, width, height);
         }
     }
     return factorMatrix;
 }
-
 
 export const gradualFactor = (pos: Position, width: number, height: number): number => {
     // For true wraparound, we want a more circular/toroidal pattern
@@ -94,43 +97,101 @@ export const gradualFactor = (pos: Position, width: number, height: number): num
     // Combined distance (circular)
     const dist = Math.sqrt(distI * distI + distJ * distJ);
 
-    // Stronger center bias - increase weight of center positions
-    const base = 1.3;
+    // Base value
+    const base = 1.15;
 
-    // Stronger radial gradient to encourage grouping near center
-    const radialFactor = 0.35 * (1 - dist);
+    // Radial pattern with slight variation
+    const radialFactor = 0.2 * (1 - dist);
 
-    // Add more pronounced asymmetry to break symmetrical arrangements
-    const asymFactor = 0.08 * Math.sin(pos.i * Math.PI / height) * Math.sin(pos.j * Math.PI / width);
+    // Add some asymmetry with a small sinusoidal component
+    const asymFactor = 0.05 * Math.sin(pos.i * Math.PI / height) * Math.sin(pos.j * Math.PI / width);
 
-    // Add adjacency bias - encourages adjacent positions to have similar factors
-    const adjacencyBias = 0.1 * Math.sin((pos.i + pos.j) * Math.PI / (width + height));
-
-    // Combine factors and apply power scaling
-    return Math.pow(base + radialFactor + asymFactor + adjacencyBias, 0.5);
+    // Combine and apply power scaling
+    return Math.pow(base + radialFactor + asymFactor, 0.4);
 };
 
-export const flattenGrid = (grid2d: number[][]): number[] => {
-    const height = grid2d.length;
-    const width = grid2d[0].length;
-    const flatGrid = new Array(height * width);
-    for (let i = 0; i < height; i++) {
-        for (let j = 0; j < width; j++) {
-            flatGrid[width * i + j] = grid2d[i][j];
+export const deepCopy = (gridState: GridState): GridState => {
+    const newGrid: number[][] = [];
+    for (let i = 0; i < gridState.height; i++) {
+        newGrid[i] = [...gridState.grid[i]];
+    }
+
+    const newIdToIndexMap = new Map(gridState.idToIndexMap);
+    const newIndexToIdMap = new Map(gridState.indexToIdMap);
+
+    return {
+        width: gridState.width,
+        height: gridState.height,
+        grid: newGrid,
+        objectiveValue: gridState.objectiveValue,
+        numericNcdMatrix: gridState.numericNcdMatrix,
+        factorMatrix: gridState.factorMatrix,
+        indexToIdMap: newIndexToIdMap,
+        idToIndexMap: newIdToIndexMap,
+        emptyIndex: -1
+    }
+};
+
+export const extractBlock = (grid: GridState, block: Block): number[][] => {
+    const normalizedBlock = normalizeBlock(block, grid.height, grid.width);
+    const {topLeft, bottomRight} = normalizedBlock;
+
+    const blockHeight = bottomRight.i - topLeft.i + 1;
+    const blockWidth = bottomRight.j - topLeft.j + 1;
+
+    console.log(`Extracting block with dimensions ${blockWidth}×${blockHeight}`);
+
+    const blockContent: number[][] = Array(blockHeight).fill(null)
+        .map(() => Array(blockWidth).fill(-1));
+
+    for (let i = 0; i < blockHeight; i++) {
+        for (let j = 0; j < blockWidth; j++) {
+            const gridI = (topLeft.i + i) % grid.height;
+            const gridJ = (topLeft.j + j) % grid.width;
+
+            blockContent[i][j] = grid.grid[gridI][gridJ];
         }
     }
-    return flatGrid;
+
+    console.log(`Extracted block content ${blockHeight}×${blockWidth}:`,
+        JSON.stringify(blockContent));
+    return blockContent;
 }
 
-export const unflattenGrid = (grid: number[], width: number, height: number): number[][] => {
-    const unflattenGrid = new Array(height).fill(null).map(() => new Array(width));
-    for (let i = 0; i < height; i++) {
-        for (let j = 0; j < width; j++) {
-            unflattenGrid[i][j] = grid[i * width + j];
+export const normalizeBlock = (block: Block, gridHeight: number, gridWidth: number): Block => {
+    const topLeftI = Math.min(Math.max(0, Math.floor(block.topLeft.i)), gridHeight - 1);
+    const topLeftJ = Math.min(Math.max(0, Math.floor(block.topLeft.j)), gridWidth - 1);
+    const bottomRightI = Math.min(Math.max(0, Math.floor(block.bottomRight.i)), gridHeight - 1);
+    const bottomRightJ = Math.min(Math.max(0, Math.floor(block.bottomRight.j)), gridWidth - 1);
+
+    const normalizedBlock = {
+        topLeft: {
+            i: Math.min(topLeftI, bottomRightI),
+            j: Math.min(topLeftJ, bottomRightJ)
+        },
+        bottomRight: {
+            i: Math.max(topLeftI, bottomRightI),
+            j: Math.max(topLeftJ, bottomRightJ)
         }
+    };
+
+    if (normalizedBlock.bottomRight.i < normalizedBlock.topLeft.i) {
+        normalizedBlock.bottomRight.i = normalizedBlock.topLeft.i;
     }
-    return unflattenGrid;
-}
+
+    if (normalizedBlock.bottomRight.j < normalizedBlock.topLeft.j) {
+        normalizedBlock.bottomRight.j = normalizedBlock.topLeft.j;
+    }
+
+    if (normalizedBlock.topLeft.i !== block.topLeft.i ||
+        normalizedBlock.topLeft.j !== block.topLeft.j ||
+        normalizedBlock.bottomRight.i !== block.bottomRight.i ||
+        normalizedBlock.bottomRight.j !== block.bottomRight.j) {
+        console.log(`Block normalized from (${block.topLeft.i},${block.topLeft.j})-(${block.bottomRight.i},${block.bottomRight.j}) to (${normalizedBlock.topLeft.i},${normalizedBlock.topLeft.j})-(${normalizedBlock.bottomRight.i},${normalizedBlock.bottomRight.j})`);
+    }
+
+    return normalizedBlock;
+};
 
 
 export const getNCDValue = (index1: number, index2: number, ncdMatrix: number[][]): number => {
@@ -171,155 +232,208 @@ export const getAdjacentEmptyCells = (grid: number[][], visited: Set<string>, em
     return adjacent;
 };
 
+export const createSafeInitialGrid = (width: number, height: number, objects: GridObject[], ncdMatrixResponse: NCDMatrixResponse) => {
+    // Process objects to ensure unique IDs as strings
+    const processedObjects = objects.map(obj => ({
+        ...obj,
+        id: String(obj.id)
+    }));
 
-export const createSafeInitialGrid = (width: number, height: number, gridObjects: GridObject[], ncdMatrixResponse: NCDMatrixResponse): GridState => {
-    const len = gridObjects.length;
-    const baseWidth = Math.ceil(Math.sqrt(len));
-    const baseHeight = Math.ceil(len / baseWidth);
+    const itemCount = processedObjects.length;
+    if (itemCount < 4) {
+        throw new Error("Needs at least 4 objects to create the initial grid");
+    }
 
+    console.log(`Creating grid for ${itemCount} objects`);
+
+    // Calculate grid dimensions with slack space
+    const baseWidth = Math.ceil(Math.sqrt(itemCount));
+    const baseHeight = Math.ceil(itemCount / baseWidth);
     const gridWidth = (width || baseWidth) + 1;
     const gridHeight = (height || baseHeight) + 1;
 
-    console.log(`Initialize safe grid with dimension: ${gridWidth}x${gridHeight}`);
+    console.log(`Grid dimensions: ${gridWidth}x${gridHeight}`);
+
+    // Create ID mappings
     const idToIndexMap: Map<string, number> = new Map();
     const indexToIdMap: Map<number, string> = new Map();
-    gridObjects.forEach((obj: GridObject, index: number) => {
-        idToIndexMap.set(obj.id, index);
-        indexToIdMap.set(index, obj.id);
-    })
     const EMPTY_CELL_INDEX = -1;
-    const grid = new Array(gridWidth * gridHeight).fill(EMPTY_CELL_INDEX);
 
-    const centerI = gridWidth / 2;
-    const centerJ = gridHeight / 2;
-    const firstObjectIdx = idToIndexMap.get(gridObjects[0].id);
-    grid[Math.floor(centerI) * gridWidth + Math.floor(centerJ)] = firstObjectIdx !== undefined ? firstObjectIdx : EMPTY_CELL_INDEX;
+    processedObjects.forEach((obj: GridObject, index: number) => {
+        indexToIdMap.set(index, obj.id);
+        idToIndexMap.set(obj.id, index);
+    });
+
+    // Initialize grid with empty cells
+    const grid: number[][] = [];
+    for (let i = 0; i < gridHeight; i++) {
+        grid[i] = Array(gridWidth).fill(EMPTY_CELL_INDEX);
+    }
+
+    // Place first object in center
+    const centerI = Math.floor(gridHeight / 2);
+    const centerJ = Math.floor(gridWidth / 2);
+    const firstObjectIdx = idToIndexMap.get(processedObjects[0].id);
+    grid[centerI][centerJ] = firstObjectIdx !== undefined ? firstObjectIdx : EMPTY_CELL_INDEX;
+
     console.log(`Placed first object (index ${firstObjectIdx}) at center (${centerI},${centerJ})`);
-    let placeCount = 1;
+
+    // Place remaining objects
+    let placedCount = 1; // We've placed the first object
     let attempts = 0;
-    const maxAttempts = 10 * len;
-    const grid2D = unflattenGrid(grid, gridWidth, gridHeight);
-    while (attempts <= maxAttempts && placeCount < len) {
+    const maxAttempts = itemCount * 10; // Avoid infinite loops
+
+    while (placedCount < itemCount && attempts < maxAttempts) {
         attempts++;
-        const visited: Set<string> = new Set();
-        const adjacentEmptyCells = getAdjacentEmptyCells(grid2D, visited, EMPTY_CELL_INDEX);
+
+        const visited = new Set<string>();
+        const adjacentEmptyCells = getAdjacentEmptyCells(grid, visited, EMPTY_CELL_INDEX);
+
         if (adjacentEmptyCells.length === 0) {
-            console.log("The grid doesn't have any empty cell");
+            console.warn("No adjacent empty cells available. Grid connectivity constraint might prevent placing all objects.");
             break;
         }
-        const randIdx = Math.floor((Math.random() * adjacentEmptyCells.length));
-        const [i, j] = adjacentEmptyCells[randIdx];
-        const nextObjectIdx = idToIndexMap.get(gridObjects[placeCount].id);
+
+        const randomIndex = Math.floor(Math.random() * adjacentEmptyCells.length);
+        const [i, j] = adjacentEmptyCells[randomIndex];
+
+        const nextObjectIdx = idToIndexMap.get(processedObjects[placedCount].id);
         if (nextObjectIdx !== undefined) {
-            grid2D[i][j] = nextObjectIdx;
-            grid[i * width + j] = nextObjectIdx;
-            placeCount++;
+            grid[i][j] = nextObjectIdx;
+            placedCount++;
+            console.log(`Placed object ${placedCount} (index ${nextObjectIdx}) at (${i},${j})`);
         }
     }
-    if (placeCount < len) {
-        console.log(`Only able to place ${placeCount} out of ${len} objects`);
+
+    if (placedCount < itemCount) {
+        console.warn(`Could only place ${placedCount} out of ${itemCount} objects while maintaining connectivity`);
     } else {
-        console.log(`Place all ${placeCount} objects successfully`);
+        console.log(`Successfully placed all ${itemCount} objects`);
     }
 
     const numericNcdMatrix = ncdMatrixResponse.ncdMatrix;
-    const factorMatrix = getFlatGradualFactorMatrix(gridWidth, gridHeight);
-    const flatGrid = flattenGrid(grid2D);
+    const factorMatrix = getGradualFactorMatrix(gridWidth, gridHeight);
+
     const gridState: GridState = {
         width: gridWidth,
         height: gridHeight,
         numericNcdMatrix,
-        factorMatrix: factorMatrix,
-        grid: flatGrid,
+        factorMatrix,
         emptyIndex: EMPTY_CELL_INDEX,
+        grid: grid,
         idToIndexMap,
         indexToIdMap,
-        objectiveValue: 0,
-        optimizationHistory: new OptimizationHistory(ADAPTIVE_OPTIMIZE_OPTIONS.historyWindowSize)
-    }
+        objectiveValue: 0
+    };
+
     gridState.objectiveValue = calculateObjectiveWithSlackSpace(gridState);
-    console.log("Created initial grid: " + JSON.stringify(gridState));
+
     return gridState;
+};
+
+export const optimizeStep = (grid: GridState, iterationCount: number): GridState => {
+    const {
+        initialTemperature,
+        finalTemperature,
+        coolingRate,
+        swapsPerStep
+    } = OPTIMIZE_STEP_OPTIONS;
+
+    let currentGrid = deepCopy(grid);
+    const temperature = initialTemperature * Math.pow(coolingRate, iterationCount);
+    const inExploitationMode = temperature <= finalTemperature;
+
+    const actualSwaps = inExploitationMode ? 1 : swapsPerStep;
+    for (let i = 0; i < actualSwaps; i++) {
+        const cell1 = selectRandomNonEmptyCell(grid);
+        let cell2;
+        if (Math.random() < 0.8) {
+            cell2 = selectRandomNonEmptyCell(grid);
+        } else {
+            cell2 = selectRandomEmptyCell(grid);
+            if (!cell2) {
+                cell2 = selectRandomNonEmptyCell(grid);
+            }
+        }
+        if (cell1.i === cell2.i && cell1.j === cell2.j) {
+            continue;
+        }
+        if (wouldBreakConnectivity(currentGrid, cell1, cell2)) {
+            continue;
+        }
+        const proposedGrid = swapCells(currentGrid, cell1, cell2);
+
+        const delta = proposedGrid.objectiveValue - grid.objectiveValue;
+        const acceptanceProbability = delta <= 0 ? 1 : Math.exp(-delta / temperature);
+        if (Math.random() < acceptanceProbability) {
+            currentGrid = proposedGrid;
+            console.log(`[Iteration ${iterationCount}] Accepted swap at (${cell1.i},${cell1.j})⟷(${cell2.i},${cell2.j}), new objective: ${currentGrid.objectiveValue.toFixed(6)}`);
+        }
+    }
+    return currentGrid;
 }
 
 
-export const wouldBreakConnectivity = (gridState: GridState, pos1: Position, pos2: Position): boolean => {
-    const {width, height, grid, emptyIndex = -1,} = gridState;
+export const wouldBreakConnectivity = (grid: GridState, cell1: Position, cell2: Position): boolean => {
+    const {width, height, grid: gridArray, emptyIndex = -1} = grid;
 
-    const value1 = getGridValue(gridState, pos1);
-    const value2 = getGridValue(gridState, pos2);
-    // if both are not empty index then the connectivity remain the same
-    if (value1 !== emptyIndex && value2 !== emptyIndex) {
-        return false;
-    }
+    const tempGrid = gridArray.map(row => [...row]);
+    [tempGrid[cell1.i][cell1.j], tempGrid[cell2.i][cell2.j]] = [tempGrid[cell2.i][cell2.j], tempGrid[cell1.i][cell1.j]];
 
-    if (value1 === emptyIndex && value2 === emptyIndex) {
-        return false;
-    }
-    const nonEmptyPos = value1 === emptyIndex ? pos2 : pos1;
-    const tempGrid = efficientCopy(gridState);
-    setGridValue(tempGrid, nonEmptyPos, emptyIndex);
+    const needToCheck = tempGrid[cell1.i][cell1.j] === emptyIndex || tempGrid[cell2.i][cell2.j] === emptyIndex;
+    if (!needToCheck) return false;
 
-    let totalNonEmptyCells = 0;
-    let nonEmptyCellIndicies: number[] = [];
-    let firstNonEmptyPosition: Position | null = null;
+    // Find the first non-empty cell to start BFS
+    let startI = -1, startJ = -1;
     for (let i = 0; i < height; i++) {
         for (let j = 0; j < width; j++) {
-            const index = i * width + j;
-            const cellValue = grid[index];
-
-            if (cellValue !== emptyIndex && !(i === nonEmptyPos.i && j === nonEmptyPos.j)) {
-                if (firstNonEmptyPosition === null) {
-                    firstNonEmptyPosition = {i, j};
-                }
-                nonEmptyCellIndicies.push(index);
-                totalNonEmptyCells++;
+            if (tempGrid[i][j] !== emptyIndex) {
+                startI = i;
+                startJ = j;
+                break;
+            }
+        }
+        if (startI !== -1) break;
+    }
+    if (startI === -1) return false;
+    let totalNonemptyCells = 0;
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            if (tempGrid[i][j] !== emptyIndex) {
+                totalNonemptyCells++;
             }
         }
     }
-    // if there is just only non-empty cell or none, then the connectivity cannot be broken
-    if (totalNonEmptyCells <= 1) return false;
-    const uf = new UnionFind(width * height);
-    const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
-    for (let i = 0; i < height; i++) {
-        for (let j = 0; j < width; j++) {
-            const index = i * width + j;
-            const position = {i, j};
-            // skip the cell that would be moved
-            if (i === nonEmptyPos.i && j === nonEmptyPos.j) continue;
-            if (getGridValue(gridState, position) !== emptyIndex) {
-                for (const [di, dj] of directions) {
-                    const ni = (i + di + height) % height;
-                    const nj = (j + dj + width) % width;
-                    const neighborPos = {i: ni, j: nj};
-                    const neighborIndex = ni * width + nj;
-                    // skip the cell that would be moved
-                    if (ni === nonEmptyPos.i && nj === nonEmptyPos.j) continue;
-                    if (getGridValue(gridState, neighborPos) !== emptyIndex) {
-                        uf.union(index, neighborIndex);
-                    }
+    const visited = Array(height).fill(0).map(() => Array(width).fill(false));
+    const queue = [[startI, startJ]];
+    visited[startI][startJ] = true;
+    let visitedCount = 1;
+    while (queue.length > 0) {
+        const [i, j] = queue.shift() as [number, number];
+
+        const directions = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+        for (const [di, dj] of directions) {
+            const ni = (i + di + height) % height;
+            const nj = (j + dj + width) % width;
+
+            if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
+                if (tempGrid[ni][nj] !== emptyIndex && !visited[ni][nj]) {
+                    visited[ni][nj] = true;
+                    queue.push([ni, nj]);
+                    visitedCount++;
                 }
             }
         }
     }
-
-    // If all non-empty cells are connected, we should have only one set
-    // (the number of sets equals the initial count minus the number of unions performed)
-    // Check if we have more than one set among the non-empty cells
-    const roots = new Set<number>();
-    for (const index of nonEmptyCellIndicies) {
-        roots.add(uf.find(index));
-    }
-    return roots.size > 1;
+    return visitedCount !== totalNonemptyCells;
 }
-
 
 export const selectRandomNonEmptyCell = (grid: GridState): Position => {
     const {width, height, grid: gridArray, emptyIndex = -1} = grid;
     const nonEmptyCells: Position[] = [];
     for (let i = 0; i < height; i++) {
         for (let j = 0; j < width; j++) {
-            if (gridArray[i * width + j] !== emptyIndex) {
+            if (gridArray[i][j] !== emptyIndex) {
                 nonEmptyCells.push({i, j});
             }
         }
@@ -328,176 +442,196 @@ export const selectRandomNonEmptyCell = (grid: GridState): Position => {
         nonEmptyCells.push({i: 0, j: 0});
     }
     const len = nonEmptyCells.length;
-    const randIndex = Math.floor(Math.random() * len);
-    return nonEmptyCells[randIndex];
+    const randIdx = Math.floor((Math.random() * len))
+    return nonEmptyCells[randIdx];
 }
 
 
+export const selectRandomEmptyCell = (grid: GridState): Position => {
+    const {width, height, grid: gridArray, emptyIndex = -1} = grid;
+    const emptyCells: Position[] = [];
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            if (gridArray[i][j] === emptyIndex) {
+                emptyCells.push({i, j});
+            }
+        }
+    }
+    if (emptyCells.length === 0) {
+        emptyCells.push({i: 0, j: 0});
+    }
+    const len = emptyCells.length;
+    const randIdx = Math.floor(Math.random() * len);
+    return emptyCells[randIdx];
+}
+
 export const calculateObjectiveWithSlackSpace = (gridState: GridState): number => {
     let total = 0;
-    const {width, height, grid} = gridState;
+    const {grid, numericNcdMatrix, factorMatrix, width, height, emptyIndex} = gridState;
 
     if (!grid || grid.length === 0) {
         console.error("Invalid grid data in calculateObjectiveWithSlackSpace");
         return 0;
     }
 
-    const contributionCache = new Map<number, number>();
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            const currentIdx = grid[i][j];
+            if (currentIdx === emptyIndex) continue;
+            const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
+            for (const [di, dj] of directions) {
+                const ni = (i + di + height) % height; // wrap around
+                const nj = (j + dj + width) % width;
+
+                const neighborIdx = grid[ni][nj];
+                if (neighborIdx !== emptyIndex) {
+                    total += numericNcdMatrix[currentIdx][neighborIdx] * factorMatrix[i][j];
+                }
+            }
+        }
+    }
+    return total;
+};
+
+export const precomputeGradualFactorMatrix = (width: number, height: number): number[][] => {
+    const factorMatrix: number[][] = [];
+
+    for (let i = 0; i < height; i++) {
+        factorMatrix[i] = [];
+        for (let j = 0; j < width; j++) {
+            factorMatrix[i][j] = symmetryBreaker({i, j}, width, height);
+        }
+    }
+
+    return factorMatrix;
+}
+
+
+export const calculateObjectiveWithNumericMatrix = (gridState: GridState): number => {
+    let total = 0;
+    const {grid, numericNcdMatrix, factorMatrix, width, height} = gridState;
 
     for (let i = 0; i < height; i++) {
         for (let j = 0; j < width; j++) {
-            const position = {i: i, j: j};
-            const cellContribution = getCellContribution(gridState, position, contributionCache);
-            total += cellContribution;
+            const currentIdx = grid[i][j];
+            let positionNCD = 0;
+            const rightJ = (j + 1) % width;
+            const rightNeighborIdx = grid[i][rightJ];
+            positionNCD += numericNcdMatrix[currentIdx][rightNeighborIdx];
+            const downI = (i + 1) % height;
+            const downNeighborIdx = grid[downI][j];
+            positionNCD += numericNcdMatrix[currentIdx][downNeighborIdx];
+            total += positionNCD * factorMatrix[i][j];
+        }
+    }
+    return total;
+}
+
+export const selectRandomCell = (grid: GridState): Position => {
+    const i = Math.floor(Math.random() * grid.height);
+    const j = Math.floor(Math.random() * grid.width);
+
+    console.log(`Selected random cell at position (${i},${j})`);
+    return {i, j};
+}
+
+
+const OPTIMIZE_STEP_OPTIONS = {
+    initialTemperature: 10.0,  // Starting temperature (higher = more exploration)
+    finalTemperature: 0.00,    // Final temperature
+    coolingRate: 0.9999,       // Cooling rate per iteration (slower = better results)
+    swapsPerStep: 1,           // Number of swaps to try per step
+}
+
+export const swapCells = (grid: GridState, pos1: Position, pos2: Position): GridState => {
+    console.log(`Swapping cells: (${pos1.i},${pos1.j}) with (${pos2.i},${pos2.j})`);
+
+    // Create a completely new grid state
+    const newGrid = deepCopy(grid);
+
+    // Get the values at each position
+    const value1 = grid.grid[pos1.i][pos1.j];
+    const value2 = grid.grid[pos2.i][pos2.j];
+
+    // Swap the values
+    newGrid.grid[pos1.i][pos1.j] = value2;
+    newGrid.grid[pos2.i][pos2.j] = value1;
+
+    // Recalculate the objective value for the new grid
+    newGrid.objectiveValue = calculateObjectiveWithSlackSpace(newGrid);
+
+    console.log(`Swapped ${value1} at (${pos1.i},${pos1.j}) with ${value2} at (${pos2.i},${pos2.j})`);
+    console.log(`New objective value: ${newGrid.objectiveValue.toFixed(6)}`);
+
+    return newGrid;
+}
+
+const SYMMETRY_BREAKER_OPTIONS = {
+    alpha: 0.25,        // Primary gradient i-coefficient
+    beta: 0.35,         // Primary gradient j-coefficient
+    baseValue: 1.15,    // Base value to ensure positive factors
+    varAmplitude1: 0.03, // Primary variation amplitude
+    varAmplitude2: 0.02, // Secondary variation amplitude
+    varFreq1: Math.PI,  // Primary variation frequency
+    varFreq2: 2.71,     // Secondary variation frequency (using e for irrationality)
+    powerFactor: 0.4    // Power to control overall effect magnitude
+}
+
+export const symmetryBreaker = (pos: Position, width: number, height: number) => {
+    const {
+        alpha,
+        beta,
+        baseValue,
+        varAmplitude1,
+        varAmplitude2,
+        varFreq1,
+        varFreq2,
+        powerFactor
+    } = SYMMETRY_BREAKER_OPTIONS;
+
+    const normalizedI = pos.i / (height - 1 || 1);
+    const normalizedJ = pos.j / (width - 1 || 1);
+
+    const baseGradient = baseValue + (alpha * normalizedI) + (beta * normalizedJ);
+
+    const primaryVariation = varAmplitude1 * Math.sin(normalizedI * varFreq1) * Math.sin(normalizedJ * varFreq2);
+    const phi = 1.618033988749895;
+    const secondaryVariation = varAmplitude2 * Math.sin(normalizedI * varFreq1 * phi) * Math.cos(normalizedJ * varFreq2 * phi);
+
+    return Math.pow(baseGradient + primaryVariation + secondaryVariation, powerFactor);
+}
+
+
+export const calculateObjectiveWithSymmetryBreaking = (
+    gridState: GridState,
+    factorMatrix: number[][],
+    ncdMatrix: number[][]
+): number => {
+    const {grid, width, height} = gridState;
+    let totalObjective = 0;
+
+    for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+            const objIndex = grid[i][j];
+
+            if (j < width - 1) {
+                const rightIndex = grid[i][j + 1];
+                const ncdValue = getNCDValue(objIndex, rightIndex, ncdMatrix);
+                totalObjective += ncdValue * factorMatrix[i][j] * factorMatrix[i][j + 1];
+            }
+
+            if (i < height - 1) {
+                const bottomIndex = grid[i + 1][j];
+                const ncdValue = getNCDValue(objIndex, bottomIndex, ncdMatrix);
+                totalObjective += ncdValue * factorMatrix[i][j] * factorMatrix[i + 1][j];
+            }
         }
     }
 
-    // Ensure the objective value is non-negative
-    // We use Math.max with a small positive value to avoid zero which can cause issues
-    return Math.max(0.0001, total / 2);
+    return totalObjective;
 };
 
-export const getCellContribution = (gridState: GridState, position: Position, contributionCache: Map<number, number>): number => {
-    const {width, height, emptyIndex = -1, factorMatrix, numericNcdMatrix, grid} = gridState;
-    const cellIndex = position.i * width + position.j;
-    const currentIndex = grid[cellIndex];
-    // if the cell is empty, it has no contribution
-    if (currentIndex === emptyIndex) {
-        return 0;
-    }
-    if (contributionCache && contributionCache.has(cellIndex)) {
-        return contributionCache.get(cellIndex)!;
-    }
-
-    let contribution = 0;
-    const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-
-    for (const [di, dj] of directions) {
-        const ni = (position.i + di + height) % height; // wrap-around
-        const nj = (position.j + dj + width) % width;
-        const neighborCellIndex = ni * width + nj;
-        const neighborIndex = grid[neighborCellIndex];
-        if (neighborIndex !== emptyIndex) {
-            contribution += numericNcdMatrix[currentIndex][neighborIndex] * factorMatrix[cellIndex];
-        }
-    }
-
-    if (contributionCache) {
-        contributionCache.set(cellIndex, contribution);
-    }
-
-    return contribution;
-}
-
-
-export const calculateCellContribution = (gridState: GridState, pos: Position): number => {
-    const {width, height, emptyIndex = -1, factorMatrix, grid, numericNcdMatrix} = gridState;
-    const cellIndex = pos.i * width + pos.j;
-    const currentIndex = grid[cellIndex];
-    if (currentIndex === emptyIndex) {
-        return 0;
-    }
-    let contribution = 0;
-    const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
-    for (const [di, dj] of directions) {
-        const ni = (pos.i + di + height) % height;
-        const nj = (pos.j + dj + width) % width;
-        const neighborCellIndex = ni * width + nj;
-        const neighborIndex = grid[neighborCellIndex];
-        if (neighborIndex !== emptyIndex) {
-            contribution += numericNcdMatrix[currentIndex][neighborIndex] * factorMatrix[cellIndex];
-        }
-    }
-    return contribution;
-}
-
-
-export const calculateNeighborContribution = (gridState: GridState, position: Position): number => {
-    const {width, height, emptyIndex = -1, grid, factorMatrix, numericNcdMatrix} = gridState;
-    const cellIndex = (position.i * width) + position.j;
-    const currentIndex = grid[cellIndex];
-    if (currentIndex === emptyIndex) {
-        return 0;
-    }
-    let contribution = 0;
-    const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-    for (const [di, dj] of directions) {
-        const ni = (position.i + di + height) % height;
-        const nj = (position.j + dj + width) % width;
-        const neighborPosition = {i: ni, j: nj};
-        const neighborCellValue = getGridValue(gridState, neighborPosition);
-        if (neighborCellValue !== emptyIndex) {
-            contribution += numericNcdMatrix[neighborCellValue][currentIndex] * factorMatrix[neighborCellValue];
-        }
-    }
-    return contribution;
-}
-
-
-export const getFactorValue = (gridState: GridState, pos: Position): number => {
-    const {factorMatrix} = gridState;
-    return factorMatrix[gridState.width * pos.i + pos.j];
-}
-
-// helper method to treat the grid as 1D great as 2D
-export const getGridValue = (grid: GridState, pos: Position): number => {
-    return grid.grid[grid.width * pos.i + pos.j];
-}
-
-export const setGridValue = (grid: GridState, position: Position, val: number): void => {
-    grid.grid[grid.width * position.i + position.j] = val;
-}
-
-
-export const efficientCopy = (gridState: GridState): GridState => {
-    try {
-        const result = structuredClone(gridState);
-        if (gridState.optimizationHistory) {
-            result.optimizationHistory = new OptimizationHistory(ADAPTIVE_OPTIMIZE_OPTIONS.historyWindowSize);
-            if (gridState.optimizationHistory['objectiveValues']) {
-                result.optimizationHistory['objectiveValues'] = [...gridState.optimizationHistory['objectiveValues']];
-            }
-        }
-        return result;
-    } catch (error: any) {
-        const {
-            width,
-            height,
-            emptyIndex = -1,
-            objectiveValue,
-            grid,
-            numericNcdMatrix,
-            factorMatrix,
-            optimizationHistory
-        } = gridState;
-
-        const newIdToIndexMap = new Map(gridState.idToIndexMap);
-        const newIndexToIdMap = new Map(gridState.indexToIdMap);
-
-        let newOptimizationHistory: OptimizationHistory;
-        if (optimizationHistory) {
-            newOptimizationHistory = new OptimizationHistory(ADAPTIVE_OPTIMIZE_OPTIONS.historyWindowSize);
-            if (optimizationHistory['objectiveValues']) {
-                newOptimizationHistory['objectiveValues'] = [...optimizationHistory['objectiveValues']];
-            }
-        } else {
-            newOptimizationHistory = new OptimizationHistory(ADAPTIVE_OPTIMIZE_OPTIONS.historyWindowSize);
-        }
-
-        return {
-            width,
-            height,
-            emptyIndex,
-            objectiveValue,
-            grid: [...grid],
-            idToIndexMap: newIdToIndexMap,
-            indexToIdMap: newIndexToIdMap,
-            factorMatrix: factorMatrix,
-            numericNcdMatrix: numericNcdMatrix,
-            optimizationHistory: newOptimizationHistory
-        };
-    }
-}
 
 export const calculateGridSimilarity = (grid1: GridState, grid2: GridState): number => {
     if (grid1.width !== grid2.width || grid1.height !== grid2.height) {
@@ -508,613 +642,10 @@ export const calculateGridSimilarity = (grid1: GridState, grid2: GridState): num
     const totalCells = grid1.height * grid1.width;
     for (let i = 0; i < grid1.height; i++) {
         for (let j = 0; j < grid1.width; j++) {
-            const flattenIndex = i * grid1.width + j;
-            if (grid1.grid[flattenIndex] === grid2.grid[flattenIndex]) {
+            if (grid1.grid[i][j] === grid2.grid[i][j]) {
                 matches++;
             }
         }
     }
     return matches / totalCells;
 }
-
-
-export const ADAPTIVE_OPTIMIZE_OPTIONS = {
-    initialTemperature: 12, // starting temperature (higher temperature = more exploration)
-    finalTemperature: 0.001, // final temperature
-    coolingRate: 0.9997, // base cooling rate per iteration
-    adaptiveCoolingEnabled: true, // enable adaptive cooling
-
-    // swap strategy configuration
-    swapsPerStep: 1, // base number of swaps to try per step
-    explorationRate: 0.3, // probability of random exploration (vs. optimization)
-
-    // cell selection parameters
-    sampleSizeMin: 5,// minimum number of cells when exploring
-    sampleSizeMax: 15, // maximum number of cells when exploring
-    adaptiveSampleSize: true, // enable adaptive sample sizing
-
-    // when to switch to more aggressive exploitation
-    exploitationThreshold: 0.1, // temperature threshold for switching to exploitation
-
-    // special moves configuration
-    allowSpecialMoves: true, // allow special moves like cluster reposition
-    specialMoveFrequency: 0.05, // frequency of attempting special moves
-
-    historyWindowSize: 1000, // window size for tracking improvement history
-}
-
-class OptimizationHistory {
-    // check if we're stuck in a plateau
-    private objectiveValues: number[] = [];
-    private windowSize: number;
-
-    constructor(windowSize: number) {
-        this.windowSize = windowSize;
-    }
-
-    addValue(value: number) {
-        this.objectiveValues.push(value);
-        if (this.objectiveValues.length > this.windowSize) {
-            this.objectiveValues.shift(); // remove the oldest value
-        }
-    }
-
-    // get improvement rate over the history window
-    getImprovementRate(): number {
-        if (this.objectiveValues.length < 2) return 0;
-        const oldest = this.objectiveValues[0];
-        const newest = this.objectiveValues[this.objectiveValues.length - 1];
-        if (oldest === 0) return 0;
-        return Math.abs((oldest - newest) / oldest);
-    }
-
-    // get change rate based on recent iterations
-    getRecentChangeRate(recentWindow: number = 100): number {
-        if (this.objectiveValues.length < recentWindow + 1) return 0;
-
-        const before = this.objectiveValues[this.objectiveValues.length - recentWindow - 1];
-        const current = this.objectiveValues[this.objectiveValues.length - 1];
-        if (before === 0) return 0;
-        return Math.abs((before - current) / before) / recentWindow;
-    }
-
-    // check if we're stuck in the plateau
-    isStuckInPlateau(threshold: number = 0.0001, minLength: number = 200): boolean {
-        if (this.objectiveValues.length < minLength) return false;
-        const recentValues = this.objectiveValues.slice(-minLength);
-        const mean = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
-
-        // calculate standard variation
-        const variance = recentValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / recentValues.length;
-        const stdDev = Math.sqrt(variance);
-        // If standard deviation is very small relative to mean, we're in a plateau
-        return (stdDev / mean) < threshold;
-    }
-
-}
-
-
-// These changes should be applied to the kgrid.ts file to fix the negative objective value issues
-
-// 1. Update the calculateSwapDelta function to prevent invalid calculations
-
-export const calculateSwapDelta = (gridState: GridState, pos1: Position, pos2: Position): number => {
-    const value1 = getGridValue(gridState, pos1);
-    const value2 = getGridValue(gridState, pos2);
-
-    // If both cell contain the same value or empty, no change
-    if (value1 === value2) {
-        return 0;
-    }
-
-    // Calculate the current contribution of each cell and its neighbors
-    const oldCellContribution1 = calculateCellContribution(gridState, pos1);
-    const oldCellContribution2 = calculateCellContribution(gridState, pos2);
-    const oldNeighborContribution1 = calculateNeighborContribution(gridState, pos1);
-    const oldNeighborContribution2 = calculateNeighborContribution(gridState, pos2);
-
-    // Create a new grid with the swap applied
-    const newGrid = efficientCopy(gridState);
-    setGridValue(newGrid, pos1, value2);
-    setGridValue(newGrid, pos2, value1);
-
-    // Calculate the new contribution after the swap
-    const newCellContribution1 = calculateCellContribution(newGrid, pos1);
-    const newCellContribution2 = calculateCellContribution(newGrid, pos2);
-    const newNeighborContribution1 = calculateNeighborContribution(newGrid, pos1);
-    const newNeighborContribution2 = calculateNeighborContribution(newGrid, pos2);
-
-    // Calculate the total difference
-    const totalNew = (newCellContribution1 + newCellContribution2 + newNeighborContribution1 + newNeighborContribution2);
-    const totalOld = (oldCellContribution1 + oldCellContribution2 + oldNeighborContribution1 + oldNeighborContribution2);
-    let delta = totalNew - totalOld;
-
-    // Sanity checks to prevent invalid deltas
-    if (isNaN(delta) || !isFinite(delta)) {
-        console.error("Invalid delta detected:", {
-            pos1, pos2,
-            old: [oldCellContribution1, oldCellContribution2, oldNeighborContribution1, oldNeighborContribution2],
-            new: [newCellContribution1, newCellContribution2, newNeighborContribution1, newNeighborContribution2]
-        });
-        return 0; // Reject this swap
-    }
-
-    // Limit extreme delta values
-    const MAX_DELTA_MAGNITUDE = 10.0;
-    if (Math.abs(delta) > MAX_DELTA_MAGNITUDE) {
-        console.warn(`Unusually large delta detected: ${delta}. Clamping to range.`);
-        delta = Math.sign(delta) * MAX_DELTA_MAGNITUDE;
-    }
-
-    return delta;
-};
-
-// 2. Add objective value validation in adaptiveOptimizeStep
-
-export const adaptiveOptimizeStep = (gridState: GridState, iterationCount: number): GridState => {
-    const options = ADAPTIVE_OPTIMIZE_OPTIONS;
-
-    // Initialize optimization history if it doesn't exist
-    if (!gridState.optimizationHistory) {
-        gridState.optimizationHistory = new OptimizationHistory(options.historyWindowSize);
-        gridState.optimizationHistory.addValue(gridState.objectiveValue);
-    }
-
-    // Periodically recalculate the objective value to prevent drift
-    if (iterationCount % 1000 === 0) {
-        const recalculatedObjective = calculateObjectiveWithSlackSpace(gridState);
-
-        if (Math.abs(recalculatedObjective - gridState.objectiveValue) > 0.1) {
-            console.warn(`Objective value drift detected. Recalculated: ${recalculatedObjective}, Current: ${gridState.objectiveValue}`);
-            gridState.objectiveValue = recalculatedObjective;
-        }
-    }
-
-    // Calculate temperature based on iteration count
-    let temperature = options.initialTemperature * Math.pow(options.coolingRate, iterationCount);
-
-    // Adaptive cooling adjustments based on progress
-    if (options.adaptiveCoolingEnabled && iterationCount > 0 && iterationCount % 100 === 0) {
-        const history = gridState?.optimizationHistory as OptimizationHistory;
-
-        // Slow down cooling if making good progress
-        if (history.getRecentChangeRate(100) > 0.001) {
-            temperature *= 1.05;
-        }
-
-        // Boost temperature to escape plateaus
-        if (history.isStuckInPlateau() && Math.random() < 0.3) {
-            temperature *= 2.0;
-            console.log(`[Iteration ${iterationCount}] Boosting temperature to escape plateau`);
-        }
-    }
-
-    // Determine if we're in exploitation mode
-    const inExploitationMode = temperature <= options.exploitationThreshold;
-    const actualSwaps = inExploitationMode ? 1 : options.swapsPerStep;
-    let currentGrid = efficientCopy(gridState);
-
-    // Try multiple swaps
-    for (let i = 0; i < actualSwaps; i++) {
-        // Sample size calculation
-        const sampleSize = options.adaptiveSampleSize
-            ? Math.max(
-                options.sampleSizeMin,
-                Math.min(
-                    options.sampleSizeMax,
-                    Math.floor(Math.sqrt(gridState.width * gridState.height) * (temperature / options.initialTemperature))
-                )
-            )
-            : options.sampleSizeMin;
-
-        // Try special moves occasionally
-        if (options.allowSpecialMoves && Math.random() < options.specialMoveFrequency) {
-            currentGrid = attemptSpecialMove(currentGrid, temperature);
-        }
-
-        // Select cells to swap
-        const cell1 = selectCellAdaptive(currentGrid, sampleSize, inExploitationMode);
-
-        // Different strategies for selecting the second cell
-        let cell2;
-        if (Math.random() < 0.6) {
-            // 60% try to find related cell
-            cell2 = findRelatedCellAdaptive(currentGrid, cell1, sampleSize);
-        } else if (Math.random() < 0.5) {
-            // 20% empty cell
-            cell2 = selectRandomEmptyCell(currentGrid);
-            if (!cell2) {
-                cell2 = selectRandomNonEmptyCell(currentGrid);
-            }
-        } else {
-            // 20% non-empty cell
-            cell2 = selectRandomNonEmptyCell(currentGrid);
-        }
-
-        // Skip if same cell or would break connectivity
-        if (cell1.i === cell2.i && cell1.j === cell2.j) {
-            continue;
-        }
-        if (wouldBreakConnectivity(currentGrid, cell1, cell2)) {
-            continue;
-        }
-
-        // Calculate delta and decide whether to accept the swap
-        const delta = calculateSwapDelta(currentGrid, cell1, cell2);
-        const acceptanceProbability = getAcceptanceProbability(delta, temperature);
-
-        if (Math.random() < acceptanceProbability) {
-            // Apply the swap
-            const value1 = getGridValue(currentGrid, cell1);
-            const value2 = getGridValue(currentGrid, cell2);
-
-            setGridValue(currentGrid, cell1, value2);
-            setGridValue(currentGrid, cell2, value1);
-
-            // Update the objective value
-            currentGrid.objectiveValue += delta;
-
-            // Validate objective value after update - force positive values
-            if (currentGrid.objectiveValue < 0) {
-                console.warn(`Negative objective value detected: ${currentGrid.objectiveValue}. Recalculating.`);
-                currentGrid.objectiveValue = calculateObjectiveWithSlackSpace(currentGrid);
-            }
-
-            // Log significant improvements
-            if (delta < -0.1) {
-                console.log(`[Iteration ${iterationCount}] Significant improvement: swap at (${cell1.i},${cell1.j})⟷(${cell2.i},${cell2.j}), new objective: ${currentGrid.objectiveValue.toFixed(6)}`);
-            }
-        }
-    }
-
-    // Update history
-    currentGrid.optimizationHistory.addValue(currentGrid.objectiveValue);
-
-    // Final validation of objective value
-    if (currentGrid.objectiveValue < 0 || isNaN(currentGrid.objectiveValue) || !isFinite(currentGrid.objectiveValue)) {
-        console.error(`Invalid objective value: ${currentGrid.objectiveValue}. Performing full recalculation.`);
-        currentGrid.objectiveValue = calculateObjectiveWithSlackSpace(currentGrid);
-    }
-
-    return currentGrid;
-};
-
-export const getRecentProgress = (gridState: GridState, windowSize: number) => {
-    if (!gridState?.optimizationHistory) return 0;
-    return gridState.optimizationHistory.getRecentChangeRate(windowSize);
-}
-
-// adaptive cell selection that considers both poor fit and cluster boundaries
-export const selectCellAdaptive = (gridState: GridState, sampleSize: number, inExploitationMode: boolean): Position => {
-    const {width, height, emptyIndex = -1, numericNcdMatrix} = gridState;
-
-    // in exploitation mode, focus more on poor-fitting cells
-    const explorationRate = inExploitationMode ? 0.1 : 0.3;
-
-    // random exploration
-    if (Math.random() < explorationRate) {
-        return selectRandomNonEmptyCell(gridState);
-    }
-
-    // strategic selection
-    const candidates: [Position, number][] = [];
-
-    // sample cells to evaluate
-    for (let i = 0; i < sampleSize; i++) {
-        const pos = selectRandomNonEmptyCell(gridState);
-        const value = getGridValue(gridState, pos);
-        if (value === emptyIndex) continue;
-
-        // calculate fit score (higher score = worse fit)
-        let fitScore = 0;
-        let neighborCount = 0;
-
-        const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-        for (const [di, dj] of directions) {
-            const ni = (pos.i + di + height) % height;
-            const nj = (pos.j + dj + width) % width;
-            const neighborPos = {i: ni, j: nj};
-            const neighborValue = getGridValue(gridState, neighborPos);
-            if (neighborValue !== emptyIndex) {
-                fitScore += numericNcdMatrix[value][neighborValue];
-                neighborCount++;
-            }
-        }
-
-        // calculate average fit score
-        const avgFitScore = neighborCount > 0 ? fitScore / neighborCount : 0;
-
-        // add boundary detection: cells at cluster boundary are good swapping candidates
-        let isBoundary = false;
-        for (const [di, dj] of directions) {
-            const ni = (pos.i + di + height) % height;
-            const nj = (pos.j + dj + width) % width;
-            const neighborPos = {i: ni, j: nj};
-            const neighborValue = getGridValue(gridState, neighborPos);
-            if (neighborValue !== emptyIndex && neighborValue !== value) {
-                // check if this neighbor is significantly different
-                if (numericNcdMatrix[value][neighborValue] > 0.5) {
-                    isBoundary = true;
-                    break;
-                }
-            }
-        }
-
-        // boundary cell gets a bonus
-        const finalScore = isBoundary ? avgFitScore * 1.5 : avgFitScore;
-        candidates.push([pos, finalScore]);
-    }
-
-    // sort by worst fit first
-    candidates.sort((a, b) => b[1] - a[1]);
-    // Return one of the worst-fitting cells (with some randomness)
-    const randomIndex = Math.floor(Math.random() * Math.min(3, candidates.length));
-    return candidates.length > 0 ? candidates[randomIndex][0] : selectRandomNonEmptyCell(gridState);
-}
-
-
-// find related cell consider both similarity and layout quality
-export const findRelatedCellAdaptive = (gridState: GridState, pos: Position, sampleSize: number): Position => {
-    const {width, emptyIndex = -1, numericNcdMatrix, factorMatrix} = gridState;
-    const value = getGridValue(gridState, pos);
-
-    if (value === emptyIndex) {
-        return selectRandomNonEmptyCell(gridState);
-    }
-
-
-    const candidates: [Position, number][] = [];
-
-    // sample cells to find related one
-    for (let i = 0; i < sampleSize; i++) {
-        const candidatePos = selectRandomNonEmptyCell(gridState);
-        if (candidatePos.i === pos.i && candidatePos.j === pos.j) continue;
-        const candidateValue = getGridValue(gridState, candidatePos);
-        if (candidateValue === emptyIndex) continue;
-        // get NCD value - lower is better
-        const ncdValue = numericNcdMatrix[value][candidateValue];
-        // consider the factor matrix value (higher is better) for central position
-        const factorValue = factorMatrix[candidatePos.i * width + candidatePos.j];
-        // combined score - lower is better, balance between similarity and position quality
-        const combinedValue = ncdValue - (factorValue * 0.1);
-        candidates.push([candidatePos, combinedValue]);
-    }
-
-    // sort in increasing order of the combined values, lower score = better match
-    candidates.sort((a, b) => a[1] - b[1]);
-    // pick one of the best matches
-    const index = Math.floor(Math.random() * Math.min(3, candidates.length));
-    return candidates.length > 0 ? candidates[index][0] : selectRandomNonEmptyCell(gridState);
-}
-
-export const attemptSpecialMove = (gridState: GridState, temperature: number): GridState => {
-    const {width, height, emptyIndex = -1, numericNcdMatrix} = gridState;
-    const newGrid = efficientCopy(gridState);
-    const moveType = Math.random();
-
-    // 1. cluster movement - move a group of related items together
-    if (moveType < 0.4) {
-        const seedPos = selectRandomNonEmptyCell(newGrid);
-        const seedValue = getGridValue(newGrid, seedPos);
-        if (seedValue === emptyIndex) return newGrid;
-
-        // find cells that are similar to seed
-        const similarCells: Position[] = [];
-        const threshold = 0.3; // similar threshold
-
-        for (let i = 0; i < height; i++) {
-            for (let j = 0; j < width; j++) {
-                const pos = {i, j};
-                const value = getGridValue(newGrid, pos);
-                if (value !== emptyIndex && value !== seedValue) {
-                    if (numericNcdMatrix[seedValue][value] < threshold) {
-                        similarCells.push(pos);
-                    }
-                }
-            }
-        }
-
-        // if we found similar cells, try to move one closer to the seed
-        if (similarCells.length > 0) {
-            const targetCell = similarCells[Math.floor(Math.random() * similarCells.length)];
-
-            // find an adjacent position to move to
-            const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
-            const shuffleDirs = directions.sort(() => Math.random() - 0.5);
-
-            for (const [di, dj] of shuffleDirs) {
-                const ni = (seedPos.i + di + height) % height;
-                const nj = (seedPos.j + dj + width) % width;
-                const moveToPos = {i: ni, j: nj};
-                const moveToValue = getGridValue(newGrid, moveToPos);
-                if (moveToValue === emptyIndex || !wouldBreakConnectivity(newGrid, targetCell, moveToPos)) {
-                    // calculate the delta for this move
-                    const delta = calculateSwapDelta(newGrid, targetCell, moveToPos);
-                    // even if it's not an improvement, we might accept it to escape local optima
-                    const acceptanceProbability = getAcceptanceProbability(delta, temperature);
-                    if (Math.random() < acceptanceProbability) {
-                        const cellValue = getGridValue(newGrid, targetCell);
-                        setGridValue(newGrid, targetCell, moveToValue);
-                        setGridValue(newGrid, moveToPos, cellValue);
-                        newGrid.objectiveValue += delta;
-
-                        console.log(`Special move: Cluster item moved near similar item. Delta: ${delta.toFixed(6)}`);
-                        return newGrid;
-                    }
-                }
-            }
-        }
-    }
-    // row or column shift - works well for grid arrangements
-    else if (moveType < 0.7) {
-        const shiftRow = Math.random() < 0.5;
-        if (shiftRow) {
-            const rowToShift = Math.floor(Math.random() * height);
-            const shiftDirection = Math.random() < 0.5 ? 1 : -1;
-
-            // calculating the effect of shifting this row
-            let shiftDelta = 0;
-            const tempGrid = efficientCopy(newGrid);
-
-            // perform the shift
-            const rowBuffer = [];
-            for (let j = 0; j < width; j++) {
-                rowBuffer[j] = getGridValue(tempGrid, {i: rowToShift, j});
-            }
-
-            for (let j = 0; j < width; j++) {
-                const newJ = (j + shiftDirection + width) % width;
-                setGridValue(tempGrid, {i: rowToShift, j: newJ}, rowBuffer[j]);
-            }
-
-            // calculate new objective after shifting rows
-            tempGrid.objectiveValue = calculateObjectiveWithSlackSpace(tempGrid);
-            shiftDelta = tempGrid.objectiveValue - newGrid.objectiveValue;
-            const acceptanceProbability = getAcceptanceProbability(shiftDelta, temperature);
-            if (Math.random() < acceptanceProbability) {
-                console.log(`Special move: Row ${rowToShift} shifted by ${shiftDirection}. Delta: ${shiftDelta.toFixed(6)}`);
-                return tempGrid;
-            }
-        } else {
-            // shift a column
-            const colToShift = Math.floor(Math.random() * width);
-            const shiftDirection = Math.random() < 0.5 ? 1 : -1;
-
-            // calculate the effect of shifting this column
-            let shiftDelta = 0;
-            const tempGrid = efficientCopy(newGrid);
-
-            // perform the shift
-            const colBuffer = [];
-            for (let i = 0; i < height; i++) {
-                colBuffer[i] = getGridValue(tempGrid, {i, j: colToShift});
-            }
-            for (let i = 0; i < height; i++) {
-                const newI = (i + shiftDirection + height) % height;
-                setGridValue(tempGrid, {i: newI, j: colToShift}, colBuffer[i]);
-            }
-
-            // calculate the objective value after shifting the column
-            tempGrid.objectiveValue = calculateObjectiveWithSlackSpace(tempGrid);
-            shiftDelta = tempGrid.objectiveValue - newGrid.objectiveValue;
-            const acceptanceProbability = getAcceptanceProbability(shiftDelta, temperature);
-            if (Math.random() < acceptanceProbability) {
-                console.log(`Special move: Column ${colToShift} shifted by ${shiftDirection}. Delta: ${shiftDelta.toFixed(6)}`);
-                return tempGrid;
-            }
-        }
-    }
-    // 3. empty cell redistribution - help break symmetry and create space for meaningful arrangements
-    else {
-        // find all empty cells
-        const emptyCells: Position[] = [];
-        for (let i = 0; i < height; i++) {
-            for (let j = 0; j < width; j++) {
-                if (getGridValue(newGrid, {i, j}) === emptyIndex) {
-                    emptyCells.push({i, j});
-                }
-            }
-        }
-        // if we have multiple empty cells, try to arrange them
-        if (emptyCells.length > 1) {
-            // strategy: move an empty cell to a poorly connected item
-            // find a cell with poor fits (high NCD) with its neighbor
-
-            const candidates: [Position, number][] = [];
-            const sampleSize = Math.min(10, width * height);
-
-            for (let i = 0; i < sampleSize; i++) {
-                const pos = selectRandomNonEmptyCell(newGrid);
-                const value = getGridValue(newGrid, pos);
-                if (value === emptyIndex) continue;
-
-                // evaluate fit with neighbors
-                let totalNCD = 0;
-                let neighborCount = 0;
-                const directions = [[0, 1], [1, 0], [-1, 0], [0, -1]];
-                for (const [di, dj] of directions) {
-                    const ni = (pos.i + di + height) % height;
-                    const nj = (pos.j + dj + width) % width;
-                    const neighborPos = {i: ni, j: nj};
-                    const neighborValue = getGridValue(newGrid, neighborPos);
-                    if (neighborValue !== emptyIndex) {
-                        totalNCD += newGrid.numericNcdMatrix[value][neighborValue];
-                        neighborCount++;
-                    }
-                }
-
-                // higher score means worse fit with neighbors
-                const averageNCD = neighborCount > 0 ? totalNCD / neighborCount : 0;
-                candidates.push([pos, averageNCD]);
-            }
-
-            candidates.sort((a, b) => b[1] - a[1]);
-
-            if (candidates.length > 0) {
-                const poorFitPos = candidates[0][0];
-                const directions = [[0, 1], [1, 0], [-1, 0], [1, 0]];
-                for (const [di, dj] of directions) {
-                    const ni = (poorFitPos.i + di + height) % height;
-                    const nj = (poorFitPos.j + dj + width) % width;
-                    const adjacentPos = {i: ni, j: nj};
-                    const adjacentValue = getGridValue(newGrid, adjacentPos);
-                    if (adjacentValue !== emptyIndex) {
-                        // try to move an empty cell here to replace the poor fit neighbor
-                        const randomEmptyIndex = Math.floor(Math.random() * emptyCells.length);
-                        const emptyCell = emptyCells[randomEmptyIndex];
-                        if (!wouldBreakConnectivity(newGrid, adjacentPos, emptyCell)) {
-                            // perform swap
-                            const delta = calculateSwapDelta(newGrid, adjacentPos, emptyCell);
-                            const acceptanceProbability = getAcceptanceProbability(delta, temperature);
-
-                            if (Math.random() < acceptanceProbability) {
-                                setGridValue(newGrid, adjacentPos, emptyIndex);
-                                setGridValue(newGrid, emptyCell, adjacentValue);
-
-                                newGrid.objectiveValue += delta;
-                                console.log(`Special move: Empty cell relocation. Delta: ${delta.toFixed(6)}`);
-                                return newGrid;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    // If no special move was performed, return the original grid
-    return newGrid;
-}
-
-
-export const getAcceptanceProbability = (delta: number, temperature: number): number => {
-    // always accept improvements
-    if (delta <= 0) {
-        return 1.0;
-    }
-    // for worsening moves, use Boltzmann distribution
-    return Math.exp(-delta / Math.max(0.001, temperature));
-}
-
-
-export const selectRandomEmptyCell = (gridState: GridState): Position | null => {
-    const {width, height, grid: gridArray, emptyIndex = -1} = gridState;
-    const emptyCells: Position[] = [];
-
-    for (let i = 0; i < height; i++) {
-        for (let j = 0; j < width; j++) {
-            if (gridArray[i * width + j] === emptyIndex) {
-                emptyCells.push({i, j});
-            }
-        }
-    }
-
-    if (emptyCells.length === 0) {
-        return null;
-    }
-
-    const randIndex = Math.floor(Math.random() * emptyCells.length);
-    return emptyCells[randIndex];
-}
-
-
-
