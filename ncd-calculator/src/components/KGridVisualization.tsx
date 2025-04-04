@@ -433,16 +433,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                                     Stop
                                 </button>
                             </div>
-
-                            <div className="mb-3">
-                                <label className="block text-sm text-white mb-2 font-medium">Max Iterations:</label>
-                                <input
-                                    type="number"
-                                    value={maxIterations}
-                                    disabled
-                                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
-                                />
-                            </div>
                         </div>
 
                         {/* Data Options */}
