@@ -1,21 +1,18 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {KGridDualOptimization} from './KGridDualOptimization';
 import {QSearchTree3D, QTreeResponse} from './QSearchTree3D';
-import {
-    Download,
-    Upload,
-} from 'lucide-react';
+import {Download, Upload,} from 'lucide-react';
 import {MatrixTable} from "@/components/MatrixTable.tsx";
 import {NCDMatrixResponse} from "@/types/ncd.ts";
-import {GridObject} from "@/services/kgrid.ts";
+import {GridObject} from "@/datastructures/kgrid.ts";
 import {LabelManager} from "@/functions/labelUtils.ts";
 
 // Visualization types enum for better type safety
-const VisualizationType = {
+export const VisualizationType = {
     QUARTET: "quartet",
     KGRID: "kgrid",
     MATRIX: "matrix"
-};
+} as const;
 
 interface KGridVisualizationProps {
     ncdMatrixResponse: NCDMatrixResponse;
@@ -235,6 +232,7 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                     height={gridHeight}
                     objects={objects}
                     maxIterations={maxIterations}
+                    currentIterations={iterations}
                     onOptimizationStart={handleOptimizationStart}
                     onOptimizationEnd={handleOptimizationEnd}
                     onIterationUpdate={handleIterationUpdate}
@@ -348,33 +346,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                 </div>
             </div>
 
-            {/* Status Panel - Only for K-Grid visualization */}
-            {activeViz === VisualizationType.KGRID && (
-                <div className="bg-blue-800 text-white border-b border-blue-900 flex justify-between items-center p-4">
-                    <div className="flex items-center space-x-6">
-                        <div className="flex items-center">
-                            <span className="font-bold mr-2">Status:</span>
-                            <span className={`font-medium ${isRunning ? 'text-green-300' : 'text-yellow-300'}`}>
-                                {isRunning ? 'Running' : 'Ready'}
-                            </span>
-                        </div>
-                        <div className="flex items-center">
-                            <span className="font-bold mr-2">Running Time:</span>
-                            <span className="font-medium text-green-300">{formatTime(runningTime)}</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center space-x-6">
-                        <div className="flex items-center">
-                            <span className="font-bold mr-2">Iterations:</span>
-                            <span className="font-medium text-green-300">{iterations.toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center">
-                            <span className="font-bold mr-2">Match:</span>
-                            <span className="font-medium text-green-300">{matchPercentage.toFixed(2)}%</span>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Main Content Area */}
             <div className="p-4 flex">
@@ -461,16 +432,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                                 >
                                     Stop
                                 </button>
-                            </div>
-
-                            <div className="mb-3">
-                                <label className="block text-sm text-white mb-2 font-medium">Max Iterations:</label>
-                                <input
-                                    type="number"
-                                    value={maxIterations}
-                                    disabled
-                                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
-                                />
                             </div>
                         </div>
 

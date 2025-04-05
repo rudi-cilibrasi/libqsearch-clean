@@ -232,6 +232,39 @@ export const getAdjacentEmptyCells = (grid: number[][], visited: Set<string>, em
     return adjacent;
 };
 
+
+function getWidthAndHeightFromItemCount(itemCount: number): [number, number] {
+    if (itemCount <= 5) {
+        return [3, 2];
+    }
+    if (itemCount <= 8) {
+        return [3, 3];
+    }
+    if (itemCount <= 11) {
+        return [4, 3];
+    }
+    if (itemCount <= 15) {
+        return [4, 4];
+    }
+    if (itemCount <= 19) {
+        return [5, 4];
+    }
+    if (itemCount <= 24) {
+        return [5, 5];
+    }
+    if (itemCount <= 28) {
+        return [6, 5];
+    }
+    if (itemCount <= 33) {
+        return [6, 6];
+    }
+    let squareRoot = Math.floor(Math.sqrt(itemCount * 1.2));
+    if (squareRoot * (squareRoot + 1) > itemCount) {
+        return [squareRoot + 1, squareRoot];
+    }
+    return [squareRoot + 1, squareRoot + 1];
+}
+
 export const createSafeInitialGrid = (width: number, height: number, objects: GridObject[], ncdMatrixResponse: NCDMatrixResponse) => {
     // Process objects to ensure unique IDs as strings
     const processedObjects = objects.map(obj => ({
@@ -247,10 +280,9 @@ export const createSafeInitialGrid = (width: number, height: number, objects: Gr
     console.log(`Creating grid for ${itemCount} objects`);
 
     // Calculate grid dimensions with slack space
-    const baseWidth = Math.ceil(Math.sqrt(itemCount));
-    const baseHeight = Math.ceil(itemCount / baseWidth);
-    const gridWidth = (width || baseWidth) + 1;
-    const gridHeight = (height || baseHeight) + 1;
+    const widthAndHeight = getWidthAndHeightFromItemCount(objects.length);
+    const gridWidth = widthAndHeight[0];
+    const gridHeight = widthAndHeight[1];
 
     console.log(`Grid dimensions: ${gridWidth}x${gridHeight}`);
 
@@ -647,7 +679,5 @@ export const calculateGridSimilarity = (grid1: GridState, grid2: GridState): num
             }
         }
     }
-    console.log('matches now: ' + matches);
-    console.log('matches/total cells: ' + (matches / totalCells));
     return matches / totalCells;
 }

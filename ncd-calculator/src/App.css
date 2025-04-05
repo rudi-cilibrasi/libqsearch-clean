@@ -1,5 +1,12 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  text-align: center;
+    max-width: 1280px;
+    margin: 0 auto;
+    text-align: center;
 }
+
+.text-xxs {
+    font-size: 0.65rem;
+    line-height: 0.6rem;
+}
+
+
