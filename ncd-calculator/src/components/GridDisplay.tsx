@@ -112,71 +112,233 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
         }
     }, [fitToContainer]);
 
-    // Identify clusters using NCD matrix
-    const clusterInfo = useMemo(() => {
+    const generateEnhancedClusters = () => {
         if (!grid || !grid.numericNcdMatrix) return new Map<number, ClusterInfo>();
-
         const itemClusters = new Map<number, number>();
         const clusters = new Map<number, ClusterInfo>();
         let currentClusterId = 0;
 
-        const areSimilar = (idx1: number, idx2: number) => {
-            if (idx1 === EMPTY_CELL_INDEX || idx2 === EMPTY_CELL_INDEX) return false;
+        const areSimilar = (idx1: number, idx2: number): boolean => {
+            if (idx1 == EMPTY_CELL_INDEX || idx2 === EMPTY_CELL_INDEX) {
+                return false;
+            }
             return grid.numericNcdMatrix[idx1][idx2] < clusterThreshold;
-        };
+        }
 
-        for (let i = 0; i < grid.height; i++) {
-            for (let j = 0; j < grid.width; j++) {
-                const itemIdx = grid.grid[i][j];
-                if (itemIdx === EMPTY_CELL_INDEX) continue;
-                if (itemClusters.has(itemIdx)) continue;
+        // track the cells have been processed
+        const processedCells = new Set<string>();
+        // Perform 4 scanning passes in different directions to avoid directional bias
+        const scanDirections = [
+            {rowStart: 0, rowEnd: grid.height, rowStep: 1, colStart: 0, colEnd: grid.width, colStep: 1},      // Top-left to bottom-right
+            {rowStart: grid.height - 1, rowEnd: -1, rowStep: -1, colStart: 0, colEnd: grid.width, colStep: 1},  // Bottom-left to top-right
+            {rowStart: 0, rowEnd: grid.height, rowStep: 1, colStart: grid.width - 1, colEnd: -1, colStep: -1},  // Top-right to bottom-left
+            {rowStart: grid.height - 1, rowEnd: -1, rowStep: -1, colStart: grid.width - 1, colEnd: -1, colStep: -1} // Bottom-right to top-left
+        ]
 
-                const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-                let assignedToExistingCluster = false;
+        // execute clustering passes
+        for (const {rowStart, rowEnd, rowStep, colStart, colEnd, colStep} of scanDirections) {
+            for (let i = rowStart; rowStep > 0 ? i < rowEnd : i > rowEnd; i += rowStep) {
+                for (let j = colStart; colStep > 0 ? j < colEnd : j > colEnd; j += colStep) {
+                    const cellKey = `${i},${j}`;
+                    const itemIdx = grid.grid[i][j];
+                    if (grid.numericNcdMatrix[i][j] === EMPTY_CELL_INDEX) continue;
+                    if (itemClusters.has(itemIdx) && processedCells.has(cellKey)) ;
 
-                for (const [di, dj] of directions) {
-                    const ni = (i + di + grid.height) % grid.height;
-                    const nj = (j + dj + grid.width) % grid.width;
-                    const neighborIdx = grid.grid[ni][nj];
+                    // Mark this cell as processed
+                    const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+                    const neighborClusters = new Map<number, number>();
 
-                    if (neighborIdx === EMPTY_CELL_INDEX) continue;
-
-                    if (itemClusters.has(neighborIdx) && areSimilar(itemIdx, neighborIdx)) {
-                        const neighborCluster = itemClusters.get(neighborIdx)!;
-                        itemClusters.set(itemIdx, neighborCluster);
-                        const cluster = clusters.get(neighborCluster)!;
-                        cluster.memberCount++;
-                        assignedToExistingCluster = true;
-                        break;
+                    for (const [di, dj] of directions) {
+                        const ni = (i + di + grid.height) % grid.height;
+                        const nj = (j + dj + grid.width) % grid.width;
+                        const neighborIdx = grid.grid[ni][nj];
+                        if (neighborIdx === EMPTY_CELL_INDEX) continue;
+                        // if neighbor is in the same cluster and similar to the current cell index
+                        if (itemClusters.has(neighborIdx) && areSimilar(itemIdx, neighborIdx)) {
+                            const neighborCluster = itemClusters.get(neighborIdx)!;
+                            neighborClusters.set(
+                                neighborCluster,
+                                (neighborClusters.get(neighborIdx) || 0) + 1)
+                        }
                     }
-                }
 
-                if (!assignedToExistingCluster) {
-                    itemClusters.set(itemIdx, currentClusterId);
+                    // determine which cluster the item should join
+                    if (neighborClusters.size > 0) {
+                        let bestCluster = -1;
+                        let maxCount = 0;
+                        neighborClusters.forEach((count, clusterId) => {
+                            if (count > maxCount) {
+                                maxCount = count;
+                                bestCluster = clusterId;
+                            }
+                        })
 
-                    const h = (currentClusterId * 137) % 360;
-                    const s = 70 + (currentClusterId % 3) * 10;
-                    const l = 65 + (currentClusterId % 5) * 5;
+                        itemClusters.set(itemIdx, bestCluster);
+                        clusters.get(bestCluster)!.memberCount++;
+                    }
+                    // if not already in a cluster and no similar neighbors in cluster
+                    else if (!itemClusters.has(itemIdx)) {
+                        // create a new cluster
+                        itemClusters.set(itemIdx, currentClusterId);
 
-                    clusters.set(currentClusterId, {
-                        clusterId: currentClusterId,
-                        memberCount: 1,
-                        color: colorTheme === "scientific"
-                            ? `hsl(${h}, ${s}%, ${l}%)`
-                            : getColorblindFriendlyColor(currentClusterId)
-                    });
 
-                    currentClusterId++;
+                        const h = (currentClusterId * 137) % 360;
+                        const s = 70 + (currentClusterId % 3) * 10;
+                        const l = 65 + (currentClusterId % 5) * 5;
+
+                        clusters.set(currentClusterId, {
+                            clusterId: currentClusterId,
+                            memberCount: 1,
+                            color: colorTheme === "scientific"
+                                ? `hsl(${h}, ${s}%, ${l}%)`
+                                : getColorblindFriendlyColor(currentClusterId)
+                        });
+
+                        currentClusterId++;
+                    }
                 }
             }
         }
 
-        const itemToClusterInfo = new Map<number, ClusterInfo>();
-        for (const [itemIdx, clusterId] of itemClusters.entries()) {
-            itemToClusterInfo.set(itemIdx, clusters.get(clusterId)!);
+        // cluster refinement pass - resolve boundary conflicts
+        const revisitedCells = new Set<string>();
+        for (const {rowStart, rowEnd, rowStep, colStart, colEnd, colStep} of scanDirections) {
+            for (let i = rowStart; rowStep > 0 ? i < rowEnd : i > rowEnd; i += rowStep) {
+                for (let j = colStart; colStep > 0 ? j < colEnd : j > colEnd; j += colStep) {
+                    const cellKey = `${i},${j}`;
+                    if (revisitedCells.has(cellKey)) continue;
+                    revisitedCells.add(cellKey);
+
+                    const itemIdx = grid.grid[i][j];
+                    if (itemIdx === EMPTY_CELL_INDEX) continue;
+                    const itemCluster = itemClusters.get(itemIdx);
+                    if (itemCluster === undefined) continue;
+
+                    // Check if this item should be reassigned to a better cluster
+                    const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+                    const clusterCounts = new Map<number, number>();
+                    clusterCounts.set(itemCluster, 0); // initialize current cluster
+
+                    // count similar neighbors by cluster
+                    for (const [di, dj] of directions) {
+                        const ni = (i + di + grid.height) % grid.height;
+                        const nj = (j + dj + grid.width) % grid.width;
+                        const neighborIdx = grid.grid[ni][nj];
+
+                        if (neighborIdx === EMPTY_CELL_INDEX) continue;
+
+                        const neighborCluster = itemClusters.get(neighborIdx);
+                        if (neighborCluster !== undefined && areSimilar(itemIdx, neighborIdx)) {
+                            clusterCounts.set(
+                                neighborCluster,
+                                (clusterCounts.get(neighborCluster) || 0) + 1
+                            );
+                        }
+                    }
+
+                    // Find the cluster with most similar neighbors
+                    let bestCluster = itemCluster;
+                    let maxCount = clusterCounts.get(itemCluster) || 0;
+
+                    clusterCounts.forEach((count, clusterId) => {
+                        if (count > maxCount) {
+                            maxCount = count;
+                            bestCluster = clusterId;
+                        }
+                    });
+
+                    // Reassign if found a better cluster
+                    if (bestCluster !== itemCluster) {
+                        // Update cluster counts
+                        clusters.get(itemCluster)!.memberCount--;
+                        clusters.get(bestCluster)!.memberCount++;
+
+                        // Reassign item
+                        itemClusters.set(itemIdx, bestCluster);
+                    }
+                }
+            }
         }
 
+
+        // Convert to the required return format
+        const itemToClusterInfo = new Map<number, ClusterInfo>();
+        itemClusters.forEach((clusterId, itemIdx) => {
+            const clusterInfo = clusters.get(clusterId);
+            if (clusterInfo) {
+                itemToClusterInfo.set(itemIdx, clusterInfo);
+            }
+        });
+
         return itemToClusterInfo;
+
+    }
+    // Identify clusters using NCD matrix
+    const clusterInfo = useMemo(() => {
+        return generateEnhancedClusters();
+        // if (!grid || !grid.numericNcdMatrix) return new Map<number, ClusterInfo>();
+        //
+        // const itemClusters = new Map<number, number>();
+        // const clusters = new Map<number, ClusterInfo>();
+        // let currentClusterId = 0;
+        //
+        // const areSimilar = (idx1: number, idx2: number) => {
+        //     if (idx1 === EMPTY_CELL_INDEX || idx2 === EMPTY_CELL_INDEX) return false;
+        //     return grid.numericNcdMatrix[idx1][idx2] < clusterThreshold;
+        // };
+        //
+        // for (let i = 0; i < grid.height; i++) {
+        //     for (let j = 0; j < grid.width; j++) {
+        //         const itemIdx = grid.grid[i][j];
+        //         if (itemIdx === EMPTY_CELL_INDEX) continue;
+        //         if (itemClusters.has(itemIdx)) continue;
+        //
+        //         const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+        //         let assignedToExistingCluster = false;
+        //
+        //         for (const [di, dj] of directions) {
+        //             const ni = (i + di + grid.height) % grid.height;
+        //             const nj = (j + dj + grid.width) % grid.width;
+        //             const neighborIdx = grid.grid[ni][nj];
+        //
+        //             if (neighborIdx === EMPTY_CELL_INDEX) continue;
+        //
+        //             if (itemClusters.has(neighborIdx) && areSimilar(itemIdx, neighborIdx)) {
+        //                 const neighborCluster = itemClusters.get(neighborIdx)!;
+        //                 itemClusters.set(itemIdx, neighborCluster);
+        //                 const cluster = clusters.get(neighborCluster)!;
+        //                 cluster.memberCount++;
+        //                 assignedToExistingCluster = true;
+        //                 break;
+        //             }
+        //         }
+        //
+        //         if (!assignedToExistingCluster) {
+        //             itemClusters.set(itemIdx, currentClusterId);
+        //
+        //             const h = (currentClusterId * 137) % 360;
+        //             const s = 70 + (currentClusterId % 3) * 10;
+        //             const l = 65 + (currentClusterId % 5) * 5;
+        //
+        //             clusters.set(currentClusterId, {
+        //                 clusterId: currentClusterId,
+        //                 memberCount: 1,
+        //                 color: colorTheme === "scientific"
+        //                     ? `hsl(${h}, ${s}%, ${l}%)`
+        //                     : getColorblindFriendlyColor(currentClusterId)
+        //             });
+        //
+        //             currentClusterId++;
+        //         }
+        //     }
+        // }
+        //
+        // const itemToClusterInfo = new Map<number, ClusterInfo>();
+        // for (const [itemIdx, clusterId] of itemClusters.entries()) {
+        //     itemToClusterInfo.set(itemIdx, clusters.get(clusterId)!);
+        // }
+        //
+        // return itemToClusterInfo;
     }, [grid, EMPTY_CELL_INDEX, clusterThreshold, colorTheme]);
 
     // Get a list of items in the selected cluster
