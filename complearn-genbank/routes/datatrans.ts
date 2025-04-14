@@ -1,6 +1,5 @@
 import express, { Request, RequestHandler, Response, Router } from "express";
 import logger from "../configurations/logger";
-import ENV_LOADER from "../configurations/envLoader";
 
 const router: Router = express.Router();
 
@@ -93,16 +92,12 @@ const datatransWebhookHandler: RequestHandler = async (
     const transactionKey = `datatrans:transaction:${webhookData.transactionId}`;
 
     // Store the complete transaction data in Redis
-    await client.set(transactionKey, JSON.stringify(webhookData));
+    console.log(JSON.stringify(webhookData));
     logger.info(`Stored transaction data in Redis with key: ${transactionKey}`);
 
     // Also store a reference by reference number for easier lookup
     if (webhookData.refno) {
-      const refnoKey = `datatrans:refno:${webhookData.refno}`;
-      await client.set(refnoKey, webhookData.transactionId);
-      logger.info(
-        `Created reference mapping in Redis: ${refnoKey} -> ${webhookData.transactionId}`
-      );
+      console.log("Transaction from datatrans: " + JSON.stringify(webhookData));
     }
 
     // Process transaction based on status
@@ -114,8 +109,7 @@ const datatransWebhookHandler: RequestHandler = async (
         );
 
         // Publish event to a Redis channel for async processing
-        await client.publish(
-          "datatrans:events",
+        console.log(
           JSON.stringify({
             type: "transaction_authorized",
             transactionId: webhookData.transactionId,
@@ -134,8 +128,7 @@ const datatransWebhookHandler: RequestHandler = async (
         );
 
         // Publish event to a Redis channel for async processing
-        await client.publish(
-          "datatrans:events",
+        console.log(
           JSON.stringify({
             type: "transaction_settled",
             transactionId: webhookData.transactionId,
@@ -152,8 +145,7 @@ const datatransWebhookHandler: RequestHandler = async (
         logger.info(`Transaction ${webhookData.transactionId} canceled`);
 
         // Publish event to a Redis channel for async processing
-        await client.publish(
-          "datatrans:events",
+        console.log(
           JSON.stringify({
             type: "transaction_canceled",
             transactionId: webhookData.transactionId,
@@ -168,8 +160,7 @@ const datatransWebhookHandler: RequestHandler = async (
         logger.info(`Transaction ${webhookData.transactionId} failed`);
 
         // Publish event to a Redis channel for async processing
-        await client.publish(
-          "datatrans:events",
+        console.log(
           JSON.stringify({
             type: "transaction_failed",
             transactionId: webhookData.transactionId,
@@ -186,8 +177,7 @@ const datatransWebhookHandler: RequestHandler = async (
         );
 
         // Publish event to a Redis channel for async processing
-        await client.publish(
-          "datatrans:events",
+        console.log(
           JSON.stringify({
             type: "transaction_other",
             status: webhookData.status,
@@ -215,77 +205,7 @@ const datatransWebhookHandler: RequestHandler = async (
   }
 };
 
-// Endpoint to query transaction data by transaction ID
-const getTransactionByIdHandler: RequestHandler = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const { transactionId } = req.params;
-    if (!transactionId) {
-      return res.status(400).json({ error: "Transaction ID is required" });
-    }
-
-    const transactionKey = `datatrans:transaction:${transactionId}`;
-    const transactionData = await client.get(transactionKey);
-
-    if (!transactionData) {
-      return res.status(404).json({ error: "Transaction not found" });
-    }
-
-    res.json({ transaction: JSON.parse(transactionData) });
-  } catch (error) {
-    logger.error("Error retrieving transaction data:", error);
-    res.status(500).json({
-      error: "Failed to retrieve transaction data",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-};
-
-// Endpoint to query transaction data by reference number
-const getTransactionByRefnoHandler: RequestHandler = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const { refno } = req.params;
-    if (!refno) {
-      return res.status(400).json({ error: "Reference number is required" });
-    }
-
-    const refnoKey = `datatrans:refno:${refno}`;
-    const transactionId = await client.get(refnoKey);
-
-    if (!transactionId) {
-      return res.status(404).json({
-        error: "Transaction not found for the given reference number",
-      });
-    }
-
-    const transactionKey = `datatrans:transaction:${transactionId}`;
-    const transactionData = await client.get(transactionKey);
-
-    if (!transactionData) {
-      return res.status(404).json({ error: "Transaction data not found" });
-    }
-
-    res.json({ transaction: JSON.parse(transactionData) });
-  } catch (error) {
-    logger.error(
-      "Error retrieving transaction data by reference number:",
-      error
-    );
-    res.status(500).json({
-      error: "Failed to retrieve transaction data",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-};
-
 // Register routes
 router.post("/", datatransWebhookHandler);
-router.get("/transaction/:transactionId", getTransactionByIdHandler);
-router.get("/transaction/refno/:refno", getTransactionByRefnoHandler);
 
 export default router;
