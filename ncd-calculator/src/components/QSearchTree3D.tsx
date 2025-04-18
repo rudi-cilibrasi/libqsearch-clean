@@ -477,7 +477,7 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({data, scaleFactor, theme}) => 
                         position.y + (isLeaf ? 8 : 6) * scaleFactor, // Increased offset
                         position.z,
                     ]}
-                    fontSize={2.2 * scaleFactor} // Increased font size
+                    fontSize={2.0 * scaleFactor} // Increased font size
                     color={textColor}
                     anchorX="center"
                     anchorY="middle"
