@@ -185,6 +185,10 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({data, scaleFactor, theme}) => 
         );
         const rootNode = sortedNodes[0];
 
+        // Keep track of the y-coordinate bounds
+        let minY = Infinity;
+        let maxY = -Infinity;
+
         // Recursive function to position nodes in a tree-like structure
         const positionNode = (
             node: QTreeNode,
@@ -199,10 +203,18 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({data, scaleFactor, theme}) => 
             // Add small random offset to prevent perfect symmetry
             const randOffset = 0.1;
             const x = Math.cos(angle) * radius * Math.cos(level) + (Math.random() - 0.5) * randOffset * radius;
-            const y = Math.sin(level) * radius + (Math.random() - 0.5) * randOffset * radius;
+
+            // Calculate y with a lower position to avoid the top of the container
+            // This is the key change - lower the tree's initial position
+            const y = Math.sin(level) * radius * 0.8 - radius * 0.3 + (Math.random() - 0.5) * randOffset * radius;
+
             const z = Math.sin(angle) * radius * Math.cos(level) + (Math.random() - 0.5) * randOffset * radius;
 
             positions.set(node.index, new THREE.Vector3(x, y, z));
+
+            // Track min and max Y for later adjustment
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
 
             // Position connected nodes
             const connectionCount = node.connections.length;
@@ -232,6 +244,23 @@ const QSearchTree: React.FC<QSearchTreeProps> = ({data, scaleFactor, theme}) => 
                 positionNode(node, angle, radius, level);
             }
         });
+
+        // Apply vertical adjustment to center the tree in the container
+        // This ensures the tree fits regardless of its size
+        if (positions.size > 0 && minY !== Infinity && maxY !== -Infinity) {
+            const treeHeight = maxY - minY;
+            const treeMiddle = (maxY + minY) / 2;
+
+            // Target a position that's slightly above the center of the container
+            // to ensure better visibility of the top nodes
+            const targetY = -treeHeight * 0.15;
+            const adjustment = targetY - treeMiddle;
+
+            // Apply the adjustment to all nodes
+            positions.forEach((pos) => {
+                pos.y += adjustment;
+            });
+        }
 
         return positions;
     };
