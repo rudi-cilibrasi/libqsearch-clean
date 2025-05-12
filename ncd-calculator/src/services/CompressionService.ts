@@ -12,8 +12,8 @@ export interface CompressionResponse {
 export class CompressionService {
 	private static instance: CompressionService;
 	private static readonly MAX_SIZES = {
+		lzma: 2 * 1024 * 1024, // 2MB maximum for LZMA
 		zstd: 128 * 1024 * 1024, // 128MB maximum for ZSTD
-		lzma: 1024 * 1024 * 1024, // 1GB maximum for LZMA
 	} as const;
 	private static readonly ABSOLUTE_MAX_SIZE = 128 * 1024 * 1024; // 128MB
 	private static readonly ALGORITHM_DESCRIPTIONS = {

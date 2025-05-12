@@ -101,9 +101,12 @@ export class LabelManager {
 	 * @returns The sanitized label
 	 */
 	public sanitizeLabel(originalLabel: string, index?: number): string {
-		// Check if we already have a sanitized version
-		if (this.originalToSanitizedMap.has(originalLabel)) {
-			return this.originalToSanitizedMap.get(originalLabel)!;
+		// Create a cache key that includes the index
+		const cacheKey = index !== undefined ? `${originalLabel}__index${index}` : originalLabel;
+		
+		// Check if we already have a sanitized version for this key
+		if (this.originalToSanitizedMap.has(cacheKey)) {
+			return this.originalToSanitizedMap.get(cacheKey)!;
 		}
 		
 		// Create a sanitized version - replace spaces and problematic characters
@@ -111,7 +114,7 @@ export class LabelManager {
 		const sanitizedLabel = `${indexPrefix}${originalLabel.replace(/[\s\n\r\t,"()[\]{}]/g, '_')}`;
 		
 		// Store mapping
-		this.originalToSanitizedMap.set(originalLabel, sanitizedLabel);
+		this.originalToSanitizedMap.set(cacheKey, sanitizedLabel);
 		this.sanitizedToOriginalMap.set(sanitizedLabel, originalLabel);
 		
 		return sanitizedLabel;
