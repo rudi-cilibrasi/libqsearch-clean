@@ -174,16 +174,45 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 }
 
 async function loadWasmBinary(): Promise<ArrayBuffer> {
+	// Check if we're in a browser environment (window is defined) or Node.js
+	const isBrowser = typeof window !== 'undefined' && typeof window.fetch === 'function';
 	try {
-		// In browser environment, we simply fetch the WASM file
-		const response = await fetch(new URL('../wasm/zstd.wasm', import.meta.url));
-		if (!response.ok) {
-			throw new Error(`Failed to fetch WASM: ${response.status} ${response.statusText}`);
+		if (isBrowser) {
+			// Browser environment - use fetch API
+			const response = await fetch(new URL('../wasm/zstd.wasm', import.meta.url));
+			if (!response.ok) {
+				throw new Error(`Failed to fetch WASM: ${response.status} ${response.statusText}`);
+			}
+			return await response.arrayBuffer();
+		} else {
+			// Node.js environment - use fs module
+			// We need to use dynamic import for fs promises to avoid issues in the browser
+			const fs = await import('fs/promises');
+			const path = await import('path');
+			
+			// Convert import.meta.url to a file path
+			// In Node.js, import.meta.url is something like 'file:///path/to/current/file.js'
+			const fileUrl = new URL(import.meta.url);
+			const currentFilePath = fileUrl.pathname;
+			const normalizedPath = process.platform === 'win32'
+				? currentFilePath.substring(1)
+				: currentFilePath;
+			
+			const wasmPath = path.resolve(
+				path.dirname(normalizedPath),
+				'../wasm/zstd.wasm'
+			);
+			
+			const wasmBinary = await fs.readFile(wasmPath);
+			
+			return wasmBinary.buffer.slice(
+				wasmBinary.byteOffset,
+				wasmBinary.byteOffset + wasmBinary.byteLength
+			);
 		}
-		return await response.arrayBuffer();
 	} catch (error) {
 		console.error('Failed to load WASM binary:', error);
-		console.error('Current directory:', import.meta.url);
+		console.error('Current location:', import.meta.url);
 		throw error;
 	}
 }
