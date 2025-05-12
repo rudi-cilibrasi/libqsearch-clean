@@ -1,7 +1,7 @@
-import { Loader } from 'lucide-react';
-import {CompressionStats} from "@/types/ncd.ts";
+import {Loader} from 'lucide-react';
+import {CompressionStats} from "@/types/ncd.d.ts";
 
-export const NCDProgress = ({ stats }: { stats: CompressionStats }) => {
+export const NCDProgress = ({stats}: { stats: CompressionStats }) => {
     const getPercentComplete = () => {
         if (stats.totalPairs === 0) return 0;
         const percent = (stats.processedPairs / stats.totalPairs) * 100;
@@ -9,7 +9,7 @@ export const NCDProgress = ({ stats }: { stats: CompressionStats }) => {
     };
 
     const formatProcessingRate = () => {
-        if (!stats.startTime || !stats.bytesProcessed ) return '0 B/s';
+        if (!stats.startTime || !stats.bytesProcessed) return '0 B/s';
         const elapsedSeconds = (performance.now() - stats.startTime) / 1000;
         const bytesPerSecond = stats.bytesProcessed / elapsedSeconds;
 
@@ -23,7 +23,7 @@ export const NCDProgress = ({ stats }: { stats: CompressionStats }) => {
 
     return (
         <div className="flex items-center gap-3 text-sm">
-            <Loader className="animate-spin text-blue-500" size={20} />
+            <Loader className="animate-spin text-blue-500" size={20}/>
             <span className="font-medium text-gray-700">
         {getPercentComplete()}% Complete
       </span>

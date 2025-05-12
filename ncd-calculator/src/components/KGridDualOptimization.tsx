@@ -3,7 +3,7 @@ import {createSafeInitialGrid, GridObject, GridState,} from "@/datastructures/kg
 import {GridDisplay} from "./GridDisplay";
 // @ts-ignore
 import OptimizationWorker from '../workers/kgridWorker.js?worker';
-import {NCDMatrixResponse} from "@/types/ncd.ts";
+import {NCDMatrixResponse} from "@/types/ncd.d.ts";
 
 interface OptimizationImprovements {
     grid1Improved: boolean;

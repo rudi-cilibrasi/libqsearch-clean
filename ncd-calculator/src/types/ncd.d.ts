@@ -15,7 +15,12 @@ export interface NCDInput {
 }
 
 
-export type WorkerMessage =  WorkerReadyMessage | WorkerStartMessage | WorkerProcessMessage | WorkerResultMessage | WorkerErrorMessage;
+export type WorkerMessage =
+    WorkerReadyMessage
+    | WorkerStartMessage
+    | WorkerProcessMessage
+    | WorkerResultMessage
+    | WorkerErrorMessage;
 
 export type WorkerReadyMessage = {
     type: 'ready';
@@ -63,4 +68,10 @@ export type WorkerErrorMessage = {
 export type NCDMatrixResponse = {
     labels: string[];
     ncdMatrix: number[][];
+}
+
+
+export interface NCDImportFormat {
+    labels: string[];
+    distances: number[][];
 }

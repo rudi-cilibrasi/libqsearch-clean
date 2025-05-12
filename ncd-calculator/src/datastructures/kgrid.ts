@@ -1,5 +1,5 @@
 import {deflate} from "pako";
-import {NCDMatrixResponse} from "@/types/ncd.ts";
+import {NCDMatrixResponse} from "@/types/ncd.d.ts";
 
 export interface GridObject {
     id: string;
