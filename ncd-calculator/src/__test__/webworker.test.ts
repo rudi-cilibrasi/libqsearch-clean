@@ -1,7 +1,7 @@
 import '@vitest/web-worker'
 import {test} from "vitest";
 import {CompressionService} from "@/services/CompressionService.ts";
-import {NCDInput} from "@/types/ncd.ts";
+import {NCDInput} from "@/types/ncd.d.ts";
 import {CRCCache} from "@/cache/CRCCache.ts";
 import fs from 'fs';
 import path from 'path';
