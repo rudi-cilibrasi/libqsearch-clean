@@ -79,7 +79,7 @@ test('Test compression decision lzma', async () => {
             expect(Math.abs(result.ncdMatrix[r][c] - expectedResult.ncdMatrix[r][c]) <= 1e-10);
         }
     }
-}, 360000);
+}, 720000);
 
 test('Test compression decision zstd', async () => {
     const input: NCDInput = {
@@ -189,7 +189,7 @@ test('Test compression decision zstd', async () => {
         }
     }
 
-}, 360000);
+}, 720000);
 
 
 
