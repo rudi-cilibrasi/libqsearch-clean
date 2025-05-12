@@ -444,6 +444,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 			/>
 			<div className="max-w-7xl mx-auto px-4 py-8">
 				<ListEditor
+					qTreeResponse={qSearchTreeResult}
 					onComputedNcdInput={onNcdInput}
 					labelMapRef={labelMapRef}
 					setLabelMap={setLabelMap}

@@ -13,6 +13,10 @@ import {useSearchParams} from "react-router-dom";
 import {CompressionService} from "@/services/CompressionService";
 import {NCDImportFormat} from "@/types/ncd";
 import {LabelManager} from "@/functions/labelUtils.ts";
+import createGraph from "@/functions/graphExport.ts";
+import {saveAs} from "file-saver";
+import {QTreeResponse} from "@/components/tree";
+import Nodes from "three/src/renderers/common/nodes/Nodes";
 
 export interface SearchMode {
 	searchMode: string;
@@ -49,6 +53,7 @@ interface ListEditorProps {
 	setOpenLogin: (open: boolean) => void;
 	authenticated: boolean;
 	initialSearchMode?: SearchMode | null;
+	qTreeResponse?: QTreeResponse | null;
 }
 
 const ListEditor: React.FC<ListEditorProps> = ({
@@ -59,7 +64,8 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	                                               resetDisplay,
 	                                               setOpenLogin,
 	                                               authenticated,
-	                                               initialSearchMode
+	                                               initialSearchMode,
+	                                               qTreeResponse
                                                }) => {
 	
 	const [importError, setImportError] = React.useState<string | null>(null);
@@ -170,6 +176,15 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			console.error("Error in automatic processing:", error);
 			setImportError(error instanceof Error ? error.message : "Failed to process imported matrix");
 		}
+	};
+	
+	
+	const handleExportMatrix = (): void => {
+		
+		const dotFormat = createGraph(qTreeResponse as Nodes, false);
+		
+		const blob = new Blob([dotFormat], {type: "text/plain;charset=utf-8"});
+		saveAs(blob, "matrix_structure.dot");
 	};
 	
 	const defaultSearchMode = {
@@ -625,12 +640,14 @@ const ListEditor: React.FC<ListEditorProps> = ({
 						</button>
 						
 						<button
+							onClick={handleExportMatrix}
 							className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                      ${
+        ${
 								selectedItems.length === 0
 									? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-300"
 									: "bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-300"
 							}`}
+							disabled={selectedItems.length === 0}
 						>
 							<Download size={18}/>
 							<span>Export Matrix</span>
