@@ -1,168 +1,214 @@
+/**
+ * LabelManager - Robust singleton class for managing label mapping
+ * Fixes issues with special characters in imported matrices
+ */
 export class LabelManager {
 	private static instance: LabelManager;
-	private labelMapping: Map<string, string>;
-	private originalToSanitizedMap: Map<string, string>; // For QSearch algorithm
-	private sanitizedToOriginalMap: Map<string, string>; // For QSearch algorithm
 	
-	private constructor() {
-		this.labelMapping = new Map<string, string>();
-		this.originalToSanitizedMap = new Map<string, string>();
-		this.sanitizedToOriginalMap = new Map<string, string>();
-		console.log("LabelManager instance created with sanitization support");
-	}
+	// Single mapping from ID to display label
+	private idToDisplayLabel: Map<string, string> = new Map();
 	
+	private constructor() {}
+	
+	/**
+	 * Get the singleton instance
+	 */
 	public static getInstance(): LabelManager {
 		if (!LabelManager.instance) {
 			LabelManager.instance = new LabelManager();
-			console.log("Created new LabelManager instance");
 		}
 		return LabelManager.instance;
 	}
 	
 	/**
-	 * Register a label with its display form
+	 * Register a mapping between an ID and its display label
 	 */
 	public registerLabel(id: string, displayLabel: string): void {
-		if (!id) {
-			console.warn("Attempted to register empty ID");
-			return;
-		}
+		if (!id) return;
 		
-		console.log(`LabelManager: Registering ${id} -> ${displayLabel}`);
-		this.labelMapping.set(id, displayLabel);
-		
-		// Verify registration succeeded
-		console.log(`LabelManager: After registration, mapping for ${id} -> ${this.getDisplayLabel(id)}`);
+		// Store the mapping
+		this.idToDisplayLabel.set(id, displayLabel || id);
 	}
 	
 	/**
 	 * Get the display label for an ID
 	 */
 	public getDisplayLabel(id: string): string | undefined {
-		if (!id) return undefined;
-		
-		const displayLabel = this.labelMapping.get(id);
-		// console.log(`LabelManager: Getting display label for ${id} -> ${displayLabel || 'undefined'}`);
-		return displayLabel;
+		return this.idToDisplayLabel.get(id);
 	}
 	
 	/**
-	 * Get the entire label mapping
+	 * Sanitize a label for use in the QSearch algorithm
+	 * This replaces all invalid characters with underscores
 	 */
-	public getLabelMapping(): Record<string, string> {
-		// Convert Map to plain object for easier serialization/logging
-		const result: Record<string, string> = {};
+	public sanitizeForQSearch(label: string): string {
+		if (!label) return '';
 		
-		this.labelMapping.forEach((value, key) => {
-			result[key] = value;
-		});
+		// First replace spaces with underscores
+		let sanitized = label.replace(/\s+/g, '_');
 		
-		return result;
+		// Replace problematic symbols and punctuation with underscores
+		// This preserves letters, numbers, and Unicode characters like Chinese, Japanese, etc.
+		// The regex matches anything that's NOT:
+		// - A letter (in any language, including CJK)
+		// - A number
+		// - An underscore or hyphen (common in identifiers)
+		sanitized = sanitized.replace(/[^\p{L}\p{N}_\-]/gu, '_');
+		
+		// Replace consecutive underscores with a single one
+		sanitized = sanitized.replace(/_+/g, '_');
+		
+		return sanitized;
+		
+	}
+	
+	/**
+	 * Process tree JSON to replace tree labels with display labels
+	 */
+	public processTreeJSON(jsonString: string, originalLabels: string[]): string {
+		try {
+			const data = JSON.parse(jsonString);
+			
+			if (!data || !data.nodes || !Array.isArray(data.nodes)) {
+				console.warn("Invalid tree JSON structure", data);
+				return jsonString;
+			}
+			
+			// Process nodes if they exist
+			data.nodes = data.nodes.map((node: any) => {
+				if (!node) return node;
+				
+				// Safety check for node.label
+				if (node.label) {
+					try {
+						// Find the matching original label
+						const matchingLabel = this.findMatchingLabel(node.label, originalLabels);
+						
+						if (matchingLabel) {
+							// Get the display label
+							const displayLabel = this.getDisplayLabel(matchingLabel);
+							if (displayLabel) {
+								console.log(`Replacing node label "${node.label}" with "${displayLabel}"`);
+								node.label = displayLabel;
+							} else {
+								console.log(`No display label found for "${matchingLabel}"`);
+							}
+						} else {
+							console.log(`No matching original label found for node label "${node.label}"`);
+						}
+					} catch (error) {
+						console.error("Error processing node label:", error);
+						// Keep the original label if there's an error
+					}
+				} else {
+					console.warn("Node missing label property:", node);
+				}
+				
+				return node;
+			});
+			
+			return JSON.stringify(data);
+		} catch (error) {
+			console.error("Error processing tree JSON:", error);
+			return jsonString;
+		}
+	}
+	
+	/**
+	 * Find the original label that matches the processed label
+	 * This handles cases where the QSearch algorithm might have
+	 * further modified our already sanitized labels
+	 */
+	private findMatchingLabel(processedLabel: string, originalLabels: string[]): string | undefined {
+		// Safety check for inputs
+		if (!processedLabel || !originalLabels || !Array.isArray(originalLabels)) {
+			console.warn("Invalid inputs to findMatchingLabel", { processedLabel, originalLabels });
+			return undefined;
+		}
+		
+		// Try direct match first
+		if (originalLabels.includes(processedLabel)) {
+			return processedLabel;
+		}
+		
+		// Try matching sanitized versions
+		for (const label of originalLabels) {
+			if (!label) continue;
+			
+			// Check if sanitized version matches
+			const sanitized = this.sanitizeForQSearch(label);
+			if (sanitized === processedLabel) {
+				return label;
+			}
+			
+			// Also try partial matches (both ways)
+			if (processedLabel.includes(sanitized) || sanitized.includes(processedLabel)) {
+				return label;
+			}
+			
+			// For labels with special characters, try an additional fallback comparison
+			// by checking if the sanitized versions share significant overlap
+			if (sanitized.length > 3 && processedLabel.length > 3) {
+				// Calculate similarity by counting shared characters
+				let matchCount = 0;
+				for (let i = 0; i < Math.min(sanitized.length, processedLabel.length); i++) {
+					if (sanitized[i] === processedLabel[i]) matchCount++;
+				}
+				
+				// If more than 70% match, consider it a match
+				const similarityRatio = matchCount / Math.min(sanitized.length, processedLabel.length);
+				if (similarityRatio > 0.7) {
+					return label;
+				}
+			}
+		}
+		
+		return undefined;
+	}
+	
+	/**
+	 * Format a matrix for QSearch input, sanitizing labels
+	 */
+	public formatMatrixForQSearch(labels: string[], matrix: number[][]): string {
+		let output = '';
+		
+		for (let i = 0; i < labels.length; i++) {
+			// Start with the sanitized label
+			const sanitizedLabel = this.sanitizeForQSearch(labels[i]);
+			let line = sanitizedLabel + " ";
+			
+			// Add each distance value
+			const row = matrix[i];
+			if (Array.isArray(row)) {
+				for (let j = 0; j < row.length; j++) {
+					const value = typeof row[j] === 'number' && !isNaN(row[j])
+						? row[j]
+						: (i === j ? 0 : 0.5); // Default values
+					
+					line += value.toFixed(6) + " ";
+				}
+			}
+			
+			output += line.trim() + "\n";
+		}
+		
+		return output;
 	}
 	
 	/**
 	 * Clear all mappings
 	 */
 	public clear(): void {
-		console.log("LabelManager: Clearing all label mappings");
-		this.labelMapping.clear();
-		this.originalToSanitizedMap.clear();
-		this.sanitizedToOriginalMap.clear();
+		this.idToDisplayLabel.clear();
 	}
 	
 	/**
 	 * Log all mappings for debugging
 	 */
 	public logMappings(): void {
-		console.log("LabelManager: Current display mappings:");
-		
-		if (this.labelMapping.size === 0) {
-			console.log("  (empty)");
-		} else {
-			this.labelMapping.forEach((value, key) => {
-				console.log(`  ${key} -> ${value}`);
-			});
-		}
-		
-		console.log("LabelManager: Current sanitization mappings:");
-		if (this.originalToSanitizedMap.size === 0) {
-			console.log("  (empty)");
-		} else {
-			this.originalToSanitizedMap.forEach((value, key) => {
-				console.log(`  ${key} -> ${value}`);
-			});
-		}
-	}
-	
-	/**
-	 * Sanitize a label for the QSearch algorithm by replacing spaces and special characters
-	 * @param originalLabel The original label to sanitize
-	 * @param index Optional index to ensure uniqueness
-	 * @returns The sanitized label
-	 */
-	public sanitizeLabel(originalLabel: string, index?: number): string {
-		// Create a cache key that includes the index
-		const cacheKey = index !== undefined ? `${originalLabel}__index${index}` : originalLabel;
-		
-		// Check if we already have a sanitized version for this key
-		if (this.originalToSanitizedMap.has(cacheKey)) {
-			return this.originalToSanitizedMap.get(cacheKey)!;
-		}
-		
-		// Create a sanitized version - replace spaces and problematic characters
-		const indexPrefix = index !== undefined ? `L${index}_` : 'L_';
-		const sanitizedLabel = `${indexPrefix}${originalLabel.replace(/[\s\n\r\t,"()[\]{}]/g, '_')}`;
-		
-		// Store mapping
-		this.originalToSanitizedMap.set(cacheKey, sanitizedLabel);
-		this.sanitizedToOriginalMap.set(sanitizedLabel, originalLabel);
-		
-		return sanitizedLabel;
-	}
-	
-	/**
-	 * Restore the original label from a sanitized one
-	 * @param sanitizedLabel The sanitized label to restore
-	 * @returns The original label or the sanitized label if not found
-	 */
-	public restoreOriginalLabel(sanitizedLabel: string): string {
-		return this.sanitizedToOriginalMap.get(sanitizedLabel) || sanitizedLabel;
-	}
-	
-	/**
-	 * Sanitize a batch of labels for the QSearch algorithm
-	 * @param labels Array of original labels
-	 * @returns Array of sanitized labels in the same order
-	 */
-	public sanitizeLabels(labels: string[]): string[] {
-		return labels.map((label, index) => this.sanitizeLabel(label, index));
-	}
-	
-	/**
-	 * Restore original labels in a tree JSON from the QSearch algorithm
-	 * @param treeJSON JSON string containing tree data with sanitized labels
-	 * @returns JSON string with original labels restored
-	 */
-	public restoreLabelsInTree(treeJSON: string): string {
-		try {
-			const tree = JSON.parse(treeJSON);
-			
-			if (tree.nodes && Array.isArray(tree.nodes)) {
-				tree.nodes = tree.nodes.map((node: any) => {
-					if (node.label && this.sanitizedToOriginalMap.has(node.label)) {
-						return {
-							...node,
-							label: this.sanitizedToOriginalMap.get(node.label)
-						};
-					}
-					return node;
-				});
-			}
-			
-			return JSON.stringify(tree);
-		} catch (error) {
-			console.error("LabelManager: Error restoring original labels in tree:", error);
-			return treeJSON;
-		}
+		console.log("=== LabelManager Mappings ===");
+		console.log("ID → Display Label:");
+		console.log(Object.fromEntries(this.idToDisplayLabel));
+		console.log("===========================");
 	}
 }

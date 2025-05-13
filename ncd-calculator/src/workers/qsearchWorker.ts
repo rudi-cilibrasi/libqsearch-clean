@@ -259,20 +259,57 @@ Module({
 			
 			try {
 				const callback = (treeJSON: string) => {
-					const labelManager = LabelManager.getInstance();
 					self.postMessage({
 						action: "consoleLog",
 						message: "Received tree JSON from C++ function"
 					} as ConsoleMessage);
 					
-					// Ensure the tree JSON is valid and has all necessary fields
-					const validTreeJSON = ensureValidTreeJSON(treeJSON, labels);
-					const restoredTreeJson = labelManager.restoreLabelsInTree(validTreeJSON);
-					// Send the tree JSON to the main thread
-					self.postMessage({
-						action: "treeJSON",
-						result: restoredTreeJson,
-					} as TreeJSONMessage);
+					try {
+						// Ensure the tree JSON is valid and has all necessary fields
+						const validTreeJSON = ensureValidTreeJSON(treeJSON, labels);
+						
+						// Get LabelManager instance
+						const labelManager = LabelManager.getInstance();
+						
+						// Log the labels being used for processing
+						self.postMessage({
+							action: "consoleLog",
+							message: "Processing tree with labels: " + JSON.stringify(labels)
+						} as ConsoleMessage);
+						
+						// Before processing, register all labels if they're not already registered
+						// This is important for imported matrices with special characters
+						labels.forEach(label => {
+							if (!labelManager.getDisplayLabel(label)) {
+								labelManager.registerLabel(label, label);
+								
+								self.postMessage({
+									action: "consoleLog",
+									message: `Registered label: ${label}`
+								} as ConsoleMessage);
+							}
+						});
+						
+						// Process the tree, replacing internal labels with display labels
+						const processedTreeJSON = labelManager.processTreeJSON(validTreeJSON, labels);
+						
+						// Send the processed tree JSON to the main thread
+						self.postMessage({
+							action: "treeJSON",
+							result: processedTreeJSON,
+						} as TreeJSONMessage);
+					} catch (error) {
+						self.postMessage({
+							action: "consoleError",
+							message: "Error processing tree: " + error
+						} as ConsoleMessage);
+						
+						// If processing fails, send the original tree JSON
+						self.postMessage({
+							action: "treeJSON",
+							result: validTreeJSON,
+						} as TreeJSONMessage);
+					}
 				};
 				
 				// Check if module is initialized

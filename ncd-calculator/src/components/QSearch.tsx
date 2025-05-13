@@ -78,6 +78,9 @@ export const QSearch: React.FC<QSearchProps> = ({
 					...node,
 					label: labelManager.getDisplayLabel(node.label) || ""
 				})) as QTreeResponse;
+				result.nodes.forEach((node: QTreeNode) => {
+					console.log("node id: " + node.label + ", display name: " + labelManager.getDisplayLabel(node.label));
+				})
 				setQSearchTreeResult(result);
 			} catch (error) {
 				console.error("Error processing QSearch result:", error);
@@ -121,11 +124,9 @@ export const QSearch: React.FC<QSearchProps> = ({
 		try {
 			setIsLoading(true);
 			setErrorMsg("");
-			
-			
-			// Debug labelManager state before processing
-			console.log("Label manager before processing:", labelManager);
-			console.log("Initial label mapping:", labelManager.getLabelMapping());
+			labels.forEach((label) => {
+				labelManager.registerLabel(label);
+			})
 			
 			// Detect if this is imported matrix data by checking content format
 			const isImportedMatrix = input.contents.some(content => {
@@ -140,34 +141,19 @@ export const QSearch: React.FC<QSearchProps> = ({
 			if (isImportedMatrix) {
 				console.log("Processing imported matrix data without compression");
 				
-				// First, register all labels with the labelManager
-				input.labels.forEach((label, index) => {
-					console.log(`Checking label ${index}: ${label}`);
-					const existingDisplayLabel = labelManager.getDisplayLabel(label);
-					console.log(`  Existing display label: ${existingDisplayLabel || 'none'}`);
-					
-					// Always register to ensure it's in the map
-					console.log(`  Registering label: ${label}`);
+				// For imported matrices, we need to explicitly register each label
+				// with itself as the display label
+				input.labels.forEach((label) => {
+					console.log(`Registering imported matrix label: ${label}`);
 					labelManager.registerLabel(label, label);
 					
-					// Verify registration
-					const newDisplayLabel = labelManager.getDisplayLabel(label);
-					console.log(`  New display label: ${newDisplayLabel || 'none'}`);
+					// Also register a sanitized version mapping back to the original
+					const sanitized = labelManager.sanitizeForQSearch(label);
+					if (sanitized !== label) {
+						console.log(`Also registering sanitized version: ${sanitized} → ${label}`);
+						labelManager.registerLabel(sanitized, label);
+					}
 				});
-				
-				console.log("Label mapping after registration:", labelManager.getLabelMapping());
-				
-				
-				// Update label map in parent component
-				const newMapping = new Map<string, string>();
-				input.labels.forEach(label => {
-					const displayLabel = labelManager.getDisplayLabel(label) || label;
-					newMapping.set(label, displayLabel);
-				});
-				
-				console.log("New mapping for parent:", Array.from(newMapping.entries()));
-				labelMapRef.current = newMapping;
-				setLabelMap(newMapping);
 				
 				// Create NCD matrix directly from imported data
 				const ncdMatrix = input.contents.map(content => {
@@ -288,51 +274,33 @@ export const QSearch: React.FC<QSearchProps> = ({
 
 
 // Updated displayNcdMatrix function with improved label handling and debugging
+	/**
+	 * Updated displayNcdMatrix function that properly maintains the mapping
+	 * between accession IDs and their display labels
+	 */
 	const displayNcdMatrix = (response: NCDMatrixResponse) => {
 		const {labels: responseLabels, ncdMatrix: matrix} = response;
 		console.log('Display matrix called with labels: ' + JSON.stringify(responseLabels));
 		
 		// Debug labelManager state before processing
-		console.log('Initial labelManager state:', labelManager.getLabelMapping());
+		console.log('Initial LabelManager state:');
+		labelManager.logMappings();
 		
-		// First register all labels with the labelManager
-		responseLabels.forEach((label, index) => {
-			console.log(`Processing label ${index}: ${label}`);
-			
-			// Get current display label (if any)
-			const currentDisplayLabel = labelManager.getDisplayLabel(label);
-			console.log(`  Current display label: ${currentDisplayLabel || 'none'}`);
-			
-			// Always register to ensure it's in the mapping
-			console.log(`  Registering: ${label}`);
-			labelManager.registerLabel(label, label);
-			
-			// Verify registration
-			const newDisplayLabel = labelManager.getDisplayLabel(label);
-			console.log(`  New display label: ${newDisplayLabel || 'none'}`);
-		});
-		
-		// Debug labelManager state after registration
-		console.log('Updated labelManager state:', labelManager.getLabelMapping());
-		
-		// Optionally force log all mappings (if implemented in LabelManager)
-		if (typeof labelManager.logMappings === 'function') {
-			labelManager.logMappings();
-		}
-		
-		// Update state
+		// Update state variables
 		setLabels(responseLabels);
 		setNcdMatrix(matrix);
 		setHasMatrix(true);
 		
 		// Create grid objects from the labels
 		const objects: GridObject[] = responseLabels.map((label, index) => {
+			// Get the existing display label if it exists
 			const displayLabel = labelManager.getDisplayLabel(label);
+			
 			console.log(`Creating grid object for ${label} with display label: ${displayLabel || 'none'}`);
 			
 			return {
 				id: label,
-				label: displayLabel || label, // Fallback to original label
+				label: displayLabel || label,
 				content: matrix[index]
 			};
 		});
@@ -340,7 +308,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 		console.log('Created grid objects:', objects);
 		setGridObjects(objects);
 		
-		// Update labelMap reference
+		// Update labelMap reference for components that need it
 		const newMapping = new Map<string, string>();
 		responseLabels.forEach(label => {
 			const displayLabel = labelManager.getDisplayLabel(label) || label;
@@ -350,6 +318,10 @@ export const QSearch: React.FC<QSearchProps> = ({
 		console.log('New label mapping:', Array.from(newMapping.entries()));
 		labelMapRef.current = newMapping;
 		setLabelMap(newMapping);
+		
+		// Log the final state of the LabelManager
+		console.log('Final LabelManager state:');
+		labelManager.logMappings();
 	};
 	
 	// Reset display state
