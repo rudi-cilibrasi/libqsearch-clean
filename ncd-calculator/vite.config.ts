@@ -77,7 +77,8 @@ export default defineConfig({
     plugins: [wasm()],
   },
   optimizeDeps: {
-    exclude: ['zstd.wasm', 'zstd.js'],
+    // Add @hpcc-js/wasm to the exclude list along with your existing exclusions
+    exclude: ['zstd.wasm', 'zstd.js', '@hpcc-js/wasm'],
     esbuildOptions: {
       target: 'es2020',
       supported: {
@@ -96,6 +97,10 @@ export default defineConfig({
             return 'assets/wasm/[name][extname]';
           }
           return 'assets/[hash][extname]';
+        },
+        manualChunks: {
+          three: ['three', '@react-three/fiber', '@react-three/drei'],
+          graphviz: ['@hpcc-js/wasm', 'graphlib', 'graphlib-dot'],
         }
       }
     },
