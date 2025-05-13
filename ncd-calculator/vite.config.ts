@@ -89,7 +89,7 @@ export default defineConfig({
   build: {
     target: 'es2020',
     rollupOptions: {
-      external: ['path', 'fs'],
+      external: ['path', 'fs', '@hpcc-js/wasm'],
       output: {
         format: 'es',
         assetFileNames: (assetInfo) => {
@@ -100,7 +100,6 @@ export default defineConfig({
         },
         manualChunks: {
           three: ['three', '@react-three/fiber', '@react-three/drei'],
-          graphviz: ['@hpcc-js/wasm', 'graphlib', 'graphlib-dot'],
         }
       }
     },
