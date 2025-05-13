@@ -67,7 +67,7 @@ export class CRCCache {
         this.cache.set(cacheKey, size);
     }
 
-    private loadAllCache(): Record<string, number> {
+    protected loadAllCache(): Record<string, number> {
         try {
             const stored = localStorage.getItem(this.STORAGE_KEY);
             if (stored) {
@@ -79,7 +79,7 @@ export class CRCCache {
         return {};
     }
 
-    private loadFromLocalStorage(): void {
+    protected loadFromLocalStorage(): void {
         try {
             const cacheObject = this.loadAllCache();
             this.cache = new Map(Object.entries(cacheObject));
