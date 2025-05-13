@@ -106,7 +106,8 @@ export default defineConfig({
     commonjsOptions: {
       include: [/lzma/, /node_modules/],
       transformMixedEsModules: true
-    }
+    },
+    assetsInlineLimit: 0
   },
-  assetsInclude: ['**/*.wasm']
+  assetsInclude: ['**/*.wasm'],
 });

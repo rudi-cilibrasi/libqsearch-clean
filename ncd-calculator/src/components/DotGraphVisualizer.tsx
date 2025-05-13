@@ -317,7 +317,7 @@ export const DotGraphVisualizer: React.FC<DotGraphVisualizerProps> = ({ data, on
 			
 			{/* Instructions at the bottom */}
 			<div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-black bg-opacity-70 text-white text-xs rounded-md z-20">
-				Pan: Click and drag | Zoom: Use buttons or mouse wheel | Reset: Click reset button
+				Pan: Click and drag | Zoom: Use buttons or mouse wheel
 			</div>
 		</div>
 	);
