@@ -16,6 +16,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hpcc-js/wasm": "^2.22.4",
+    "@hpcc-js/wasm-graphviz": "^1.7.0",
     "@react-three/drei": "^9.117.3",
     "@react-three/fiber": "^8.17.10",
     "@react-three/test-renderer": "^8.2.1",
@@ -90,6 +92,7 @@
     "vite-plugin-top-level-await": "^1.4.4",
     "vite-plugin-wasm": "^3.4.1",
     "vitest": "^3.0.3",
-    "worker-loader": "^3.0.8"
+    "worker-loader": "^3.0.8",
+    "@types/graphlib": "^2.1.12"
   }
 }
