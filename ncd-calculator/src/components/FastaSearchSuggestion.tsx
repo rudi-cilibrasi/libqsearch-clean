@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   ChevronRight,
   Database,
@@ -52,6 +52,9 @@ export const FastaSearchSuggestion = ({
   const [hasSearched, setHasSearched] = useState(false);
   const [currentLabels, setCurrentLabels] = useState<Record<string, string>>({});
   const [componentError, setComponentError] = useState<string | null>(null);
+  
+  // Reference to keep track of the latest search term and request
+  const searchRequests = useRef<Map<string, { timestamp: number, abortController?: AbortController }>>(new Map());
   
   // Safe validation function for suggestions
   const isValidSuggestion = useCallback((suggestion: any): boolean => {
@@ -129,7 +132,31 @@ export const FastaSearchSuggestion = ({
     }
   }, [isValidSuggestion, getSuggestionProperty]);
   
-  // Effect for fetching suggestions with error handling
+  // Clean up function to cancel all pending requests except for the most recent
+  const cancelPreviousRequests = useCallback((currentSearchTerm: string) => {
+    // Sort requests by timestamp to find the latest for each search term
+    const currentTimestamp = Date.now();
+    
+    searchRequests.current.forEach((requestData, term) => {
+      // Keep requests that are for the current search term and recent (within last 2 seconds)
+      const isCurrentTerm = term === currentSearchTerm;
+      const isRecent = currentTimestamp - requestData.timestamp < 2000;
+      
+      if (!isCurrentTerm || !isRecent) {
+        // Cancel and remove old requests
+        if (requestData.abortController) {
+          try {
+            requestData.abortController.abort();
+          } catch (e) {
+            console.error("Error aborting request:", e);
+          }
+        }
+        searchRequests.current.delete(term);
+      }
+    });
+  }, []);
+  
+  // Effect for fetching suggestions with error handling and request cancellation
   useEffect(() => {
     setError(null);
     setComponentError(null);
@@ -144,6 +171,19 @@ export const FastaSearchSuggestion = ({
       const normalizedSearchTerm = searchTerm.trim().toLowerCase();
       setLoading(true);
       
+      // Cancel previous requests for other search terms
+      cancelPreviousRequests(normalizedSearchTerm);
+      
+      // Create abort controller for this request
+      const abortController = new AbortController();
+      const requestTimestamp = Date.now();
+      
+      // Register this request
+      searchRequests.current.set(normalizedSearchTerm, {
+        timestamp: requestTimestamp,
+        abortController
+      });
+      
       try {
         const count =
           getLastLocalPageCountObj(searchTerm) === null
@@ -151,13 +191,27 @@ export const FastaSearchSuggestion = ({
             : getLastLocalPageCountObj(searchTerm).count;
         const startIndex = getFastaSuggestionStartIndex(normalizedSearchTerm);
         
+        // Check if this request has been cancelled before proceeding
+        if (searchRequests.current.get(normalizedSearchTerm)?.timestamp !== requestTimestamp) {
+          return; // Request was superseded by a newer one
+        }
+        
+        // Add a signal to abort the fetch if needed
+        // Note: This implementation assumes you can modify the GenBankSearchService to accept an AbortSignal
+        // If you can't modify the service, you'll need to implement a different cancellation strategy
         const paginatedSuggestions: PaginatedResults =
           await genbankSearchService.getSuggestions(
             normalizedSearchTerm,
             count + 1,
             startIndex,
-            displayMode
+            displayMode,
+            abortController.signal // Add this parameter if your service supports it
           );
+        
+        // Check again if this request is still relevant
+        if (searchRequests.current.get(normalizedSearchTerm)?.timestamp !== requestTimestamp) {
+          return; // Request was superseded by a newer one
+        }
         
         // Validate suggestions before setting state
         const validatedSuggestions = Array.isArray(paginatedSuggestions?.suggestions)
@@ -176,18 +230,32 @@ export const FastaSearchSuggestion = ({
           });
         }
       } catch (err) {
-        console.error("Error fetching suggestions:", err);
-        setSuggestions([]);
-        setComponentError("Failed to fetch suggestions. Please try again.");
+        // Only set error state if this request is still the current one
+        if (searchRequests.current.get(normalizedSearchTerm)?.timestamp === requestTimestamp) {
+          // Ignore aborted request errors
+          if (err.name !== 'AbortError') {
+            console.error("Error fetching suggestions:", err);
+            setSuggestions([]);
+            setComponentError("Failed to fetch suggestions. Please try again.");
+          }
+        }
       } finally {
-        setLoading(false);
+        // Only update loading state if this request is still the current one
+        if (searchRequests.current.get(normalizedSearchTerm)?.timestamp === requestTimestamp) {
+          setLoading(false);
+        }
       }
     };
     
     const timer = setTimeout(fetchSuggestions, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm, isValidSuggestion]);
+    return () => {
+      clearTimeout(timer);
+      // Clean up on unmount or search term change
+      cancelPreviousRequests("");
+    };
+  }, [searchTerm, isValidSuggestion, cancelPreviousRequests]);
   
+  // Rest of the component remains largely the same...
   // Effect for updating labels with error handling
   useEffect(() => {
     if (suggestions.length > 0) {
@@ -221,14 +289,14 @@ export const FastaSearchSuggestion = ({
   }, [localPageCount]);
   
   const setLastLocalPageCountObj = useCallback((searchTerm: string, count: number) => {
-    setLocalPageCount({
-      ...localPageCount,
+    setLocalPageCount((prevState) => ({
+      ...prevState,
       [searchTerm]: {
         count: count,
         timestamp: Date.now(),
       },
-    });
-  }, [localPageCount]);
+    }));
+  }, []);
   
   const handleSuggestionSelect = useCallback((suggestion: Suggestion) => {
     try {
@@ -299,6 +367,14 @@ export const FastaSearchSuggestion = ({
     }
   }, []);
   
+  // Reset component function
+  const resetComponent = useCallback(() => {
+    setComponentError(null);
+    setSuggestions([]);
+    setHasSearched(false);
+    cancelPreviousRequests("");
+  }, [cancelPreviousRequests]);
+  
   // Early return if no search term
   if (!searchTerm?.trim()) return null;
   
@@ -312,11 +388,7 @@ export const FastaSearchSuggestion = ({
             <span>{componentError}</span>
           </div>
           <button
-            onClick={() => {
-              setComponentError(null);
-              setSuggestions([]);
-              setHasSearched(false);
-            }}
+            onClick={resetComponent}
             className="mt-2 text-sm text-blue-600 hover:underline"
           >
             Try again
@@ -412,8 +484,10 @@ export const FastaSearchSuggestion = ({
                 );
               })
             ) : hasSearched && searchTerm.trim().length > 2 ? (
-              <div className="p-4 text-center text-gray-600">
-                No more suggestions available
+              <div className="p-4 text-center text-gray-600" onClick={resetComponent}>
+                <span className="cursor-pointer hover:text-blue-600">
+                  No suggestions found. Click to try again.
+                </span>
               </div>
             ) : searchTerm.trim().length <= 2 ? (
               <div className="p-4 text-center text-gray-600">
