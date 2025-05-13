@@ -18,7 +18,7 @@ export interface NCDInput {
 export type WorkerMessage =
     WorkerReadyMessage
     | WorkerStartMessage
-    | WorkerProcessMessage
+    | WorkerProgressMessage
     | WorkerResultMessage
     | WorkerErrorMessage;
 
@@ -35,7 +35,7 @@ export type WorkerStartMessage = {
 }
 
 
-export type WorkerProcessMessage = {
+export type WorkerProgressMessage = {
     type: 'progress';
     i: number;
     j: number;

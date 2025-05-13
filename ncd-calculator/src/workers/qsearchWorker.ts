@@ -258,9 +258,6 @@ Module({
 			} as ConsoleMessage);
 			
 			try {
-				// Inside the QSearchWorker.ts file
-// Inside the callback function:
-				
 				const callback = (treeJSON: string) => {
 					self.postMessage({
 						action: "consoleLog",

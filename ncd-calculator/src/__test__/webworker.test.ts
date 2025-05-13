@@ -1,10 +1,10 @@
 import '@vitest/web-worker'
 import {test} from "vitest";
 import {CompressionService} from "@/services/CompressionService.ts";
-import {NCDInput} from "@/types/ncd.d.ts";
 import {CRCCache} from "@/cache/CRCCache.ts";
 import fs from 'fs';
 import path from 'path';
+import {NCDInput} from "@/types/ncd";
 
 test('Test compression decision lzma', async () => {
     const input: NCDInput = {
@@ -19,7 +19,7 @@ test('Test compression decision lzma', async () => {
     };
 
     input.contents = await Promise.all(
-        input.labels.map(async (label) => {
+        input.labels.map(async (label: string) => {
             const filePath = path.join(__dirname + "/compression_data", `${label}`);
             const fileContent = await fs.promises.readFile(filePath, 'utf-8');
             return fileContent.replace(/\n/g, '').toLowerCase();
@@ -93,7 +93,7 @@ test('Test compression decision zstd', async () => {
     };
 
     input.contents = await Promise.all(
-        input.labels.map(async (label) => {
+        input.labels.map(async (label: string) => {
             const filePath = path.join(__dirname + "/compression_data", `${label}`);
             return await fs.promises.readFile(filePath, 'utf-8');
         })
