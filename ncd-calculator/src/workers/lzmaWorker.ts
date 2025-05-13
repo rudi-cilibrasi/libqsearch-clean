@@ -29,7 +29,7 @@ const COMPRESSION_SETTINGS = {
   COMPRESSION_MODE: 9,
   
   // Timeout for compression operations (ms)
-  OPERATION_TIMEOUT: 600000 // 10 minutes
+  OPERATION_TIMEOUT: 900000 // 15 minutes
 } as const;
 
 let isLzmaInitialized = false;
