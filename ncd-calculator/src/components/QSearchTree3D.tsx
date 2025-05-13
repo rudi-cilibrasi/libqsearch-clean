@@ -120,12 +120,12 @@ export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({data}) => {
                     {theme === "dark" ? "Light Theme" : "Dark Theme"}
                 </button>
               )}
-              <button
-                onClick={toggleDotGraph}
-                className="bg-purple-600 text-white hover:bg-purple-700 shadow-md px-4 py-2 rounded-md text-sm flex items-center"
-              >
-                  {showDotGraph ? "Show 3D Tree" : "Show DOT Graph"}
-              </button>
+              {/*<button*/}
+              {/*  onClick={toggleDotGraph}*/}
+              {/*  className="bg-purple-600 text-white hover:bg-purple-700 shadow-md px-4 py-2 rounded-md text-sm flex items-center"*/}
+              {/*>*/}
+              {/*    {showDotGraph ? "Show 3D Tree" : "Show DOT Graph"}*/}
+              {/*</button>*/}
               <button
                 onClick={handleExport}
                 className="bg-green-600 text-white hover:bg-green-700 shadow-md px-4 py-2 rounded-md text-sm flex items-center"

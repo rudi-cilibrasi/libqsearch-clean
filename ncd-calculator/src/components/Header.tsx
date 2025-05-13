@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { BACKEND_BASE_URL } from "../config/api";
+import { BACKEND_BASE_URL } from "@/configs/api";
 import { getLoginUser } from "../functions/user.ts";
 
 interface HeaderProps {

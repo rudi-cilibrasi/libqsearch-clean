@@ -14,7 +14,7 @@ import {
 import {MemoryCache} from "@/cache/MemoryCache.ts";
 import {LocalStorageCache} from "@/cache/LocalStorageCache.ts";
 import {RedisStorageCache} from "@/cache/RedisStorageCache.ts";
-import {VITE_REDIS_ENDPOINT} from "@/config/api.tsx";
+import {VITE_REDIS_ENDPOINT} from "@/configs/api.tsx";
 
 export class GenbankCache {
     private readonly memoryCache: CacheInterface<CacheTypes>;
