@@ -58,12 +58,8 @@ interface ListEditorProps {
 
 const ListEditor: React.FC<ListEditorProps> = ({
 	                                               onComputedNcdInput,
-	                                               labelMapRef,
-	                                               setLabelMap,
 	                                               setIsLoading,
 	                                               resetDisplay,
-	                                               setOpenLogin,
-	                                               authenticated,
 	                                               initialSearchMode,
 	                                               qTreeResponse
                                                }) => {
@@ -252,85 +248,51 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	};
 	
 	const sendNcdInput = async (): Promise<void> => {
-		if (selectedItems && selectedItems.length > 16 && !authenticated) {
-			setOpenLogin(true);
-			return;
-		}
+		// if (selectedItems && selectedItems.length > 16 && !authenticated) {
+		// 	setOpenLogin(true);
+		// 	return;
+		// }
 		setIsLoading(true);
-		
-		
 		try {
+			const labelManager = LabelManager.getInstance();
+			// pre-register all labels regardless processing part
+			selectedItems.forEach((item) => {
+				labelManager.registerLabel(item.id, item.label);
+			})
+			
 			if (hasImportedMatrix) {
 				const labels: string[] = [];
 				const contents: string[] = [];
-				selectedItems.forEach((item) => {
-					labels.push(item.label);
+				selectedItems.forEach(item => {
+					labels.push(item.id);
 					contents.push(item.content || "");
-				})
-				await onComputedNcdInput({labels, contents});
+					
+					if (!labelManager.getDisplayLabel(item.id)) {
+						labelManager.registerLabel(item.id, item.id);
+					}
+				});
+				// process the input directly
+				await onComputedNcdInput({labels, contents} as NcdInput);
 			} else {
-				const computedNcdInput = await computeNcdInput();
-				const ncdSelectedItems = getNcdSelectedItems(computedNcdInput, selectedItems);
-				updateDisplayLabelMap(ncdSelectedItems);
-				const input = getConvertedNcdInput(ncdSelectedItems);
+				const computedNcdInput = await computeNcdInput(selectedItems);
+				// update the items with their computed content
+				const ncdSelectedItems = updateLabelsWithComputedContent(computedNcdInput, selectedItems);
+				
+				// covert to the format expected by the NCD processor
+				const input = {
+					labels: ncdSelectedItems.map((item) => item.id),
+					contents: ncdSelectedItems.map((item) => item.content || "")
+				} as NcdInput;
 				await onComputedNcdInput(input);
 			}
-		} catch
-			(error) {
+		} catch (error) {
 			console.error("Error processing NCD input:", error);
 		} finally {
 			setIsLoading(false);
 		}
 	};
 	
-	const getConvertedNcdInput = (ncdSelectedItems: SelectedItem[]): NcdInput => {
-		const response: NcdInput = {
-			labels: [],
-			contents: [],
-		};
-		for (let i = 0; i < ncdSelectedItems.length; i++) {
-			response.labels[i] = ncdSelectedItems[i].id;
-			response.contents[i] = ncdSelectedItems[i].content || "";
-		}
-		return response;
-	};
-	
-	const getNcdSelectedItems = (
-		ncdInputItems: SelectedItem[],
-		selectedItems: SelectedItem[]
-	): SelectedItem[] => {
-		const map = new Map<string, SelectedItem>();
-		for (let i = 0; i < selectedItems.length; i++) {
-			map.set(selectedItems[i].id, selectedItems[i]);
-		}
-		const ncdSelectedItems: SelectedItem[] = [];
-		for (let i = 0; i < ncdInputItems.length; i++) {
-			const id = ncdInputItems[i].id;
-			const item = map.get(id);
-			if (item) {
-				item.content = ncdInputItems[i].content;
-				ncdSelectedItems.push(item);
-			}
-		}
-		return ncdSelectedItems;
-	};
-	
-	const updateDisplayLabelMap = (selectedItems: SelectedItem[]): void => {
-		selectedItems.forEach(item => {
-			labelManager.registerLabel(item.id, item.label);
-		});
-		const mapping = labelManager.getLabelMapping();
-		const newMapping = new Map();
-		if (mapping) {
-			for (let [key, value] of Object.entries(mapping)) {
-				newMapping.set(key, value);
-			}
-			labelMapRef.current = newMapping;
-			setLabelMap(newMapping);
-		}
-	};
-	
-	const computeNcdInput = async (): Promise<SelectedItem[]> => {
+	const computeNcdInput = async (selectedItems: SelectedItem[]): Promise<SelectedItem[]> => {
 		const langItems = selectedItems.filter((item) => item.type === LANGUAGE);
 		const fastaItems = selectedItems.filter(
 			(item) => item.type === FASTA || item.type === FILE_UPLOAD
@@ -352,6 +314,26 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		
 		return mergeAndPreserveInitialOrder(langNcdInput, mergedFastaInput, orderMap);
 	};
+	
+	
+	const updateLabelsWithComputedContent = (
+		computedItems: SelectedItem[],
+		selectedItems: SelectedItem[]
+	) => {
+		const itemMap = new Map<string, SelectedItem>();
+		selectedItems.forEach(item => {
+			itemMap.set(item.id, {...item});
+		});
+		computedItems.forEach((computed) => {
+			const item = itemMap.get(computed.id);
+			if (item && computed.content) {
+				item.content = computed.content;
+			}
+		})
+		
+		return Array.from(itemMap.values());
+	}
+	
 	
 	const getCachedFastaContent = (items: SelectedItem[]): SelectedItem[] => {
 		const res = items.filter(
@@ -512,6 +494,8 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	const addItem = (item: SelectedItem): void => {
 		if (!selectedItems.find((selected) => selected.id === item.id)) {
+			const labelManager = LabelManager.getInstance();
+			labelManager.registerLabel(item.id, item.label);
 			setSelectedItems([...selectedItems, item]);
 		}
 	};
