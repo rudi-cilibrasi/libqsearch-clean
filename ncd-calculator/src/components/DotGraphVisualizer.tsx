@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Graphviz } from '@hpcc-js/wasm';
 import createGraph from '../functions/graphExport';
 
 interface DotGraphVisualizerProps {
@@ -30,7 +29,7 @@ export const DotGraphVisualizer: React.FC<DotGraphVisualizerProps> = ({ data, on
 		const initGraphviz = async () => {
 			try {
 				setLoading(true);
-				// Use the static load method as shown in the documentation
+				const { Graphviz } = await import('@hpcc-js/wasm');
 				const graphvizInstance = await Graphviz.load();
 				setGraphviz(graphvizInstance);
 			} catch (err) {
