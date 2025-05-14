@@ -9,7 +9,7 @@ import type {
   WorkerReadyMessage,
   WorkerProgressMessage
 } from "@/types/ncd";
-import { LZMA } from '../lib/lzma';
+import { LZMA } from '../libs/lzma';
 
 // Configuration settings for LZMA compression
 // These settings are optimized for NCD computation with files ≤1MB
