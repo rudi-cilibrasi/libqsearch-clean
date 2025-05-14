@@ -1,15 +1,3 @@
-#root {
-    max-width: 1280px;
-    margin: 0 auto;
-    text-align: center;
-}
-
-.text-xxs {
-    font-size: 0.65rem;
-    line-height: 0.6rem;
-}
-
-
 @keyframes float {
     0% {
         transform: translate(0, 0);
@@ -33,3 +21,8 @@
 }
 
 
+.screenshot-container img {
+    mix-blend-mode: screen; /* Helps light elements stand out on dark backgrounds */
+    border-radius: 0.5rem; /* Matches your UI's rounded corners */
+    border: 1px solid rgba(59, 130, 246, 0.2); /* Subtle blue border */
+}

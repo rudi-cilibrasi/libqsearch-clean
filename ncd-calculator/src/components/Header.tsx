@@ -1,158 +1,30 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { BACKEND_BASE_URL } from "@/configs/api";
-import { getLoginUser } from "../functions/user.ts";
+import React from "react";
+import { Activity } from 'lucide-react';
 
-interface HeaderProps {
-  openLogin: boolean;
-  setOpenLogin: (open: boolean) => void;
-  setAuthenticated: (authenticated: boolean) => void;
-}
-
-interface LogoutResponse {
-  data: {
-    user: string | null;
-  };
-}
-
-const Header: React.FC<HeaderProps> = ({
-  openLogin,
-  setOpenLogin,
-  setAuthenticated,
-}) => {
-  const [userName, setUserName] = useState<string | null>(null);
-
-  const openModal = (): void => {
-    setOpenLogin(true);
-  };
-
-  const closeModal = (): void => {
-    setOpenLogin(false);
-  };
-
-  const handleGoogleLogin = async (): Promise<void> => {
-    try {
-      window.location.href = `${BACKEND_BASE_URL}/auth/google`;
-    } catch (error) {
-      console.error("Google login failed", error);
-    }
-  };
-
-  const handleGithubLogin = async (): Promise<void> => {
-    try {
-      window.location.href = `${BACKEND_BASE_URL}/auth/github`;
-    } catch (error) {
-      console.error("Github login failed", error);
-    }
-  };
-
-  const fetchUserData = async (): Promise<void> => {
-    const authUserName = await getLoginUser();
-    setUserName(authUserName);
-    setAuthenticated(!!authUserName);
-    console.log(`User is authenticated ${!!authUserName} ${authUserName}`);
-  };
-
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchData = async () => {
-      try {
-        const authUserName = await getLoginUser();
-        if (mounted) {
-          setUserName(authUserName);
-          setAuthenticated(!!authUserName);
-        }
-      } catch (error) {
-        if (mounted) {
-          setUserName(null);
-          setAuthenticated(false);
-        }
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const handleLogout = async (): Promise<void> => {
-    try {
-      const res = await axios.get<LogoutResponse["data"]>(
-        `${BACKEND_BASE_URL}/auth/logout`,
-        { withCredentials: true }
-      );
-      console.log("handleLogout response", res);
-      const returnedUser = res.data.user;
-      setUserName(returnedUser);
-      setAuthenticated(!!returnedUser);
-      console.log(`User is authenticated ${!!returnedUser}`);
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
+const Header = ({ isScrolled, openLogin, setOpenLogin }) => {
   return (
-    <header className="flex justify-between items-center px-10 py-4 text-white">
-      <div className="text-4xl font-bold">NCD Calculator</div>
-      <div className="flex justify-right items-center">
-        <a href="/about" className="text-white pr-10 text-lg">
-          About Us
-        </a>
-        {!userName ? (
-            <button
-                className="text-white bg-blue-500 px-4 py-2 rounded-lg focus:outline-none"
-                onClick={openModal}
-            >
-              Login
-            </button>
-        ) : (
-            <div className="flex items-center space-x-4">
-              <span className="text-white">{userName}</span>
-              <button
-                  className="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600"
-                  onClick={handleLogout}
-              >
-                Logout
-              </button>
-            </div>
-        )}
-      </div>
-
-      {/*Open modal*/}
-      {openLogin && (
-          <div
-              className="fixed z-50 inset-0 flex justify-center items-center bg-black bg-opacity-50 backdrop-blur-sm"
-          onClick={closeModal}
-        >
-          <div
-            className="bg-white p-6 rounded-lg w-80"
-            onClick={(e: React.MouseEvent<HTMLDivElement>) =>
-              e.stopPropagation()
-            }
-          >
-            <h2 className="text-center text-xl font-semibold mb-4 text-black">
-              Login to continue
-            </h2>
-            <div className="flex flex-col items-center space-y-4">
-              <button
-                className="bg-red-500 text-white px-6 py-2 rounded-full w-full"
-                onClick={handleGoogleLogin}
-              >
-                Login with Google
-              </button>
-              <button
-                className="bg-green-700 text-white px-6 py-2 rounded-full w-full"
-                onClick={handleGithubLogin}
-              >
-                Login with Github
-              </button>
-            </div>
-          </div>
+    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      isScrolled ? 'bg-gray-900/95 backdrop-blur-sm shadow-lg py-2' : 'bg-transparent py-4'
+    }`}>
+      <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
+        <div className="flex items-center">
+          <Activity className="h-6 w-6 text-blue-400 mr-2" />
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+            NCD Calculator
+          </h1>
         </div>
-      )}
+        <div className="flex items-center gap-4">
+          <a href="#about" className="text-gray-300 hover:text-white transition-colors hidden md:block">
+            About Us
+          </a>
+          <button
+            onClick={() => setOpenLogin(true)}
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white transition-colors"
+          >
+            Login
+          </button>
+        </div>
+      </div>
     </header>
   );
 };
