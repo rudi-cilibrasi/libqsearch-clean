@@ -4,7 +4,7 @@ import QSearch from "./components/QSearch"
 import ErrorPage from "./components/ErrorPage"
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
 import AboutPage from "@/components/AboutPage"
-import LandingPage from "@/components/LandingPage"
+import {LandingPage} from "@/components/LandingPage.tsx";
 
 function App() {
     const [openLogin, setOpenLogin] = useState(false)

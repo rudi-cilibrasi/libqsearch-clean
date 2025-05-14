@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { BACKEND_BASE_URL } from "../config/api.js";
+import { BACKEND_BASE_URL } from "@/configs/api.js";
 
 interface UserResponse {
   userName: string;
