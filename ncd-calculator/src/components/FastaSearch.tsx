@@ -7,7 +7,7 @@ import {GenBankSearchService} from "@/services/GenBankSearchService.ts";
 import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager.js";
 import AutoLabelingToggle from "@/components/AutoLabelingToggle.tsx";
 import {Suggestion} from "@/services/genbank.ts";
-import {SelectedItem} from "@/components/ListEditor.tsx";
+import {SelectedItem} from "@/components/InputHolder.tsx";
 
 interface FastaSearchProps {
   addItem(item: SelectedItem | any): void;
@@ -54,7 +54,7 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
       selected: false
     },
   ]);
-  const [searchError, setSearchError] = useState(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const genbankSearchService = new GenBankSearchService();
   const localStorageKeyManager = LocalStorageKeyManager.getInstance();
   const [autoLabelingEnabled, setAutoLabelingEnabled] = useState(true);
@@ -86,7 +86,7 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
     });
   };
 
-  const onSelectSearchTerm = (item) => {
+  const onSelectSearchTerm = (item: any) => {
     addItem({
       id: item.accessionId,
       type: FASTA,
@@ -95,10 +95,10 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
     });
   };
 
-  const getSelectedDisplayMode = (): string => {
+  const getSelectedDisplayMode = (): "common" | "scientific" | "accession" => {
     const selected: ProjectionOption[] = projections.filter((p) => p.selected);
     if (selected.length === 0) return "accession";
-    return selected[0].name;
+    return selected[0].name as "common" | "scientific" | "accession";
   }
 
   return (
@@ -107,7 +107,6 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
         <div>
           <SearchInput
               searchTerm={searchTerm}
-              addItem={addItem}
               label="Enter Animal Name"
               type="fasta"
               handleSearchTerm={handleSearchTerm}
@@ -137,12 +136,12 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
               displayMode={getSelectedDisplayMode()}
           />
         </div>
-        <div className="mt-auto border-t border-gray-200 pt-4">
+        <div className="mt-auto border-t border-gray-700 pt-4 bg-gray-950">
 
 
           <div className="mb-4 mx-6">
             <div className="flex justify-between items-center mb-1.5">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-sm font-medium text-gray-200">
                 Display Mode
               </label>
               <AutoLabelingToggle
@@ -150,7 +149,7 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
                   onToggle={() => setAutoLabelingEnabled(!autoLabelingEnabled)}
               />
             </div>
-            <div className="inline-flex bg-white rounded-lg p-1 gap-2 border border-gray-200">
+            <div className="inline-flex bg-gray-800 rounded-lg p-1 gap-2 border border-gray-700">
               {projections.map((projection) => {
                 const Icon = projection.icon;
                 return (
@@ -161,11 +160,11 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
             flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium
             transition-all duration-150 ease-in-out min-w-[100px]
             ${projection.selected
-                            ? "bg-blue-100 text-blue-600 shadow-sm border border-blue-200"
-                            : "bg-gray-50 text-gray-600 hover:text-gray-800 hover:bg-gray-100"}
+                            ? "bg-blue-600 text-white shadow-sm border border-blue-400"
+                            : "bg-gray-700 text-gray-300 hover:text-gray-100 hover:bg-gray-600"}
           `}
                     >
-                      <Icon className={`w-3.5 h-3.5 ${projection.selected ? 'text-blue-600' : 'text-gray-500'}`}/>
+                      <Icon className={`w-3.5 h-3.5 ${projection.selected ? 'text-white' : 'text-gray-400'}`}/>
                       <span>{projection.label}</span>
                     </button>
                 );

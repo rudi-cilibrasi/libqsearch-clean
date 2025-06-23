@@ -40,7 +40,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   return (
     <div className="p-6">
-      <h3 className="text-lg font-bold text-gray-900 mb-4">{label}</h3>
+      <h3 className="text-lg font-bold text-gray-100 mb-4">{label}</h3>
       <div className="relative">
         <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
           <Search size={20} className="text-gray-400" />
@@ -53,9 +53,9 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           }
           onKeyDown={handlePress}
           placeholder="Search..."
-          className="w-full py-3 px-4 pl-12 border-2 border-gray-200 rounded-lg text-base outline-none
-                        bg-black text-white placeholder-gray-400
-                        focus:border-blue-500 transition-colors"
+          className="w-full py-3 px-4 pl-12 border-2 border-gray-600 rounded-lg text-base outline-none
+                        bg-gray-800 text-white placeholder-gray-500
+                        focus:border-blue-400 focus:bg-gray-750 hover:border-gray-500 transition-colors"
         />
       </div>
     </div>

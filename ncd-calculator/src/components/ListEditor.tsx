@@ -16,7 +16,6 @@ import {LabelManager} from "@/functions/labelUtils.ts";
 import createGraph from "@/functions/graphExport.ts";
 import {saveAs} from "file-saver";
 import {QTreeResponse} from "@/components/tree";
-import Nodes from "three/src/renderers/common/nodes/Nodes";
 
 export interface SearchMode {
 	searchMode: string;
@@ -110,14 +109,56 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			// Get LabelManager instance
 			const labelManager = LabelManager.getInstance();
 			
+			console.log('Attempting to fetch animal names for accession IDs...');
+			
+			// Try to fetch animal names for what appear to be accession IDs
+			let enhancedLabels: { [key: string]: string } = {};
+			const potentialAccessionIds = data.labels.filter(label => 
+				// Check if label looks like an accession ID (contains letters and numbers, not spaces)
+				/^[a-zA-Z0-9._-]+$/.test(label) && label.length >= 6
+			);
+			
+			if (potentialAccessionIds.length > 0) {
+				try {
+					console.log(`Found ${potentialAccessionIds.length} potential accession IDs, fetching animal names...`);
+					const fastaResponse = await getFastaSequences(potentialAccessionIds);
+					
+					// Create mapping from accession to animal name
+					fastaResponse.accessions.forEach((accession, index) => {
+						const commonName = fastaResponse.commonNames[index];
+						const scientificName = fastaResponse.scientificNames[index];
+						
+						// Use common name if available, otherwise scientific name, otherwise accession
+						let displayName = accession;
+						if (commonName && commonName.trim() !== '') {
+							displayName = commonName;
+						} else if (scientificName && scientificName.trim() !== '') {
+							// Use first two words of scientific name for brevity
+							const parts = scientificName.split(' ');
+							displayName = parts.slice(0, 2).join(' ');
+						}
+						
+						enhancedLabels[accession] = displayName;
+						console.log(`Enhanced label: ${accession} → ${displayName}`);
+					});
+				} catch (error) {
+					console.warn('Failed to fetch animal names for accession IDs:', error);
+					// Continue with original labels if fetching fails
+				}
+			}
+			
 			// Create items for each label in the matrix
 			const importedItems: SelectedItem[] = data.labels.map((label, index) => {
-				// Register for display and sanitization
-				labelManager.registerLabel(label, label);
+				// Use enhanced label if available, otherwise original label
+				const displayLabel = enhancedLabels[label] || label;
+				
+				// Register both the original label and the display label
+				labelManager.registerLabel(label, displayLabel);
+				console.log(`Registered label: ${label} → ${displayLabel}`);
 				
 				return {
 					id: label,
-					label: label,
+					label: displayLabel,
 					type: FILE_UPLOAD,
 					content: JSON.stringify(data.distances[index]),
 				};
@@ -176,8 +217,9 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	
 	const handleExportMatrix = (): void => {
+		if (!qTreeResponse) return;
 		
-		const dotFormat = createGraph(qTreeResponse as Nodes, false);
+		const dotFormat = createGraph(qTreeResponse, false);
 		
 		const blob = new Blob([dotFormat], {type: "text/plain;charset=utf-8"});
 		saveAs(blob, "matrix_structure.dot");
@@ -557,52 +599,60 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	
 	return (
-		<div className="p-6 w-[1200px] mx-auto">
-			<div className="flex gap-4 mb-6">
+		<div className="w-full max-w-none xl:max-w-[1600px] 2xl:max-w-[1800px] mx-auto p-4 sm:p-6">
+			{/* Mode selection tabs - scrollable on mobile */}
+			<div className="flex gap-2 sm:gap-4 mb-4 sm:mb-6 overflow-x-auto pb-2 scrollbar-hide">
 				<button
 					onClick={() => setMode(FASTA)}
-					className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+					className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap text-sm sm:text-base
                     ${
 						searchMode.searchMode === FASTA
-							? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-							: "bg-gray-100 text-gray-600 border-2 border-transparent"
+							? "bg-blue-600 text-white border-2 border-blue-500"
+							: "bg-gray-700 text-gray-300 border-2 border-transparent hover:bg-gray-600"
 					}`}
 				>
-					<Dna size={20}/>
-					<span>Animal Grouping</span>
+					<Dna size={18} className="sm:w-5 sm:h-5"/>
+					<span className="hidden xs:inline">Animal Grouping</span>
+					<span className="xs:hidden">Animals</span>
 				</button>
 				<button
 					onClick={() => setMode(LANGUAGE)}
-					className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+					className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap text-sm sm:text-base
                     ${
 						searchMode.searchMode === LANGUAGE
-							? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-							: "bg-gray-100 text-gray-600 border-2 border-transparent"
+							? "bg-blue-600 text-white border-2 border-blue-500"
+							: "bg-gray-700 text-gray-300 border-2 border-transparent hover:bg-gray-600"
 					}`}
 				>
-					<Globe2 size={20}/>
-					<span>Language Analysis</span>
+					<Globe2 size={18} className="sm:w-5 sm:h-5"/>
+					<span className="hidden xs:inline">Language Analysis</span>
+					<span className="xs:hidden">Languages</span>
 				</button>
 				<button
 					onClick={() => setMode(FILE_UPLOAD)}
-					className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+					className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap text-sm sm:text-base
                     ${
 						searchMode.searchMode === FILE_UPLOAD
-							? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-							: "bg-gray-100 text-gray-600 border-2 border-transparent"
+							? "bg-blue-600 text-white border-2 border-blue-500"
+							: "bg-gray-700 text-gray-300 border-2 border-transparent hover:bg-gray-600"
 					}`}
 				>
-					<FileType2 size={20}/>
-					<span>File Upload</span>
+					<FileType2 size={18} className="sm:w-5 sm:h-5"/>
+					<span className="hidden xs:inline">File Upload</span>
+					<span className="xs:hidden">Files</span>
 				</button>
 			</div>
 			
-			<div className="flex gap-6">
-				<div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
+			{/* Main content area - stacked on mobile, side-by-side on desktop */}
+			<div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+				{/* Input/Search Panel */}
+				<div className="w-full lg:w-1/2 h-[400px] sm:h-[500px] lg:h-[600px] border border-gray-600 rounded-xl bg-gray-800 overflow-hidden flex flex-col shadow-lg">
 					<div className="flex-1 overflow-y-auto p-3">
 						{renderModal(searchMode)}
 					</div>
 				</div>
+				
+				{/* Selected Items Panel */}
 				<InputHolder
 					selectedItems={selectedItems}
 					onRemoveItem={removeItem}
@@ -611,62 +661,66 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			</div>
 			
 			{/* Bottom section with all the buttons */}
-			<div className="mt-6 flex flex-col">
-				{/* Import/Export buttons row */}
-				<div className="flex mb-4">
-					<div className="mr-auto flex gap-3">
+			<div className="mt-4 sm:mt-6 flex flex-col space-y-4">
+				{/* Import/Export and action buttons - responsive layout */}
+				<div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+					{/* Import/Export buttons */}
+					<div className="flex flex-col xs:flex-row gap-2 xs:gap-3">
 						<button
 							onClick={triggerFileInput}
-							className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-700 transition-all border border-indigo-300"
+							className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-all border border-indigo-500 text-sm sm:text-base"
 						>
-							<Upload size={18}/>
+							<Upload size={16} className="sm:w-[18px] sm:h-[18px]"/>
 							<span>Import Matrix</span>
 						</button>
 						
 						<button
 							onClick={handleExportMatrix}
-							className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-        ${
+							className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all text-sm sm:text-base
+								${
 								selectedItems.length === 0
-									? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-300"
-									: "bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-300"
+									? "bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600"
+									: "bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-500"
 							}`}
 							disabled={selectedItems.length === 0}
 						>
-							<Download size={18}/>
+							<Download size={16} className="sm:w-[18px] sm:h-[18px]"/>
 							<span>Export Matrix</span>
 						</button>
 					</div>
 					
-					<button
-						onClick={clearAllSelectedItems}
-						disabled={isClearDisabled}
-						className={`px-6 py-3 rounded-lg transition-all
-                      ${
-							isClearDisabled
-								? "bg-gray-100 text-gray-400 cursor-not-allowed"
-								: "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
-						}`}
-					>
-						Clear All
-					</button>
-					<button
-						onClick={sendNcdInput}
-						disabled={isSearchDisabled}
-						className={`px-6 py-3 rounded-lg transition-all ml-5
-                      ${
-							isSearchDisabled
-								? "bg-gray-100 text-gray-400 cursor-not-allowed"
-								: "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
-						}`}
-					>
-						Calculate
-					</button>
+					{/* Action buttons */}
+					<div className="flex flex-col xs:flex-row gap-2 xs:gap-3">
+						<button
+							onClick={clearAllSelectedItems}
+							disabled={isClearDisabled}
+							className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-all text-sm sm:text-base
+		                      ${
+								isClearDisabled
+									? "bg-gray-700 text-gray-500 cursor-not-allowed"
+									: "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
+							}`}
+						>
+							Clear All
+						</button>
+						<button
+							onClick={sendNcdInput}
+							disabled={isSearchDisabled}
+							className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-all text-sm sm:text-base
+		                      ${
+								isSearchDisabled
+									? "bg-gray-700 text-gray-500 cursor-not-allowed"
+									: "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
+							}`}
+						>
+							Calculate
+						</button>
+					</div>
 				</div>
 				
 				{/* Error message */}
 				{importError && (
-					<div className="mt-2 p-3 bg-red-50 border border-red-300 text-red-700 rounded-md text-sm flex items-start">
+					<div className="p-3 bg-red-900/50 border border-red-700 text-red-300 rounded-md text-sm flex items-start">
 						<AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0"/>
 						<span>{importError}</span>
 					</div>
@@ -682,9 +736,10 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				className="hidden"
 			/>
 			
+			{/* Auto-processing indicator */}
 			{isAutoProcessing && (
-				<div className="mt-2 p-3 bg-blue-50 border border-blue-300 text-blue-700 rounded-md text-sm flex items-start">
-					<svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
+				<div className="mt-2 p-3 bg-blue-900/50 border border-blue-700 text-blue-300 rounded-md text-sm flex items-start">
+					<svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none"
 					     viewBox="0 0 24 24">
 						<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
 						<path className="opacity-75" fill="currentColor"

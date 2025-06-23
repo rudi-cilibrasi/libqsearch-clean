@@ -74,13 +74,8 @@ export const QSearch: React.FC<QSearchProps> = ({
 		if (event.data.action === "treeJSON") {
 			try {
 				const result = JSON.parse(event.data.result);
-				result.nodes = result.nodes.map((node: QTreeNode) => ({
-					...node,
-					label: labelManager.getDisplayLabel(node.label) || ""
-				})) as QTreeResponse;
-				result.nodes.forEach((node: QTreeNode) => {
-					console.log("node id: " + node.label + ", display name: " + labelManager.getDisplayLabel(node.label));
-				})
+				// Store the raw tree result - don't process labels here
+				// Let the QSearchTree3D component handle label display using labelManager
 				setQSearchTreeResult(result);
 			} catch (error) {
 				console.error("Error processing QSearch result:", error);
@@ -124,9 +119,31 @@ export const QSearch: React.FC<QSearchProps> = ({
 		try {
 			setIsLoading(true);
 			setErrorMsg("");
-			labels.forEach((label) => {
-				labelManager.registerLabel(label);
-			})
+			
+			// Only clear mappings if we detect this is a new calculation with different labels
+			// This preserves animal names from FASTA search selections
+			const existingLabels = Array.from(labelManager.getAllMappings().keys());
+			const hasNewLabels = input.labels.some(label => !existingLabels.includes(label));
+			const hasFewerLabels = input.labels.length < existingLabels.length;
+			
+			if (hasNewLabels || hasFewerLabels) {
+				console.log("Clearing label mappings for new calculation");
+				labelManager.clear();
+			} else {
+				console.log("Preserving existing label mappings");
+			}
+			
+			// Register all input labels with themselves as display labels
+			input.labels.forEach((label) => {
+				// Only register if no mapping exists yet (preserves enhanced labels from matrix import)
+				const existingMapping = labelManager.getDisplayLabel(label);
+				if (!existingMapping) {
+					labelManager.registerLabel(label, label);
+					console.log(`Registered label: ${label} → ${label}`);
+				} else {
+					console.log(`Preserved existing label mapping: ${label} → ${existingMapping}`);
+				}
+			});
 			
 			// Detect if this is imported matrix data by checking content format
 			const isImportedMatrix = input.contents.some(content => {
@@ -141,17 +158,25 @@ export const QSearch: React.FC<QSearchProps> = ({
 			if (isImportedMatrix) {
 				console.log("Processing imported matrix data without compression");
 				
-				// For imported matrices, we need to explicitly register each label
-				// with itself as the display label
+				// For imported matrices, preserve existing enhanced labels and only add sanitized mappings if needed
 				input.labels.forEach((label) => {
-					console.log(`Registering imported matrix label: ${label}`);
-					labelManager.registerLabel(label, label);
+					const existingMapping = labelManager.getDisplayLabel(label);
 					
-					// Also register a sanitized version mapping back to the original
+					if (existingMapping && existingMapping !== label) {
+						// Enhanced mapping already exists, preserve it
+						console.log(`Preserved enhanced mapping: ${label} → ${existingMapping}`);
+					} else {
+						// No enhanced mapping, register with itself
+						labelManager.registerLabel(label, label);
+						console.log(`Registered original: ${label} → ${label}`);
+					}
+					
+					// Also register sanitized version mapping back to the display label (or original)
 					const sanitized = labelManager.sanitizeForQSearch(label);
 					if (sanitized !== label) {
-						console.log(`Also registering sanitized version: ${sanitized} → ${label}`);
-						labelManager.registerLabel(sanitized, label);
+						const displayLabel = existingMapping || label;
+						labelManager.registerLabel(sanitized, displayLabel);
+						console.log(`Registered sanitized: ${sanitized} → ${displayLabel}`);
 					}
 				});
 				
@@ -414,68 +439,78 @@ export const QSearch: React.FC<QSearchProps> = ({
 				setOpenLogin={setOpenLogin}
 				setAuthenticated={setAuthenticated}
 			/>
-			<div className="max-w-7xl mx-auto px-4 py-8">
-				<ListEditor
-					qTreeResponse={qSearchTreeResult}
-					onComputedNcdInput={onNcdInput}
-					labelMapRef={labelMapRef}
-					setLabelMap={setLabelMap}
-					setIsLoading={setIsLoading}
-					resetDisplay={resetDisplay}
-					setOpenLogin={setOpenLogin}
-					authenticated={authenticated}
-				/>
-				
-				{/* Loading state */}
-				{isLoading && (
-					<div className="flex items-center gap-2 text-slate-600 my-4">
-						{compressionInfo && (
-							<span>
-                Computing result using {compressionInfo.algorithm.toUpperCase()}
-								...
-              </span>
-						)}
-						<NCDProgress stats={compressionStats}/>
-					</div>
-				)}
-				
-				{/* Error state */}
-				{errorMsg && <div className="text-red-600 my-4">{errorMsg}</div>}
-				
-				{/* Results */}
-				{!isLoading && hasMatrix && labels.length > 0 && ncdMatrix.length > 0 && (
-					<KGridVisualization
-						labelManager={labelManager}
-						objects={gridObjects}
-						maxIterations={100000}
-						onOptimizationStart={handleOptimizationStart}
-						onOptimizationEnd={handleOptimizationEnd}
-						onIterationUpdate={handleIterationUpdate}
-						qSearchTreeResult={qSearchTreeResult}
-						autoStart={true}
-						totalExecutionTime={totalExecutionTime || undefined}
-						iterationsPerSecond={iterationsPerSecond || undefined}
-						ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
+			<div className="w-full min-h-screen bg-gray-950">
+				<div className="w-full max-w-none xl:max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+					<ListEditor
+						qTreeResponse={qSearchTreeResult}
+						onComputedNcdInput={onNcdInput}
+						labelMapRef={labelMapRef}
+						setLabelMap={setLabelMap}
+						setIsLoading={setIsLoading}
+						resetDisplay={resetDisplay}
+						setOpenLogin={setOpenLogin}
+						authenticated={authenticated}
 					/>
-				)}
-				
-				{/* Compression info */}
-				{compressionInfo && !isLoading && (
-					<div className="mt-2 mb-4 flex items-center justify-center gap-2 text-sm">
-						<div
-							className={`px-3 py-1 rounded-full ${
-								compressionInfo.algorithm === "zstd"
-									? "bg-blue-100 text-blue-700"
-									: compressionInfo.algorithm === "lzma"
-										? "bg-purple-100 text-purple-700"
-										: "bg-green-100 text-green-700"
-							}`}
-						>
-							{compressionInfo.algorithm.toUpperCase()}
+					
+					{/* Loading state */}
+					{isLoading && (
+						<div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 text-slate-300 my-4 p-4 bg-gray-800 border border-gray-700 rounded-lg shadow-sm">
+							{compressionInfo && (
+								<span className="text-sm sm:text-base text-gray-200">
+	                Computing result using {compressionInfo.algorithm.toUpperCase()}
+									...
+	              </span>
+							)}
+							<NCDProgress stats={compressionStats}/>
 						</div>
-						<span className="text-gray-600">{compressionInfo.reason}</span>
-					</div>
-				)}
+					)}
+					
+					{/* Error state */}
+					{errorMsg && (
+						<div className="text-red-300 my-4 p-4 bg-red-900/50 border border-red-700 rounded-lg text-sm sm:text-base">
+							{errorMsg}
+						</div>
+					)}
+					
+					{/* Results */}
+					{!isLoading && hasMatrix && labels.length > 0 && ncdMatrix.length > 0 && (
+						<div className="mt-6">
+							<KGridVisualization
+								labelManager={labelManager}
+								objects={gridObjects}
+								maxIterations={100000}
+								onOptimizationStart={handleOptimizationStart}
+								onOptimizationEnd={handleOptimizationEnd}
+								onIterationUpdate={handleIterationUpdate}
+								qSearchTreeResult={qSearchTreeResult}
+								autoStart={true}
+								totalExecutionTime={totalExecutionTime || undefined}
+								iterationsPerSecond={iterationsPerSecond || undefined}
+								ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
+							/>
+						</div>
+					)}
+					
+					{/* Compression info */}
+					{compressionInfo && !isLoading && (
+						<div className="mt-2 mb-4 flex flex-col sm:flex-row items-center justify-center gap-2 text-sm p-4 bg-gray-800 border border-gray-700 rounded-lg shadow-sm">
+							<div
+								className={`px-3 py-1 rounded-full text-xs sm:text-sm ${
+									compressionInfo.algorithm === "zstd"
+										? "bg-blue-900/50 text-blue-300 border border-blue-700"
+										: compressionInfo.algorithm === "lzma"
+											? "bg-purple-900/50 text-purple-300 border border-purple-700"
+											: "bg-green-900/50 text-green-300 border border-green-700"
+								}`}
+							>
+								{compressionInfo.algorithm.toUpperCase()}
+							</div>
+							<span className="text-gray-300 text-center sm:text-left text-xs sm:text-sm">
+								{compressionInfo.reason}
+							</span>
+						</div>
+					)}
+				</div>
 			</div>
 		</>
 	);

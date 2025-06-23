@@ -55,15 +55,15 @@ export const Language: React.FC<LanguageProps> = ({
             </div>
 
             {/* Information Box - Styled similarly to FileUpload */}
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
                 <div className="flex items-start gap-2">
-                    <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <Info className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
                     <div className="space-y-2">
                         <div>
-                            <h3 className="text-blue-800 font-medium text-sm">
+                            <h3 className="text-blue-300 font-medium text-sm">
                                 Explore Language Relationships! ✨
                             </h3>
-                            <p className="text-blue-700 text-xs mt-1 leading-relaxed">
+                            <p className="text-blue-200 text-xs mt-1 leading-relaxed">
                                 Using the Universal Declaration of Human Rights (UDHR), discover how
                                 languages relate to each other. Select at least {MIN_ITEMS} languages
                                 to generate a meaningful visualization.
@@ -88,11 +88,11 @@ export const Language: React.FC<LanguageProps> = ({
                                     className={`flex justify-between items-center p-4 rounded-lg cursor-pointer transition-all
                                         ${
                                         isItemSelected(lang.id)
-                                            ? "bg-blue-50 border border-blue-200"
-                                            : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                                            ? "bg-blue-600/20 border border-blue-500"
+                                            : "bg-gray-700 border border-gray-600 hover:bg-gray-650 hover:border-gray-500"
                                     }`}
                                 >
-                                    <span className="text-gray-700">{lang.label}</span>
+                                    <span className="text-gray-200">{lang.label}</span>
                                     <ChevronRight size={20} className="text-gray-400" />
                                 </div>
                             ))}

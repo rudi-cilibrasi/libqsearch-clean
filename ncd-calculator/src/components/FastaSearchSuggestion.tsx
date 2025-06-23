@@ -400,13 +400,13 @@ export const FastaSearchSuggestion = ({
   
   return (
     <div className={`w-full ${className}`}>
-      <div className="rounded-lg border shadow-md bg-white">
+      <div className="rounded-lg border border-gray-600 shadow-md bg-gray-800">
         <div>
-          <div className="p-2 border-b">
-            <div className="flex items-center gap-2 text-sm text-gray-700 px-2">
+          <div className="p-2 border-b border-gray-600">
+            <div className="flex items-center gap-2 text-sm text-gray-200 px-2">
               <Search className="h-4 w-4" />
               <span>Suggestions</span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-400">
                 (
                 {displayMode === "common"
                   ? "Common Names"
@@ -442,23 +442,23 @@ export const FastaSearchSuggestion = ({
                   <div
                     key={`suggestion-${suggestionId || index}`}
                     onClick={() => handleSuggestionSelect(suggestion)}
-                    className="p-3 hover:bg-gray-100 cursor-pointer transition-colors"
+                    className="p-3 hover:bg-gray-700 cursor-pointer transition-colors"
                   >
                     <div className="flex justify-between items-center group">
                       <div className="flex items-center gap-2">
                         {getIcon(displayMode)}
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-gray-100">
                           {currentLabel}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-gray-700">
+                      <div className="flex items-center gap-2 text-gray-300">
                         <Tag className="h-4 w-4" />
                         <span className="text-xs">{suggestionType}</span>
                         <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2 text-sm text-gray-600 italic ml-6 mt-1">
+                    <div className="flex items-center gap-2 text-sm text-gray-400 italic ml-6 mt-1">
                       <Info className="h-3 w-3" />
                       <span>
                         {displayMode === "common"
@@ -472,7 +472,7 @@ export const FastaSearchSuggestion = ({
                     {Array.isArray(additionalCommonNames) &&
                       additionalCommonNames.length > 0 &&
                       displayMode !== "accession" && (
-                        <div className="flex gap-2 text-xs text-gray-600 mt-1 ml-6">
+                        <div className="flex gap-2 text-xs text-gray-400 mt-1 ml-6">
                           <Tag className="h-3 w-3" />
                           <span>
                           Also known as:{" "}

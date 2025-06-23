@@ -203,6 +203,33 @@ export class LabelManager {
 	}
 	
 	/**
+	 * Get all mappings for advanced label resolution
+	 */
+	public getAllMappings(): Map<string, string> {
+		return new Map(this.idToDisplayLabel);
+	}
+
+	/**
+	 * Find display label by trying multiple strategies
+	 */
+	public findDisplayLabel(label: string): string {
+		// Strategy 1: Direct lookup
+		const direct = this.getDisplayLabel(label);
+		if (direct) return direct;
+		
+		// Strategy 2: Check if label is a sanitized version of a registered ID
+		for (const [id, display] of this.idToDisplayLabel) {
+			const sanitized = this.sanitizeForQSearch(id);
+			if (sanitized === label) {
+				return display;
+			}
+		}
+		
+		// Strategy 3: Fallback to original label
+		return label;
+	}
+
+	/**
 	 * Log all mappings for debugging
 	 */
 	public logMappings(): void {

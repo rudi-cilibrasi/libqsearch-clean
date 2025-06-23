@@ -209,41 +209,47 @@ const Header: React.FC<HeaderProps> = ({
       isScrolled ? 'bg-gray-900/95 backdrop-blur-sm shadow-lg py-2' : 'bg-transparent py-4'
     }`}>
       <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
-        <div className="flex items-center">
-          <Activity className="h-6 w-6 text-blue-400 mr-2" />
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+        <div className="flex items-center flex-shrink-0">
+          <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-blue-400 mr-2" />
+          <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
             NCD Calculator
           </h1>
         </div>
         
-        <div className="flex items-center gap-4">
-          <a href="/about" className="text-gray-300 hover:text-white transition-colors hidden md:block">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <a href="/about" className="text-gray-300 hover:text-white transition-colors hidden sm:block text-sm sm:text-base">
             About Us
           </a>
           
           {isLoading ? (
             // Loading state
-            <div className="px-5 py-2 bg-gray-700 rounded-lg text-gray-300">
+            <div className="px-3 sm:px-5 py-2 bg-gray-700 rounded-lg text-gray-300 text-sm sm:text-base">
               <span className="animate-pulse">Loading...</span>
             </div>
           ) : !userName ? (
             // Not logged in state
             <button
               onClick={openModal}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white transition-colors"
+              className="px-3 sm:px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white transition-colors text-sm sm:text-base"
             >
               Login
             </button>
           ) : (
             // Logged in state
-            <div className="flex items-center space-x-4">
-              <span className="text-white hidden md:inline-flex items-center">
-                <span className="bg-blue-500/20 px-3 py-1 rounded-full text-blue-300">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <span className="text-white hidden sm:inline-flex items-center">
+                <span className="bg-blue-500/20 px-2 sm:px-3 py-1 rounded-full text-blue-300 text-sm">
                   {userName}
                 </span>
               </span>
+              {/* Mobile: Show just initials */}
+              <span className="text-white sm:hidden">
+                <span className="bg-blue-500/20 w-8 h-8 rounded-full flex items-center justify-center text-blue-300 text-sm font-bold">
+                  {userName ? userName.charAt(0).toUpperCase() : 'U'}
+                </span>
+              </span>
               <button
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors"
+                className="px-3 sm:px-5 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors text-sm sm:text-base"
                 onClick={handleLogout}
               >
                 Logout
@@ -255,8 +261,8 @@ const Header: React.FC<HeaderProps> = ({
       
       {/* Error notification if needed */}
       {error && (
-        <div className="fixed top-20 right-4 bg-red-500/90 text-white px-4 py-2 rounded shadow-lg z-50 flex items-center">
-          <span>{error}</span>
+        <div className="fixed top-16 sm:top-20 right-4 bg-red-500/90 text-white px-4 py-2 rounded shadow-lg z-50 flex items-center max-w-xs sm:max-w-sm">
+          <span className="text-sm">{error}</span>
           <button
             onClick={() => setError(null)}
             className="ml-3 text-white hover:text-gray-200"
@@ -269,16 +275,16 @@ const Header: React.FC<HeaderProps> = ({
       {/* Login Modal with error handling */}
       {openLogin && (
         <div
-          className="fixed z-50 inset-0 flex justify-center items-center bg-black bg-opacity-50 backdrop-blur-sm"
+          className="fixed z-50 inset-0 flex justify-center items-center bg-black bg-opacity-50 backdrop-blur-sm px-4"
           onClick={closeModal}
         >
           <div
-            className="bg-gray-800 p-8 rounded-lg w-80 border border-gray-700 shadow-xl"
+            className="bg-gray-800 p-6 sm:p-8 rounded-lg w-full max-w-sm sm:w-80 border border-gray-700 shadow-xl"
             onClick={(e: React.MouseEvent<HTMLDivElement>) =>
               e.stopPropagation()
             }
           >
-            <h2 className="text-center text-xl font-semibold mb-6 text-white">
+            <h2 className="text-center text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-white">
               Login to Continue
             </h2>
             {error && (
@@ -286,13 +292,13 @@ const Header: React.FC<HeaderProps> = ({
                 {error}
               </div>
             )}
-            <div className="flex flex-col items-center space-y-4">
+            <div className="flex flex-col items-center space-y-3 sm:space-y-4">
               <button
-                className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg w-full transition-colors flex items-center justify-center"
+                className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg w-full transition-colors flex items-center justify-center text-sm sm:text-base"
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
               >
-                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" viewBox="0 0 24 24">
                   <path
                     fill="currentColor"
                     d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"
@@ -301,11 +307,11 @@ const Header: React.FC<HeaderProps> = ({
                 Login with Google
               </button>
               <button
-                className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg w-full transition-colors flex items-center justify-center"
+                className="bg-gray-900 hover:bg-gray-800 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg w-full transition-colors flex items-center justify-center text-sm sm:text-base"
                 onClick={handleGithubLogin}
                 disabled={isLoading}
               >
-                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" viewBox="0 0 24 24">
                   <path
                     fill="currentColor"
                     d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"

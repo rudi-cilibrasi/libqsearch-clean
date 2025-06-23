@@ -268,35 +268,11 @@ Module({
 						// Ensure the tree JSON is valid and has all necessary fields
 						const validTreeJSON = ensureValidTreeJSON(treeJSON, labels);
 						
-						// Get LabelManager instance
-						const labelManager = LabelManager.getInstance();
-						
-						// Log the labels being used for processing
-						self.postMessage({
-							action: "consoleLog",
-							message: "Processing tree with labels: " + JSON.stringify(labels)
-						} as ConsoleMessage);
-						
-						// Before processing, register all labels if they're not already registered
-						// This is important for imported matrices with special characters
-						labels.forEach(label => {
-							if (!labelManager.getDisplayLabel(label)) {
-								labelManager.registerLabel(label, label);
-								
-								self.postMessage({
-									action: "consoleLog",
-									message: `Registered label: ${label}`
-								} as ConsoleMessage);
-							}
-						});
-						
-						// Process the tree, replacing internal labels with display labels
-						const processedTreeJSON = labelManager.processTreeJSON(validTreeJSON, labels);
-						
-						// Send the processed tree JSON to the main thread
+						// Send the raw tree JSON to the main thread for label processing
+						// The main thread has the correct label mappings
 						self.postMessage({
 							action: "treeJSON",
-							result: processedTreeJSON,
+							result: validTreeJSON,
 						} as TreeJSONMessage);
 					} catch (error) {
 						self.postMessage({
@@ -307,7 +283,7 @@ Module({
 						// If processing fails, send the original tree JSON
 						self.postMessage({
 							action: "treeJSON",
-							result: validTreeJSON,
+							result: treeJSON,
 						} as TreeJSONMessage);
 					}
 				};

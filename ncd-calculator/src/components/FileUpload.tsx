@@ -212,7 +212,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
     if (selectedCompression === "auto") {
       return (
-          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">
+          <span className="bg-blue-900/50 text-blue-300 border border-blue-700 px-2 py-0.5 rounded-full text-xs">
           Auto-selected
         </span>
       );
@@ -220,7 +220,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
     if (selectedCompression !== effectiveAlgorithm.algorithm) {
       return (
-          <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs">
+          <span className="bg-yellow-900/50 text-yellow-300 border border-yellow-700 px-2 py-0.5 rounded-full text-xs">
           Switched to {effectiveAlgorithm.algorithm.toUpperCase()}
         </span>
       );
@@ -232,10 +232,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   return (
       <div className="min-h-0 flex flex-col p-4 gap-4">
         {/* Compression Settings Section */}
-        <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="p-4 bg-gray-700 rounded-lg border border-gray-600 shadow-sm">
           <div className="flex items-center gap-2 mb-2">
-            <Files className="h-5 w-5 text-gray-600" />
-            <label className="font-medium text-gray-700 text-sm">
+            <Files className="h-5 w-5 text-gray-300" />
+            <label className="font-medium text-gray-200 text-sm">
               NCD Compression Settings
             </label>
           </div>
@@ -244,10 +244,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({
               onChange={(e) =>
                   setSelectedCompression(e.target.value as CompressionAlgorithm | "auto")
               }
-              className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-700"
+              className="w-full p-2 border border-gray-500 rounded-lg text-sm bg-gray-600 text-gray-200"
           >
             {availableAlgorithms.map((algo) => (
-                <option key={algo.value} value={algo.value}>
+                <option key={algo.value} value={algo.value} className="bg-gray-600 text-gray-200">
                   {algo.label} - {algo.description}
                 </option>
             ))}
@@ -256,9 +256,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
         {/* Error Message Section */}
         {sizeError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{sizeError}</p>
+            <div className="p-3 bg-red-900/50 border border-red-700 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-300">{sizeError}</p>
             </div>
         )}
 
@@ -267,50 +267,50 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           <div
               className={`border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center p-6 min-h-[400px]
             ${isDragging
-                  ? "border-blue-400 bg-blue-50"
-                  : "border-gray-300 hover:border-blue-300 hover:bg-gray-50"
+                  ? "border-blue-400 bg-blue-900/20"
+                  : "border-gray-500 hover:border-blue-400 hover:bg-gray-700/50"
               }
-            ${sizeError ? "border-red-300" : ""}`}
+            ${sizeError ? "border-red-400" : ""}`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
           >
             {/* Information Box */}
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4 max-w-lg">
+            <div className="p-3 bg-blue-900/30 border border-blue-700 rounded-lg mb-4 max-w-lg">
               <div className="flex items-start gap-2">
-                <FileSearch className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <FileSearch className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
                 <div className="space-y-2">
                   <div>
-                    <h3 className="text-blue-800 font-medium text-sm">
+                    <h3 className="text-blue-300 font-medium text-sm">
                       Discover File Similarities! ✨
                     </h3>
-                    <p className="text-blue-700 text-xs mt-1 leading-relaxed">
+                    <p className="text-blue-200 text-xs mt-1 leading-relaxed">
                       Upload any files and watch as we reveal their hidden connections.
                       Perfect for:
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 gap-1.5">
-                    <div className="flex items-center gap-1.5 text-xs text-blue-700">
+                    <div className="flex items-center gap-1.5 text-xs text-blue-200">
                       <FileText className="h-3.5 w-3.5" />
                       Text & Documents - Compare versions or find patterns
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-blue-700">
+                    <div className="flex items-center gap-1.5 text-xs text-blue-200">
                       <FileCode className="h-3.5 w-3.5" />
                       Source Code - Detect similar implementations
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-blue-700">
+                    <div className="flex items-center gap-1.5 text-xs text-blue-200">
                       <FileDigit className="h-3.5 w-3.5" />
                       Research Data - Analyze relationships
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-blue-700">
+                    <div className="flex items-center gap-1.5 text-xs text-blue-200">
                       <FileAudio className="h-3.5 w-3.5" />
                       Media Files - Find similar content
                     </div>
                   </div>
 
                   {effectiveAlgorithm && (
-                      <div className="flex items-center gap-2 pt-1 text-xs font-medium text-blue-700">
+                      <div className="flex items-center gap-2 pt-1 text-xs font-medium text-blue-200">
                         <Info className="h-3.5 w-3.5" />
                         Using: {effectiveAlgorithm.algorithm.toUpperCase()}
                         {getStatusBadge()}
@@ -323,15 +323,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             {/* Upload Controls */}
             <Upload
                 className={`h-10 w-10 mb-3 ${
-                    isDragging ? "text-blue-500" : "text-gray-400"
+                    isDragging ? "text-blue-400" : "text-gray-400"
                 }`}
             />
-            <p className="text-center mb-3 text-gray-600 text-sm">
+            <p className="text-center mb-3 text-gray-300 text-sm">
               Drag and drop your files here
             </p>
 
             <label className="cursor-pointer">
-              <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors inline-flex items-center gap-2">
+              <div className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2">
                 <Upload className="h-4 w-4" />
                 Browse Files
               </div>
@@ -345,7 +345,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
             {/* Size Limit Information */}
             <div className="mt-3 text-center space-y-1">
-              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
                 <Info className="h-3.5 w-3.5" />
                 <span>Max combined size: 128MB</span>
               </div>
