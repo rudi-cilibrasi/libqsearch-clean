@@ -266,7 +266,13 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                 {hasTreeData() ? (
                     <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
                         {qSearchTreeResult &&
-                            <QSearchTree3D data={qSearchTreeResult} darkThemeOnly={true} labelManager={labelManager}/>
+                            <QSearchTree3D 
+                                data={qSearchTreeResult} 
+                                darkThemeOnly={true} 
+                                labelManager={labelManager}
+                                ncdMatrix={ncdMatrixResponse.ncdMatrix}
+                                labels={ncdMatrixResponse.labels}
+                            />
                         }
                     </div>
                 ) : (
