@@ -1,3 +1,17 @@
+/**
+ * @module components/QSearch
+ *
+ * Main NCD calculator page component. Orchestrates the full pipeline:
+ * 1. Receives user input (labels + contents) from ListEditor
+ * 2. Dispatches compression to CompressionService (which manages web workers)
+ * 3. Collects the NCD matrix and tracks compression progress
+ * 4. Sends the matrix to the QSearch WASM worker for quartet tree construction
+ * 5. Feeds results to tree visualization (3D/DOT) and KGrid visualization
+ *
+ * This is the central coordination point — it does not compute NCD itself,
+ * but wires together all the services and workers.
+ */
+
 import React, {useEffect, useRef, useState} from "react";
 // @ts-ignore
 import QSearchWorker from "../workers/qsearchWorker.js?worker";

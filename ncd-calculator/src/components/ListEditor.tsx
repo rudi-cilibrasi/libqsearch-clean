@@ -1,3 +1,16 @@
+/**
+ * @module components/ListEditor
+ *
+ * Input management component for the NCD calculator. Provides three input modes:
+ * - **FASTA Search** — Search NCBI GenBank for DNA/protein sequences by accession or name
+ * - **File Upload** — Drag-and-drop or browse for local files (any format)
+ * - **Languages** — Select UDHR (Universal Declaration of Human Rights) translations
+ *
+ * Manages the list of selected items, handles content resolution (e.g., fetching
+ * FASTA sequences from GenBank), and triggers NCD computation by passing
+ * { labels[], contents[] } up to the parent QSearch component.
+ */
+
 import React, {useEffect, useRef, useState} from "react";
 import {AlertCircle, Dna, Download, FileType2, Globe2, Upload} from "lucide-react";
 import {getTranslationResponse} from "../functions/udhr";

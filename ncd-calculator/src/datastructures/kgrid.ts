@@ -1,3 +1,21 @@
+/**
+ * @module datastructures/kgrid
+ *
+ * Grid-based NCD visualization using simulated annealing optimization.
+ * Arranges items on a 2D toroidal grid (wraps around edges) so that
+ * similar items (low NCD) are placed adjacent to each other.
+ *
+ * Key concepts:
+ * - **GridState** — The grid layout, NCD matrix, and objective value
+ * - **Objective function** — Sum of NCD values between adjacent cells, weighted
+ *   by a position-dependent factor matrix to break symmetry
+ * - **Simulated annealing** — Probabilistically accepts worse swaps at high
+ *   temperature, converging to local optima as temperature decreases
+ * - **Connectivity constraint** — Non-empty cells must remain connected (BFS check)
+ *
+ * Also includes a standalone `calculateNCD` using pako/gzip for quick comparisons.
+ */
+
 import {deflate} from "pako";
 import {NCDMatrixResponse} from "@/types/ncd.d.ts";
 

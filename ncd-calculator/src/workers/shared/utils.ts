@@ -1,8 +1,37 @@
+/**
+ * @module workers/shared/utils
+ *
+ * Core NCD (Normalized Compression Distance) math utilities shared across
+ * compression web workers. This module provides:
+ * - Text encoding helpers for concatenating string pairs before compression
+ * - CRC32 hashing for content-addressable compression caching
+ * - The NCD formula: NCD(x,y) = (C(xy) - min(C(x), C(y))) / max(C(x), C(y))
+ * - Cache lookup logic for skipping already-computed compression pairs
+ * - A generic chunk processor that drives the pairwise NCD computation loop
+ *
+ * Used by lzmaWorker.ts and zstdWorker.ts.
+ */
+
+/**
+ * Encode a string to a UTF-8 byte array.
+ *
+ * @param text - The string to encode
+ * @returns UTF-8 encoded bytes
+ */
 export function encodeText(text: string): Uint8Array {
     return new TextEncoder().encode(text);
 }
 
 
+/**
+ * Concatenate two strings with a delimiter for pairwise compression.
+ * The delimiter `\n###\n` separates the two inputs so the compressor
+ * can detect shared information between them.
+ *
+ * @param str1 - First input string
+ * @param str2 - Second input string
+ * @returns Concatenated byte array: [str1] + delimiter + [str2]
+ */
 export async function getPairFileConcatenated(str1: string, str2: string): Promise<Uint8Array> {
     const encoded1 = encodeText(str1);
     const encoded2 = encodeText(str2);
@@ -14,6 +43,11 @@ export async function getPairFileConcatenated(str1: string, str2: string): Promi
     return combinedArray;
 }
 
+/**
+ * Generate the CRC32 lookup table using the standard polynomial 0xEDB88320.
+ *
+ * @returns 256-entry lookup table for CRC32 computation
+ */
 export function getCRC32GeneratedTable(): Uint32Array {
     const table = new Uint32Array(256);
     for (let i = 0; i < 256; i++) {
@@ -26,6 +60,13 @@ export function getCRC32GeneratedTable(): Uint32Array {
     return table;
 }
 
+/**
+ * Compute a CRC32 checksum of binary data, returned as an 8-character hex string.
+ * Used as a content-addressable key for caching compression results.
+ *
+ * @param data - Binary data to hash
+ * @returns 8-character lowercase hex string (e.g., "a1b2c3d4")
+ */
 export function calculateCRC32(data: Uint8Array): string {
     const table = getCRC32GeneratedTable();
     let crc = 0xFFFFFFFF;
@@ -35,6 +76,18 @@ export function calculateCRC32(data: Uint8Array): string {
     return (~crc >>> 0).toString(16).padStart(8, '0');
 }
 
+/**
+ * Calculate the Normalized Compression Distance from pre-computed compressed sizes.
+ *
+ * Formula: NCD(x,y) = (C(xy) - min(C(x), C(y))) / max(C(x), C(y))
+ *
+ * Result is clamped to [0, 1]. Returns 1 on invalid input sizes.
+ *
+ * @param sizeX - Compressed size of input x alone
+ * @param sizeY - Compressed size of input y alone
+ * @param sizeXY - Compressed size of x concatenated with y
+ * @returns NCD value between 0 (identical) and 1 (maximally different)
+ */
 export function calculateNCD(sizeX: number, sizeY: number, sizeXY: number): number {
     if (!isValidCompressionSize(sizeX) || !isValidCompressionSize(sizeY) || !isValidCompressionSize(sizeXY)) {
         console.error('Invalid compressed sizes:', { sizeX, sizeY, sizeXY });
@@ -46,10 +99,21 @@ export function calculateNCD(sizeX: number, sizeY: number, sizeXY: number): numb
     return Math.min(Math.max(numerator / denominator, 0), 1);
 }
 
+/** Check that a compressed size is non-negative (valid). */
 export function isValidCompressionSize(size: number) {
     return size >= 0;
 }
 
+/**
+ * Look up cached individual and pairwise compressed sizes for a content pair.
+ * Cache keys are `{algorithm}:{crc32}` for singles and `{algorithm}:{crc1}-{crc2}` for pairs.
+ *
+ * @param content1 - First input string
+ * @param content2 - Second input string
+ * @param algorithm - Compression algorithm name (e.g., "lzma", "zstd")
+ * @param cachedSizes - Map of cache keys to compressed sizes
+ * @returns Cached sizes if all three are found, or null if any is missing
+ */
 export function getCachedSizes(
     content1: string,
     content2: string,
@@ -77,7 +141,23 @@ export function getCachedSizes(
     return { size1, size2, combinedSize, key1: crc1, key2: crc2 };
 }
 
-// Shared worker helper that processes chunks of data
+/**
+ * Process a chunk of pairwise NCD computations within a web worker.
+ * Iterates over pairs (i, j) where startI ≤ i < endI and i ≤ j < n,
+ * computing NCD for each pair either from cache or by compressing.
+ * Sends progress messages back to the main thread via `self.postMessage`.
+ *
+ * @param startI - Starting row index (inclusive)
+ * @param endI - Ending row index (exclusive)
+ * @param n - Total number of items
+ * @param contents - Array of input strings
+ * @param singleCompressedSizes - Pre-computed compressed sizes for each individual input
+ * @param algorithm - Compression algorithm name
+ * @param cachedSizes - Optional cache of previously computed sizes
+ * @param compressPair - Function to compress a concatenated pair and return its size
+ * @param self - The worker's global scope for posting messages
+ * @returns Array of results with NCD values and metadata for each pair
+ */
 export async function processChunk(
     startI: number,
     endI: number,
