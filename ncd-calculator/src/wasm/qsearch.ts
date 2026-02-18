@@ -1,3 +1,21 @@
+/**
+ * @module wasm/qsearch
+ *
+ * Emscripten-compiled WebAssembly module for the QSearch quartet tree algorithm.
+ * This is auto-generated code from a C++ implementation — do not edit manually.
+ *
+ * Exports a `run_qsearch(matrixStr, dim)` function that takes a space-separated
+ * NCD distance matrix and returns a JSON tree structure with nodes and connections.
+ *
+ * The QSearch algorithm finds optimal unrooted quartet trees by:
+ * 1. Starting with a random tree topology
+ * 2. Iteratively improving via subtree transfer and interchange mutations
+ * 3. Scoring trees against the NCD distance matrix
+ * 4. Returning the best tree found as a JSON object
+ *
+ * Called from qsearchWorker.ts, which wraps the WASM module in a web worker.
+ */
+
 import React from 'react'
 var Module = (() => {
   var _scriptName = import.meta.url;

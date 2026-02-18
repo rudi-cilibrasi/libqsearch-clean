@@ -1,3 +1,18 @@
+/**
+ * @module functions/fasta
+ *
+ * FASTA format parser and validator. FASTA is a standard bioinformatics format
+ * for representing nucleotide or protein sequences. Each sequence has an optional
+ * header line starting with `>` followed by metadata (accession, species name),
+ * then one or more lines of sequence data (DNA: ATCG, RNA: AUCG, Protein: amino acids).
+ *
+ * This module handles:
+ * - Parsing single and multi-sequence FASTA content
+ * - Extracting metadata (accession, scientific name, common name) from headers
+ * - Validating sequences (DNA, RNA, and protein alphabets)
+ * - Converting uploaded files into labeled items for the NCD pipeline
+ */
+
 import { parseAccessionAndRemoveVersion } from "../cache/cache.ts";
 import { FILE_UPLOAD } from "../constants/modalConstants.js";
 import { SelectedItem } from '../components/InputHolder.tsx';
@@ -11,6 +26,7 @@ export interface FastaMetadata {
 }
 
 
+/** Check if content starts with a FASTA header line (begins with `>`). */
 export const hasMetadata = (content: string): boolean => {
   if (!content || content.trim() === "") {
     return false;
@@ -48,6 +64,13 @@ export const parseMultipleMetadata = (content: string): FastaMetadata[] => {
   });
 };
 
+/**
+ * Parse multi-sequence FASTA content into an array of metadata + sequence objects.
+ * Each entry starts at a `>` header line and continues until the next header or EOF.
+ *
+ * @param content - Raw FASTA-formatted string (may contain multiple sequences)
+ * @returns Array of parsed sequences with accession, names, and sequence data
+ */
 export const parseFasta = (content: string): FastaMetadata[] => {
   if (!content?.trim()) {
     return [];
@@ -89,6 +112,13 @@ export const parseFasta = (content: string): FastaMetadata[] => {
   }
   return sequences;
 };
+/**
+ * Parse metadata from a single FASTA header line.
+ * Expected format: `>ACCESSION Scientific name (Common name), ...`
+ *
+ * @param content - String starting with a `>` header line
+ * @returns Parsed metadata or empty object if no header found
+ */
 export const parseMetadata = (content: string): FastaMetadata | {} => {
   if (!hasMetadata(content)) {
     return { };
@@ -175,6 +205,10 @@ export const isValidFastaSequenceWithoutHeader = (content: string): boolean => {
   return validSequence(content);
 };
 
+/**
+ * Validate that content is a valid biological sequence (DNA, RNA, or protein).
+ * Checks against standard alphabets after stripping whitespace.
+ */
 export const validSequence = (content: string): boolean => {
   const cleanContent = content.replace(/\s/g, "");
   const isDna = /^[ATCGNatcgn\s]*$/.test(cleanContent); // DNA
@@ -215,6 +249,14 @@ const isValidFastaWithSequence = (fastaList: FastaMetadata[]): boolean => {
   return true;
 };
 
+/**
+ * Convert a file into a SelectedItem for the NCD input list.
+ * If the file contains FASTA data, extracts the sequence and derives a label
+ * from common name, scientific name, or accession. Otherwise uses the raw content.
+ *
+ * @param fileInfo - File metadata and content
+ * @returns A SelectedItem with label, cleaned content, and type
+ */
 export const getFastaInfoFromFile = (fileInfo: FileInfo): SelectedItem => {
   const content = fileInfo.content;
   let label = fileInfo.name;
