@@ -29,8 +29,6 @@ import {LabelManager} from "@/functions/labelUtils.ts";
 import createGraph from "@/functions/graphExport.ts";
 import {saveAs} from "file-saver";
 import {QTreeResponse} from "@/components/tree";
-import Nodes from "three/src/renderers/common/nodes/Nodes";
-
 export interface SearchMode {
 	searchMode: string;
 }
@@ -190,7 +188,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	const handleExportMatrix = (): void => {
 		
-		const dotFormat = createGraph(qTreeResponse as Nodes, false);
+		const dotFormat = createGraph(qTreeResponse as Parameters<typeof createGraph>[0], false);
 		
 		const blob = new Blob([dotFormat], {type: "text/plain;charset=utf-8"});
 		saveAs(blob, "matrix_structure.dot");
