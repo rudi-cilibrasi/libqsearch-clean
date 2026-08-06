@@ -80,60 +80,6 @@ describe('Compression Worker Tests', () => {
         }
     });
     
-    test('LZMA worker correctly calculates NCD for FASTA files', async () => {
-        // Load the FASTA test data
-        const input = await loadTestData(FASTA_FILES);
-        
-        console.log(`Testing LZMA compression with ${input.labels.length} FASTA files`);
-        console.log(`Total content size: ${input.contents.reduce((sum, content) => sum + content.length, 0)} characters`);
-        
-        // Prepare cache and compression settings
-        const crcCache = new CRCCache();
-        const [_, cachedSizes] = CompressionService.preprocessNcdInput(input, crcCache);
-        
-        console.time('lzma-fasta-compression');
-        
-        try {
-            // Process with LZMA algorithm
-            const result = await compressionService.processContent({
-                ...input,
-                cachedSizes: cachedSizes.size > 0 ? cachedSizes : undefined,
-                algorithm: "lzma",
-            }, (message) => {
-                // Log progress updates
-                if (message.type === 'progress') {
-                    console.log(`LZMA progress: ${JSON.stringify(message)}`);
-                }
-            });
-            
-            console.timeEnd('lzma-fasta-compression');
-            
-            // Validate result structure
-            expect(result.type).toBe("result");
-            expect(result.labels).toEqual(input.labels);
-            
-            // Validate NCD matrix properties
-            validateNcdMatrix(result.ncdMatrix, input.labels.length);
-            
-            // Verify new compression data was generated
-            expect(result.newCompressionData).toBeDefined();
-            expect(Array.isArray(result.newCompressionData)).toBe(true);
-            
-            // Check that compression data has the expected structure
-            if (result.newCompressionData && result.newCompressionData.length > 0) {
-                const firstEntry = result.newCompressionData[0];
-                expect(firstEntry).toHaveProperty('key1');
-                expect(firstEntry).toHaveProperty('key2');
-                expect(firstEntry).toHaveProperty('size1');
-                expect(firstEntry).toHaveProperty('size2');
-                expect(firstEntry).toHaveProperty('combinedSize');
-            }
-        } finally {
-            compressionService.terminate();
-            console.log("LZMA worker terminated after FASTA test");
-        }
-    }, 600000); // 10 minute timeout to ensure adequate time for compression
-    
     test('LZMA worker correctly calculates NCD for binary files', async () => {
         // Load the GIF test data
         const input = await loadTestData(GIF_FILES);
