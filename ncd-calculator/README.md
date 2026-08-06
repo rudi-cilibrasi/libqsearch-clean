@@ -34,6 +34,8 @@ Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__
 
 UDHR translations are retrieved as PDFs through the configured backend proxy. PDF.js uses the worker bundled from the installed `pdfjs-dist` package so the parser and worker versions remain identical after dependency updates; do not replace it with a separately versioned CDN URL.
 
+Compressor-based NCD converges toward its theoretical properties as compressed inputs grow. For very short or extremely periodic inputs, gzip headers, framing, and pair separators can dominate the compressed size and produce a nonzero empirical NCD even for repeated content. Formula tests therefore use synthetic compressed sizes, while compressor integration tests use the realistic mitochondrial fixture. The matrix diagonal remains exactly zero by definition in the worker pipeline.
+
 ## Visual system
 
 The landing page and workbench share a restrained scientific/editorial system: warm paper, dark green structural surfaces, oxide annotations, serif headings, monospace metadata, square controls, and thin rules. Decorative gradients, glow effects, generic cards, and promotional copy are intentionally avoided. The design keeps the NCD equation, comparison set, computation state, and result matrix visually primary.

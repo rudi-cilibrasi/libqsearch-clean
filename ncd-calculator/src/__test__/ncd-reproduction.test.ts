@@ -19,13 +19,21 @@ function gzipCompressedSizePair(a: string, b: string): number {
 }
 
 describe("NCD Reproduction Tests - Issue #25", () => {
-    test("NCD of identical sequences should be 0", () => {
-        const seq = "atcgatcgatcgatcgatcg".repeat(100);
+    test("NCD formula is zero when the pair and individual sizes match", () => {
+        expect(calculateNCD(5_000, 5_000, 5_000)).toBe(0);
+    });
+
+    test("gzip NCD of an identical realistic sequence should be near zero", () => {
+        // A tiny periodic input compresses to only a few dozen bytes, making
+        // gzip framing and the pair separator dominate the NCD. The realistic
+        // fixture keeps that fixed overhead small relative to compressed data.
+        const [seq] = getSampleSequenceJson().contents as string[];
         const sizeA = gzipCompressedSize(seq);
         const sizeB = gzipCompressedSize(seq);
         const sizeAB = gzipCompressedSizePair(seq, seq);
         const ncd = calculateNCD(sizeA, sizeB, sizeAB);
         console.log(`Identical: sizeA=${sizeA}, sizeB=${sizeB}, sizeAB=${sizeAB}, NCD=${ncd}`);
+        expect(sizeA).toBe(sizeB);
         expect(ncd).toBeLessThan(0.1);
     });
 
