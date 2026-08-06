@@ -91,9 +91,3 @@ VITE_BACKEND_BASE_URL=https://openscienceresearchpark.com/api \
 VITE_AUTH_ENABLED=false \
 npm run build
 ```
-
-Publish the contents of `ncd-calculator/dist/` at `/ncd/`. GitHub Pages is static hosting, so direct browser visits to `/ncd/calculator`, `/ncd/about`, and `/ncd/error` also need an `index.html` fallback at each route. The portfolio repository at `namvdo.github.io` automates this with `npm run update-ncd`.
-
-The compression, QSearch, and K-Grid pipelines run in the browser. Authentication, Redis caching, and the request proxy require the separately hosted `complearn-genbank` API, whose CORS and OAuth settings must allow the GitHub Pages or custom-domain origin. Keep `VITE_AUTH_ENABLED=false` for a static-only deployment; set it to `true` only after that API configuration is in place.
-
-As of 2026-08-06, the frontend's historical `npm run typecheck` command reports pre-existing strict-type errors, including errors in generated WebAssembly bindings. Until that backlog is resolved, the portfolio deployment script gates this integration on the base-path and landing-page tests plus a successful Vite production build.
