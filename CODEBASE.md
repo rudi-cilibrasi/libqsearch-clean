@@ -109,7 +109,8 @@ ncd-calculator/
 │   └── libs/
 │       └── lzma.ts                # LZMA library wrapper
 └── public/
-    └── qsearch.wasm               # Compiled QSearch WASM binary
+    ├── qsearch.wasm               # Compiled QSearch WASM binary
+    └── udhr/v1/*.txt              # Versioned, integrity-checked UDHR article corpus
 ```
 
 ## Data Flow
@@ -179,6 +180,16 @@ Updated 2026-08-06 (Asia/Ho_Chi_Minh).
 The calculator route begins directly at the source controls and comparison set. `ListEditor.tsx` owns input selection and computation readiness; the source components handle GenBank, UDHR, and local-file acquisition; `InputHolder.tsx` provides a compact accessible object inventory. **Try example data** remains available beside the source selector, while the primary **Show Similarity** action closes the workflow at the bottom right. Long source corpora, including the UDHR language list, scroll within a keyboard-focusable work area instead of extending the page.
 
 `Workbench.css` extends the landing-page visual system across input preparation, progress, and result interpretation. The output viewer retains its algorithm-specific components, but its surrounding controls, status surface, and matrix colors use the shared scientific palette. `src/__test__/workbench.test.tsx` verifies the example-set invariants, minimum-set readiness message, empty state, and accessible item removal.
+
+## UDHR Corpus Pipeline
+
+Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+
+Language comparison no longer parses PDFs in the browser. `scripts/build-udhr-corpus.mjs` reads a pinned Unicode UDHR Project commit, verifies that every configured record is complete and OHCHR-linked, validates the XML structure, and emits one canonical UTF-8 asset per language plus `src/generated/udhr-manifest.json`. The canonical representation contains the body of Articles 1–30, one article per line. This gives every input the same section coverage and removes PDF layout, page-break, font-map, and heading-number artifacts from the compression input.
+
+`src/functions/udhr.ts` lazy-loads selected assets and fails closed unless their UTF-8 length, Unicode code-point count, 30-article structure, NFC form, and SHA-256 digest match the manifest. Concurrent requests for one language share the same promise; successful content is held in memory while immutable assets use normal browser HTTP caching. The retired `udhr_cache` local-storage entry is deleted during storage initialization so old lossy PDF extraction results cannot be reused.
+
+`scripts/verify-udhr-corpus.mjs` performs an offline verification and runs before production builds. Corpus generation, limitations, and update review are detailed in `ncd-calculator/docs/UDHR_CORPUS.md`.
 
 ## How to Run
 

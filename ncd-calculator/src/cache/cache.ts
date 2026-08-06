@@ -1,52 +1,12 @@
 import React from "react";
 import {STORAGE_VERSION, STORAGE_VERSION_NAME} from "@/cache/LocalStorageKeyManager.ts";
 
-export const UDHR_CACHE = "udhr_cache";
-
-export const initCache = () => {
-    initUdhrCacheAndGet();
-}
-
-
-
-const initUdhrCacheAndGet = (): string | null => {
-    const udhrCache = localStorage.getItem(UDHR_CACHE);
-    if (!udhrCache || Object.keys(udhrCache).length === 0) {
-        localStorage.setItem(UDHR_CACHE, JSON.stringify({}));
-    }
-    return localStorage.getItem(UDHR_CACHE);
-}
-
-
 export const parseAccessionAndRemoveVersion = (label: string): string | undefined => {
     if (!label || label === '') {
         return undefined;
     }
     if (label.indexOf(".") === -1) return label;
     return label.split(".")[0].trim().toLowerCase();
-}
-
-
-export const cacheTranslation = (lang: string, content: string): void => {
-    if (!lang || !content || content.trim() === '') {
-        return;
-    }
-    let udhrCache = JSON.parse(localStorage.getItem(UDHR_CACHE) || '{}');
-    if (!udhrCache) {
-        udhrCache = JSON.parse(initUdhrCacheAndGet() || '{}');
-    }
-    udhrCache[lang] = content;
-    const cache = JSON.stringify(udhrCache);
-    localStorage.setItem(UDHR_CACHE, cache);
-}
-
-
-export const getTranslationCache = (lang: string): any => {
-    let cache = JSON.parse(localStorage.getItem(UDHR_CACHE) || '{}');
-    if (!cache || Object.keys(cache).length === 0) {
-        cache = JSON.parse(initUdhrCacheAndGet() || '{}');
-    }
-    return cache[lang] || null;
 }
 
 

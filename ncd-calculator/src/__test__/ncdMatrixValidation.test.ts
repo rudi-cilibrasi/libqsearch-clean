@@ -47,7 +47,7 @@ describe('Matrix Validation', () => {
 		const ncdMatrix = [
 			[0.0, 'invalid'],
 			[0.3, 0.0]
-		];
+		] as unknown as number[][];
 		
 		expect(validateMatrix(labels, ncdMatrix)).toContain('Invalid value at');
 	});
@@ -60,5 +60,20 @@ describe('Matrix Validation', () => {
 		];
 		
 		expect(validateMatrix(labels, ncdMatrix)).toContain('Invalid value at');
+	});
+
+	test('should reject infinite and negative distances', () => {
+		expect(validateMatrix(['A', 'B'], [[0, Infinity], [Infinity, 0]])).toContain('Invalid value at');
+		expect(validateMatrix(['A', 'B'], [[0, -0.1], [-0.1, 0]])).toContain('Negative distance');
+	});
+
+	test('should reject non-zero diagonals and asymmetric matrices', () => {
+		expect(validateMatrix(['A', 'B'], [[0.01, 0.2], [0.2, 0]])).toContain('must be zero');
+		expect(validateMatrix(['A', 'B'], [[0, 0.2], [0.3, 0]])).toContain('must be symmetric');
+	});
+
+	test('should reject duplicate or blank labels', () => {
+		expect(validateMatrix(['A', ' A '], [[0, 0.2], [0.2, 0]])).toContain('must be unique');
+		expect(validateMatrix(['A', '  '], [[0, 0.2], [0.2, 0]])).toContain('non-empty');
 	});
 })

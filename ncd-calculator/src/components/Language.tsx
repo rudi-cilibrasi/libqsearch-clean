@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {ChevronRight} from "lucide-react";
-import { LANGUAGE_NAMES } from "../functions/udhr";
+import {UDHR_LANGUAGES} from "../functions/udhr";
 import { SearchInput } from "./SearchInput";
 import {LANGUAGE} from "../constants/modalConstants";
 import type {SelectedItem} from "./workbenchTypes";
@@ -17,15 +17,6 @@ export const Language: React.FC<LanguageProps> = ({
     const [searchTerm, setSearchTerm] = useState<string>("");
 
     const safeSelectedItems = Array.isArray(selectedItems) ? selectedItems : [];
-
-    const availableLanguages: SelectedItem[] = Object.entries(LANGUAGE_NAMES).map(
-        ([code, name]) => ({
-            id: code,
-            type: LANGUAGE,
-            label: name,
-            content: "",
-        })
-    );
 
     const handleSearchTerm = (searchTerm: string): void => {
         setSearchTerm(searchTerm);
@@ -53,21 +44,35 @@ export const Language: React.FC<LanguageProps> = ({
                 tabIndex={0}
             >
                 <ul className="source-option-list">
-                    {availableLanguages
-                        .filter((lang) => lang.label.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map((lang) => {
-                            const selected = isItemSelected(lang.id);
+                    {UDHR_LANGUAGES
+                        .filter((language) => {
+                            const query = searchTerm.trim().toLowerCase();
+                            return !query || [
+                                language.name,
+                                language.id,
+                                language.languageTag,
+                                language.iso6393,
+                            ].some((value) => value?.toLowerCase().includes(query));
+                        })
+                        .map((language) => {
+                            const selected = isItemSelected(language.id);
+                            const item: SelectedItem = {
+                                id: language.id,
+                                type: LANGUAGE,
+                                label: language.name,
+                                content: "",
+                            };
                             return (
-                                <li key={lang.id}>
+                                <li key={language.id}>
                                     <button
                                         type="button"
-                                        onClick={() => addItem(lang)}
+                                        onClick={() => addItem(item)}
                                         disabled={selected}
                                         aria-pressed={selected}
                                         className="source-option"
                                     >
-                                        <span>{lang.label}</span>
-                                        <small>{lang.id.toUpperCase()}</small>
+                                        <span>{language.name}</span>
+                                        <small>{language.languageTag}</small>
                                         {selected ? <em>Added</em> : <ChevronRight size={17} aria-hidden="true"/>}
                                     </button>
                                 </li>

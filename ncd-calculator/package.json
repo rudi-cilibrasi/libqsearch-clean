@@ -8,12 +8,14 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/verify-production-bundle.mjs",
+    "build": "npm run udhr:verify && vite build && node scripts/verify-production-bundle.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "debug": "vite --debug",
     "test": "vitest --run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "udhr:refresh": "node scripts/build-udhr-corpus.mjs",
+    "udhr:verify": "node scripts/verify-udhr-corpus.mjs"
   },
   "dependencies": {
     "@hpcc-js/wasm": "^2.22.4",
@@ -42,7 +44,6 @@
     "pako": "^2.1.0",
     "pdf-lib": "^1.17.1",
     "pdf-parser": "^1.0.5",
-    "pdfjs-dist": "^4.8.69",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.3.5",

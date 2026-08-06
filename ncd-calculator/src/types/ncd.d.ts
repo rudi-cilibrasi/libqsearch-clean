@@ -11,6 +11,7 @@ export interface CompressionStats {
 export interface NCDInput {
     contents: string[];
     labels: string[];
+    kind?: 'objects' | 'distance-matrix';
     cachedSizes?: Map<string, number>;
 }
 

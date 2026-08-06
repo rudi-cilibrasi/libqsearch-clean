@@ -34,8 +34,7 @@ export class LocalStorageKeyManager {
       "^fasta_searchTermAccessions:",
       "^fasta_accessionSequence:",
       "^selectedItems$",
-      "^searchMode$",
-      "^udhr_cache$"
+      "^searchMode$"
     ] as const;
   }
 
@@ -50,6 +49,10 @@ export class LocalStorageKeyManager {
     if (this.initialized) {
       return;
     }
+
+    // Remove the retired runtime-PDF cache. Its values may contain lossy or
+    // empty extraction results and must never be reused as scientific inputs.
+    localStorage.removeItem("udhr_cache");
 
     console.log(`${LOG_PREFIX} Initializing with required version: ${STORAGE_VERSION}`);
 

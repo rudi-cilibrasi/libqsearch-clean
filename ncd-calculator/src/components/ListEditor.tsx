@@ -16,7 +16,7 @@ import {AlertCircle, Dna, Download, FileType2, FlaskConical, Globe2, Upload} fro
 import {getTranslationResponse} from "../functions/udhr";
 import {InputHolder} from "./InputHolder.tsx";
 import {Language} from "./Language";
-import {cacheTranslation, getTranslationCache, useStorageState} from "../cache/cache";
+import {useStorageState} from "../cache/cache";
 import {FastaSearch} from "./FastaSearch";
 import {FileUpload} from "./FileUpload";
 import {LocalStorageKeyManager, LocalStorageKeys} from "../cache/LocalStorageKeyManager";
@@ -49,6 +49,7 @@ export interface ProcessedFastaItem {
 export interface NcdInput {
 	labels: string[];
 	contents: string[];
+	kind?: "objects" | "distance-matrix";
 }
 
 interface ListEditorProps {
@@ -171,13 +172,13 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				contents.push(item.content || "");
 			});
 			
-			await onComputedNcdInput({labels, contents});
-			setIsAutoProcessing(false);
-			
+			await onComputedNcdInput({labels, contents, kind: "distance-matrix"});
 			console.log("Automatic processing of imported matrix complete");
 		} catch (error) {
 			console.error("Error in automatic processing:", error);
 			setImportError(error instanceof Error ? error.message : "Failed to process imported matrix");
+		} finally {
+			setIsAutoProcessing(false);
 		}
 	};
 	
@@ -257,6 +258,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		// 	setOpenLogin(true);
 		// 	return;
 		// }
+		setImportError(null);
 		setIsLoading(true);
 		try {
 			const labelManager = LabelManager.getInstance();
@@ -277,7 +279,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 					}
 				});
 				// process the input directly
-				await onComputedNcdInput({labels, contents} as NcdInput);
+				await onComputedNcdInput({labels, contents, kind: "distance-matrix"});
 			} else {
 				const computedNcdInput = await computeNcdInput(selectedItems);
 				// update the items with their computed content
@@ -286,12 +288,14 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				// covert to the format expected by the NCD processor
 				const input = {
 					labels: ncdSelectedItems.map((item) => item.id),
-					contents: ncdSelectedItems.map((item) => item.content || "")
+					contents: ncdSelectedItems.map((item) => item.content || ""),
+					kind: "objects",
 				} as NcdInput;
 				await onComputedNcdInput(input);
 			}
 		} catch (error) {
 			console.error("Error processing NCD input:", error);
+			setImportError(error instanceof Error ? error.message : "Unable to prepare the comparison set");
 		} finally {
 			setIsLoading(false);
 		}
@@ -419,17 +423,10 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	const getCompleteLanguageItem = async (selectedItem: SelectedItem): Promise<SelectedItem> => {
 		const lang = selectedItem.id;
-		let translationCached = getTranslationCache(lang);
-		if (!translationCached) {
-			const text = await getTranslationResponse(lang);
-			if (text && text.trim() !== "") {
-				cacheTranslation(lang, text);
-			}
-			translationCached = text;
-		}
+		const text = await getTranslationResponse(lang);
 		return {
 			...selectedItem,
-			content: translationCached,
+			content: text,
 		};
 	};
 	

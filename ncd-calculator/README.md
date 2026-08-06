@@ -36,7 +36,18 @@ Production builds also verify that the Graphviz renderer was bundled into relati
 
 Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__test__/workbench.test.tsx`.
 
-UDHR translations are retrieved as PDFs through the configured backend proxy. PDF.js uses the worker bundled from the installed `pdfjs-dist` package so the parser and worker versions remain identical after dependency updates; do not replace it with a separately versioned CDN URL.
+### Reproducible UDHR inputs
+
+UDHR comparisons use a versioned UTF-8 snapshot generated from the Unicode UDHR Project at a pinned commit. Each of the 59 records is marked complete in the source index and linked there to an OHCHR translation. The comparison corpus contains the body of Articles 1–30 only: preambles, source notes, and localized headings are excluded so every language has identical section coverage. Paragraphs within an article are joined with one space, and the 30 article boundaries are represented by line feeds.
+
+The browser loads only the selected same-origin text assets. It decodes UTF-8 in fatal mode and verifies the byte count, Unicode code-point count, article count, NFC normalization, and SHA-256 digest before compression. A failed check stops the calculation. Assets use the browser HTTP cache plus request deduplication instead of application-managed local storage.
+
+```bash
+npm run udhr:verify
+npm run udhr:refresh
+```
+
+`udhr:verify` is offline and runs automatically before every production build. `udhr:refresh` regenerates the corpus from the immutable source commit configured in `scripts/udhr-corpus-config.mjs`; review the generated manifest, text changes, and source commit before accepting an update. The complete design and scientific scope are documented in [`docs/UDHR_CORPUS.md`](docs/UDHR_CORPUS.md).
 
 Compressor-based NCD converges toward its theoretical properties as compressed inputs grow. For very short or extremely periodic inputs, gzip headers, framing, and pair separators can dominate the compressed size and produce a nonzero empirical NCD even for repeated content. Formula tests therefore use synthetic compressed sizes, while compressor integration tests use the realistic mitochondrial fixture. The matrix diagonal remains exactly zero by definition in the worker pipeline.
 
