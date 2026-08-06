@@ -32,10 +32,6 @@
     margin-right: 10px;
 }
 
-.workbench-sourcebar__actions .workbench-button--primary {
-    min-height: 40px;
-}
-
 .source-tabs {
     display: flex;
     gap: 0;
@@ -76,7 +72,8 @@
 
 .workbench-panel {
     min-width: 0;
-    min-height: 590px;
+    height: 560px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     background: rgba(255, 253, 247, 0.45);
@@ -87,7 +84,8 @@
 }
 
 .source-browser {
-    min-height: 590px;
+    height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }
@@ -148,8 +146,16 @@
     padding-bottom: 20px;
 }
 
+.source-browser__results--scrollable {
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
 .source-option-list {
+    margin: 0;
+    padding: 0;
     border-top: 1px solid var(--line);
+    list-style: none;
 }
 
 .source-option {
@@ -442,6 +448,10 @@
 
 .workbench-actions__primary {
     justify-content: flex-end;
+}
+
+.workbench-actions__primary .workbench-button--primary {
+    min-width: 158px;
 }
 
 .workbench-button {
@@ -910,8 +920,8 @@ button.genbank-suggestions__status:hover {
 
     .workbench-sourcebar__actions {
         width: 100%;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        justify-content: flex-end;
         order: -1;
         margin: 0 0 12px;
     }
@@ -932,16 +942,27 @@ button.genbank-suggestions__status:hover {
         border-bottom: 0;
     }
 
-    .workbench-panel,
+    .workbench-panel {
+        height: 520px;
+    }
+
     .source-browser {
-        min-height: 520px;
+        height: 100%;
+        min-height: 0;
     }
 
     .workbench-actions__secondary,
     .workbench-actions__primary {
         width: 100%;
         flex-wrap: wrap;
+    }
+
+    .workbench-actions__secondary {
         justify-content: flex-start;
+    }
+
+    .workbench-actions__primary {
+        justify-content: flex-end;
     }
 
     .ncd-visualization__body {
@@ -974,10 +995,6 @@ button.genbank-suggestions__status:hover {
 }
 
 @media (max-width: 480px) {
-    .workbench-sourcebar__actions {
-        grid-template-columns: 1fr;
-    }
-
     .source-browser__search,
     .selected-objects__summary,
     .selected-objects__body,

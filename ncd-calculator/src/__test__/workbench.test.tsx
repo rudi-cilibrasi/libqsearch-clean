@@ -1,9 +1,17 @@
 import {cleanup, fireEvent, render, screen} from "@testing-library/react";
+import {MemoryRouter} from "react-router-dom";
 import {describe, expect, test, vi} from "vitest";
 import {FastaSearch} from "../components/FastaSearch";
 import {InputHolder} from "../components/InputHolder";
 import {Language} from "../components/Language";
+import ListEditor from "../components/ListEditor";
 import {getWorkbenchExampleItems} from "../components/workbenchExamples";
+
+vi.mock("../services/CompressionService", () => ({
+    CompressionService: {
+        getInstance: () => ({initialize: vi.fn(), terminate: vi.fn()}),
+    },
+}));
 
 describe("NCD workbench", () => {
     test("provides a valid four-object example set with independent copies", () => {
@@ -55,6 +63,28 @@ describe("NCD workbench", () => {
         render(<Language addItem={vi.fn()} selectedItems={[]}/>);
 
         expect(screen.getByLabelText("Filter languages")).toBeInTheDocument();
+        expect(screen.getByRole("region", {name: "Available languages"})).toHaveAttribute("tabindex", "0");
+        expect(screen.getByRole("list")).toBeInTheDocument();
         expect(screen.queryByText("Compare written languages")).not.toBeInTheDocument();
+    });
+
+    test("places the primary computation action in the bottom action row", () => {
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={vi.fn()}
+                    labelMapRef={{current: new Map()}}
+                    setLabelMap={vi.fn()}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+
+        const showSimilarity = screen.getByRole("button", {name: "Show Similarity"});
+        expect(showSimilarity.closest(".workbench-actions")).not.toBeNull();
+        expect(showSimilarity.closest(".workbench-sourcebar")).toBeNull();
     });
 });

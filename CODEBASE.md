@@ -176,7 +176,7 @@ The landing-page sections are intentionally small and domain-specific: applicati
 
 Updated 2026-08-06 (Asia/Ho_Chi_Minh).
 
-The calculator route begins directly at the source controls and comparison set. `ListEditor.tsx` owns input selection and computation readiness; the source components handle GenBank, UDHR, and local-file acquisition; `InputHolder.tsx` provides a compact accessible object inventory. Prominent **Try example data** and **Show Similarity** actions sit together above the inputs, making the complete compression path testable without an API, user files, or scrolling.
+The calculator route begins directly at the source controls and comparison set. `ListEditor.tsx` owns input selection and computation readiness; the source components handle GenBank, UDHR, and local-file acquisition; `InputHolder.tsx` provides a compact accessible object inventory. **Try example data** remains available beside the source selector, while the primary **Show Similarity** action closes the workflow at the bottom right. Long source corpora, including the UDHR language list, scroll within a keyboard-focusable work area instead of extending the page.
 
 `Workbench.css` extends the landing-page visual system across input preparation, progress, and result interpretation. The output viewer retains its algorithm-specific components, but its surrounding controls, status surface, and matrix colors use the shared scientific palette. `src/__test__/workbench.test.tsx` verifies the example-set invariants, minimum-set readiness message, empty state, and accessible item removal.
 

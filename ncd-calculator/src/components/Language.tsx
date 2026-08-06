@@ -46,28 +46,34 @@ export const Language: React.FC<LanguageProps> = ({
                 />
             </div>
 
-            <div className="source-browser__results source-browser__results--list">
-                <div className="source-option-list">
+            <div
+                className="source-browser__results source-browser__results--list source-browser__results--scrollable"
+                role="region"
+                aria-label="Available languages"
+                tabIndex={0}
+            >
+                <ul className="source-option-list">
                     {availableLanguages
                         .filter((lang) => lang.label.toLowerCase().includes(searchTerm.toLowerCase()))
                         .map((lang) => {
                             const selected = isItemSelected(lang.id);
                             return (
-                                <button
-                                    type="button"
-                                    key={lang.id}
-                                    onClick={() => addItem(lang)}
-                                    disabled={selected}
-                                    aria-pressed={selected}
-                                    className="source-option"
-                                >
-                                    <span>{lang.label}</span>
-                                    <small>{lang.id.toUpperCase()}</small>
-                                    {selected ? <em>Added</em> : <ChevronRight size={17} aria-hidden="true"/>}
-                                </button>
+                                <li key={lang.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => addItem(lang)}
+                                        disabled={selected}
+                                        aria-pressed={selected}
+                                        className="source-option"
+                                    >
+                                        <span>{lang.label}</span>
+                                        <small>{lang.id.toUpperCase()}</small>
+                                        {selected ? <em>Added</em> : <ChevronRight size={17} aria-hidden="true"/>}
+                                    </button>
+                                </li>
                             );
                         })}
-                </div>
+                </ul>
             </div>
         </div>
     );

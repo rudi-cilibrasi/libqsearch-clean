@@ -592,9 +592,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 						<FlaskConical size={17} aria-hidden="true"/>
 						Try example data
 					</button>
-					<button type="button" onClick={sendNcdInput} disabled={isSearchDisabled} className="workbench-button workbench-button--primary">
-						Show Similarity
-					</button>
 				</div>
 			</div>
 
@@ -619,6 +616,9 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				<div className="workbench-actions__primary">
 					<button type="button" onClick={clearAllSelectedItems} disabled={isClearDisabled} className="workbench-button">
 						Clear set
+					</button>
+					<button type="button" onClick={sendNcdInput} disabled={isSearchDisabled} className="workbench-button workbench-button--primary">
+						Show Similarity
 					</button>
 				</div>
 			</footer>
