@@ -1,0 +1,77 @@
+# Reproducible NCD and QSearch pipeline
+
+Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+
+This document defines the numerical and provenance contract used by the browser workbench. It is intended to make a result repeatable and to prevent cache or search behavior from being mistaken for scientific evidence.
+
+## Symmetric empirical NCD
+
+For objects `x` and `y`, separator `s = "\n###\n"`, and compressor `C`, the implementation computes both concatenation orders:
+
+```text
+C*(x, y) = min(C(x || s || y), C(y || s || x))
+
+NCD*(x, y) = (C*(x, y) - min(C(x), C(y))) / max(C(x), C(y))
+```
+
+The minimum is a conservative symmetrization of the order-dependent behavior of a real compressor. Every off-diagonal matrix entry uses the same `C*(x, y)` value in both positions. The diagonal is defined as zero and is not estimated by compressing an object twice. Slight empirical values above one are retained because compressor overhead and finite input length can violate the ideal bounds. Negative values are floored at zero for use as distances.
+
+This policy fixes the former pair-order cache defect. Previously, a sorted cache key could store whichever directional compressed size happened to be calculated first. Later calculations could therefore depend on object ordering and cache history. Version 2 never stores a directional pair size as the matrix value.
+
+## Content-addressed, versioned cache
+
+Object identities are SHA-256 digests of the exact UTF-8 bytes sent to the compressor. A cache key contains:
+
+```text
+pipeline version / compressor revision / object-or-pair / pair policy / content digest(s)
+```
+
+Pair digests are sorted only after the pair has been reduced with the minimum-bidirectional policy. Cache writes are validated, batched once per matrix calculation, and bounded to the newest 20,000 entries. This avoids one local-storage serialization per pair and limits unbounded browser growth.
+
+`CompressionCache` removes `compression_cache`, schema 1, and every stale `ncd-compression-cache:*` namespace during initialization. It also rejects a current-schema envelope whose pipeline version or numeric values are invalid. This migration is intentionally destructive: an old directional result cannot be safely interpreted under the symmetric protocol.
+
+Changing a compressor build, compression level, separator, pair policy, or formula behavior requires a new compressor revision or pipeline version. Changing the serialized envelope requires a new cache schema version.
+
+## Reproducible multi-start QSearch
+
+QSearch is a randomized hill-climbing heuristic. A single run can end at one of several locally optimal tree topologies. The workbench now derives a stable unsigned 32-bit base seed from the full-precision serialized matrix and expands it into a deterministic seed schedule. The native random generator is shared across C++ translation units and is reset before every search.
+
+Runs are performed sequentially inside one worker. Sequential execution is required because the native generator is process-global, and it bounds WebAssembly memory as the number of objects grows. The default schedule is 16 runs for at most 16 objects, 10 for at most 64, 6 for at most 128, and 4 beyond 128. The selected result is the highest-scoring run. Exact score ties prefer the topology seen most often, then a canonical split key and the smaller seed, so selection remains deterministic.
+
+Matrix rows use collision-free positional leaf identifiers. Original Unicode labels are restored by leaf index after native execution. The serializer preserves the shortest decimal representation that round-trips to the same IEEE-754 value; the former six-decimal rounding has been removed.
+
+The workbench also keeps computational identifiers separate from presentation labels. Stable identifiers such as `eng`, `fra`, and `deu` are used for content lookup, matrix ordering, caching, and QSearch. A same-length display-label vector carries `English`, `French`, and `German, Standard (1901)` into the selected-object list, distance matrix, K-grid, tree, and exported topology. The boundary rejects missing, blank, or positionally mismatched names instead of guessing. Older saved UDHR selections and imported matrices whose identifiers match the corpus manifest are upgraded to the canonical corpus names at load time.
+
+The checked-in `qsearch.js` is generated with the pinned `emscripten/emsdk:3.1.74` image:
+
+```bash
+make wasm-calculator
+```
+
+CI rebuilds the module and fails if it differs from the checked-in artifact. With the same matrix, seed schedule, native source, and WASM artifact, the chosen result is reproducible. A compiler or algorithm revision should be treated as a new computational protocol and recorded with exported results.
+
+## Topology and edge support
+
+Each unrooted tree is represented by its non-trivial leaf splits. Node numbering, drawing orientation, and internal-node labels do not affect the canonical topology key. For each split on the selected tree, the computation records:
+
+```text
+split stability = runs containing the split / total seeded runs
+```
+
+It also records the selected topology frequency, number of distinct topologies, selected score, and selected seed. These values measure optimization stability under different random starts. They are not bootstrap support, confidence intervals, posterior probabilities, or evidence that a linguistic or biological grouping is true. Statistical support would require a justified resampling design over exchangeable input units, which this pipeline does not currently perform.
+
+The result also identifies the internal edge with the most even number of leaves on its two sides. This "most balanced split" is a deterministic display summary. Search stability and canonical node-index ordering break ties. It does not change the NCD matrix, select a different QSearch topology, infer an evolutionary root, or assert that either side is a known scientific class. Leaf indices rather than display labels define the split, so repeated human-readable names cannot make distinct inputs collide.
+
+These diagnostics remain in the typed QSearch result and are included as comments and edge metadata when the user explicitly exports DOT. They are intentionally absent from the live tree: seed values, optimizer scores, run counts, protocol identifiers, and heuristic split summaries are reproducibility metadata rather than primary end-user results. The live view presents the inferred unrooted topology and language names only.
+
+## Fail-fast boundaries
+
+The pipeline stops when content hashing is unavailable, a compressed size is non-finite or non-positive, a matrix is malformed or asymmetric, a native run has a non-finite score, or a returned graph is disconnected, cyclic, or has non-reciprocal edges. It does not draw a synthetic fallback tree. A visible error is preferable to a plausible but fabricated result.
+
+Regression coverage includes pair-order reduction, cache migration and reload, empirical values above one, stable-ID/display-name separation, canonical unrooted splits, deterministic seed schedules, topology support aggregation, native seed repeatability, and a complete browser-worker/WASM repeatability test.
+
+## Scientific references
+
+The minimum of both concatenation orders is discussed as a conservative symmetry option in Cilibrasi and Vitányi, *Clustering by Compression*: <https://homepages.cwi.nl/~paulv/papers/cluster.pdf>.
+
+QSearch is described as a randomized hill-climbing method in Cilibrasi and Vitányi, *A fast quartet tree heuristic for hierarchical clustering*: <https://arxiv.org/abs/cs/0606048>.

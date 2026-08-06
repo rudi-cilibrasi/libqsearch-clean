@@ -34,6 +34,14 @@ Production builds run `npm run udhr:verify` before Vite. This offline check read
 
 This corpus makes the input bytes reproducible; it does not make an NCD result a direct measure of semantic, historical, or genealogical language distance. UTF-8 byte width, writing system, orthographic conventions, translation choices, corpus length, and compressor behavior all affect empirical NCD. Comparisons across scripts are especially sensitive to byte representation. Results should be described as compressor-based similarity among these specific UDHR article encodings, with the corpus version and compression algorithm reported.
 
+### English in the European UDHR example
+
+For the eight-record English, French, Spanish, Portuguese, Italian, Swedish, German, and Dutch example, the selected unrooted QSearch topology contains the balanced split `{French, Spanish, Portuguese, Italian}` versus `{English, Swedish, German, Dutch}`. Thus English is already on the Germanic side of the inferred topology even though several individual English-to-Romance NCD values are lower than the English-to-Germanic values. A tree is fitted to all pairwise distances simultaneously; it is not a nearest-neighbor list.
+
+This pairwise attraction must not be "corrected" using the expected family labels. The original CompLearn UDHR experiment also observed English leaning toward Romance and attributed that signal to its large Latin-derived vocabulary. A local sensitivity check on 2026-08-06 found the same qualitative English-to-Romance attraction with gzip, bzip2, and XZ, so substituting a compressor is not a principled correction. See Cilibrasi and Vitányi, *Clustering by Compression*, language-tree discussion: <https://homepages.cwi.nl/~paulv/papers/cluster.pdf>.
+
+If the research objective is historical genealogy rather than similarity among complete translations, it requires a separate, explicitly labeled experiment using suitable evidence such as a controlled basic-vocabulary or cognate corpus. That method would be domain-specific and should not silently replace the feature-free UDHR NCD result. Increasing the amount of comparable, independently sourced text per language can improve compressor resolution, but it cannot guarantee a predetermined topology and must use a versioned corpus assembled without consulting the desired output.
+
 SHA-256 verifies that the deployed bytes match this repository's reviewed snapshot. It does not independently certify the linguistic accuracy of each upstream translation. Changes to source records, canonicalization, or compressor settings require a new corpus version and should not be combined with prior matrices without explicit compatibility analysis.
 
 ## Updating the snapshot

@@ -5,10 +5,6 @@ interface MatrixTableProps {
     labels: string[]
 }
 export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) => {
-    const formatLabel = (label: string): string => (
-        label.length > 16 ? `${label.substring(0, 14)}…` : label
-    );
-
     const getCellStyle = (value: number): React.CSSProperties => {
         const intensity = Math.max(0, Math.min(value, 1));
         const lightness = Math.round(95 - intensity * 48);
@@ -28,11 +24,11 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) =>
 
     const getDiagonalCellStyle = (): React.CSSProperties => {
         return {
-            backgroundColor: "#a6462b",
-            color: "#fffdf7",
+            backgroundColor: "hsl(151 25% 95%)",
+            color: "#16211b",
             padding: "6px",
             textAlign: "center",
-            border: "1px solid #7c321f",
+            border: "1px solid #315b4b",
             fontFamily: "var(--font-mono)",
             fontWeight: "bold",
             fontSize: "0.85rem"
@@ -79,10 +75,10 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) =>
                         <caption>Pairwise normalized compression distance matrix</caption>
                         <thead>
                         <tr>
-                            <th style={{...getHeaderStyle(), width: '112px'}}>ID</th>
+                            <th scope="col" style={{...getHeaderStyle(), width: '112px'}}>Object</th>
                             {labels.map((label, index) => (
-                                <th key={index} title={label} style={{...getHeaderStyle(), width: '112px', maxWidth: '112px', overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                                    {formatLabel(label)}
+                                <th scope="col" key={index} title={label} style={{...getHeaderStyle(), minWidth: '132px', whiteSpace: 'normal'}}>
+                                    {label}
                                 </th>
                             ))}
                         </tr>
@@ -90,8 +86,8 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) =>
                         <tbody>
                         {ncdMatrix.map((row, rowIndex) => (
                             <tr key={rowIndex}>
-                                <th title={labels[rowIndex]} style={{...getRowHeaderStyle(), width: '112px', maxWidth: '112px', overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                                    {formatLabel(labels[rowIndex])}
+                                <th scope="row" title={labels[rowIndex]} style={{...getRowHeaderStyle(), minWidth: '132px', whiteSpace: 'normal'}}>
+                                    {labels[rowIndex]}
                                 </th>
                                 {row.map((value, colIndex) => (
                                     <td
@@ -116,7 +112,7 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) =>
                         </div>
                         <div className="flex items-center">
                             <span className="distance-matrix__swatch distance-matrix__swatch--far"></span>
-                            <span className="font-bold">1.0000</span> (different)
+                            <span className="font-bold">1.0000+</span> (different; finite-compressor effects may exceed 1)
                         </div>
                     </div>
                     <div>

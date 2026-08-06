@@ -14,6 +14,8 @@ BUILD_DIR_REACT_APP = qsearch_worker_react/src/wasm
 TARGET_SINGLE_THREAD = $(BUILD_DIR_SINGLE_THREAD)/qsearch.js
 TARGET_WORKER_DOM = $(BUILD_DIR_WORKER_DOM)/qsearch.js
 TARGET_REACT_APP = $(BUILD_DIR_REACT_APP)/qsearch.js
+TARGET_CALCULATOR = ncd-calculator/src/wasm/qsearch.js
+EMSCRIPTEN_IMAGE = emscripten/emsdk:3.1.74
 
 # List of source files to include in the build
 SRC_FILES := \
@@ -31,6 +33,15 @@ SRC_FILES := \
 OBJ_FILES := $(patsubst src/%.cpp,web_build/%.o,$(SRC_FILES))
 
 all: $(TARGET_SINGLE_THREAD) $(TARGET_WORKER_DOM) $(TARGET_REACT_APP)
+
+# Build the checked-in calculator module with a pinned compiler toolchain.
+wasm-calculator:
+	docker run --rm -u $$(id -u):$$(id -g) -v "$(CURDIR):/src" -w /src $(EMSCRIPTEN_IMAGE) \
+		em++ -std=c++20 -O3 -Wall -Wextra \
+		-s NO_EXIT_RUNTIME=1 -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 \
+		-s SINGLE_FILE=1 -s DISABLE_EXCEPTION_CATCHING=0 -s EXPORT_ES6=1 \
+		-s ENVIRONMENT=worker -lembind $(SRC_FILES) -o $(TARGET_CALCULATOR)
+	perl -pi -e 's/[ \t]+$$//' $(TARGET_CALCULATOR)
 
 # Include dependency files
 -include $(OBJ_FILES:.o=.d)
@@ -61,4 +72,4 @@ clean:
 	rm $(TARGET_WORKER_DOM)
 	rm $(TARGET_REACT_APP)
 
-.PHONY: all clean
+.PHONY: all clean wasm-calculator

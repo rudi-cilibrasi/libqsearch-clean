@@ -13,10 +13,10 @@ A similarity metric based on Kolmogorov complexity. For two strings x and y:
 NCD(x, y) = (C(xy) - min(C(x), C(y))) / max(C(x), C(y))
 ```
 
-Where `C(x)` is the compressed size of x. Values range from 0 (identical) to ~1 (completely different).
+Where `C(x)` is the compressed size of x. The empirical implementation uses `min(C(x || s || y), C(y || s || x))` for the pair term. Values are normally near the interval from zero to one, but finite compressor effects can produce values above one.
 
 ### QSearch Quartet Trees
-An algorithm that builds phylogenetic-like trees from a distance matrix. It works by finding optimal quartet topologies and merging them into a full tree. The QSearch algorithm runs in a WebAssembly module compiled from C++.
+An algorithm that builds phylogenetic-like trees from a distance matrix. The randomized native search runs multiple times with a deterministic seed schedule. The highest-scoring result is selected and canonical unrooted splits are counted across runs. The reported percentages are search stability, not bootstrap confidence. QSearch runs in a WebAssembly module compiled from C++.
 
 ### Compressors
 Two compression algorithms are available:
@@ -63,19 +63,22 @@ ncd-calculator/
 │   │   └── ui/                     # Reusable UI primitives
 │   ├── workers/
 │   │   ├── shared/
-│   │   │   └── utils.ts            # NCD math, CRC32, pair processing
+│   │   │   └── utils.ts            # NCD math and bidirectional pair processing
 │   │   ├── lzmaWorker.ts           # LZMA compression web worker
 │   │   ├── zstdWorker.ts           # ZSTD compression web worker
 │   │   ├── qsearchWorker.ts        # QSearch tree algorithm worker
 │   │   └── kgridWorker.ts          # Grid optimization worker
 │   ├── services/
 │   │   ├── CompressionService.ts   # Compression worker orchestration (singleton)
+│   │   ├── CompressionProtocol.ts  # Versioned compressor and pair policy
+│   │   ├── QSearchProtocol.ts      # Seed schedule, canonical splits, support
 │   │   ├── CompressorCapabilities.ts
 │   │   ├── ZSTDCompressor.ts       # ZSTD wrapper
 │   │   ├── GenBankSearchService.ts # NCBI GenBank API client
 │   │   └── genbank.ts              # GenBank utilities
 │   ├── wasm/
-│   │   └── qsearch.ts             # QSearch WASM module (Emscripten-compiled C++)
+│   │   ├── qsearch.js              # Checked-in QSearch WASM module
+│   │   └── qsearch.d.ts            # Typed WASM boundary
 │   ├── datastructures/
 │   │   ├── kgrid.ts               # Grid state, NCD calculation, simulated annealing
 │   │   └── unionFind.ts           # Union-Find data structure
@@ -91,7 +94,7 @@ ncd-calculator/
 │   │   ├── encoding.ts            # Text encoding utilities
 │   │   └── ...
 │   ├── cache/
-│   │   ├── CRCCache.ts            # CRC-based compression cache
+│   │   ├── CompressionCache.ts     # Versioned SHA-256 compression cache
 │   │   ├── LocalStorageCache.ts   # Browser localStorage cache
 │   │   ├── MemoryCache.ts         # In-memory cache
 │   │   └── ...
@@ -133,8 +136,9 @@ User Input (FASTA sequences / files / UDHR translations)
          ▼
 ┌─────────────────────┐
 │  lzmaWorker.ts /    │  For each pair (i,j):
-│  zstdWorker.ts      │    1. Compress x, compress y, compress x+y
-│                     │    2. Calculate NCD(x,y)
+│  zstdWorker.ts      │    1. Compress x, y, x||y, and y||x
+│                     │    2. Use min(C(x||y), C(y||x))
+│                     │    3. Calculate NCD(x,y)
 │  (uses utils.ts)    │  Reports progress back to main thread
 └────────┬────────────┘
          │ NCD matrix (n×n)
@@ -147,8 +151,8 @@ User Input (FASTA sequences / files / UDHR translations)
    ▼          ▼
 ┌────────┐  ┌──────────────┐
 │QSearch │  │   KGrid      │
-│Worker  │  │  Worker       │
-│(WASM)  │  │(sim.anneal.) │
+│Worker  │  │  Worker      │
+│seeded  │  │(sim.anneal.) │
 └───┬────┘  └──────┬───────┘
     │              │
     ▼              ▼
@@ -179,7 +183,7 @@ Updated 2026-08-06 (Asia/Ho_Chi_Minh).
 
 The calculator route begins directly at the source controls and comparison set. `ListEditor.tsx` owns input selection and computation readiness; the source components handle GenBank, UDHR, and local-file acquisition; `InputHolder.tsx` provides a compact accessible object inventory. **Try example data** remains available beside the source selector, while the primary **Show Similarity** action closes the workflow at the bottom right. Long source corpora, including the UDHR language list, scroll within a keyboard-focusable work area instead of extending the page.
 
-`Workbench.css` extends the landing-page visual system across input preparation, progress, and result interpretation. The output viewer retains its algorithm-specific components, but its surrounding controls, status surface, and matrix colors use the shared scientific palette. `src/__test__/workbench.test.tsx` verifies the example-set invariants, minimum-set readiness message, empty state, and accessible item removal.
+`Workbench.css` extends the landing-page visual system across input preparation, progress, and result interpretation. The production GUI follows `ncd-calculator/docs/END_USER_UI_POLICY.md`: it shows actionable controls, meaningful progress, canonical object names, and scientific results, while seeds, internal identifiers, protocol versions, worker rates, iteration counts, objective values, cache state, and optimizer diagnostics remain in exports, logs, tests, or technical documentation. `src/__test__/workbench.test.tsx` verifies the example-set invariants, minimum-set readiness message, empty state, and accessible item removal; visualization tests prevent internal QSearch diagnostics from returning to the live tree.
 
 ## UDHR Corpus Pipeline
 
@@ -213,5 +217,8 @@ npx vitest --run --exclude='**/webworker*'
 
 - **Web Workers** — All heavy computation (compression, QSearch, grid optimization) runs in dedicated web workers to keep the UI responsive.
 - **Singleton Services** — `CompressionService` uses a singleton pattern with factory injection for testability.
-- **CRC-based Caching** — Compression results are cached by CRC32 hash of content, avoiding redundant compression.
-- **WASM for QSearch** — The quartet tree algorithm is compiled from C++ to WebAssembly via Emscripten, called through `wasm/qsearch.ts`.
+- **Protocol-versioned caching** — Compression results use SHA-256 content identities and cache keys that include the pipeline, compressor revision, and pair policy. Stale schemas are removed rather than reused.
+- **Seeded multi-start QSearch** — A bounded deterministic schedule explores multiple randomized starts. Canonical split counting reports optimization stability.
+- **Pinned QSearch WASM** — `make wasm-calculator` builds the checked-in module with Emscripten 3.1.74. CI verifies that regeneration is clean.
+
+The exact numerical, cache, selection, and support definitions are documented in `ncd-calculator/docs/NCD_QSEARCH_REPRODUCIBILITY.md`.

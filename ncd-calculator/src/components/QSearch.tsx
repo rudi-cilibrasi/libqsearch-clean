@@ -20,12 +20,16 @@ import Header from "./Header";
 import {NCDProgress} from "./NCDProgress";
 import type {CompressionStats, NCDInput, NCDMatrixResponse} from "@/types/ncd";
 import {useNCDCache} from "@/hooks/useNCDCache";
-import {CompressionResponse, CompressionService} from "@/services/CompressionService";
+import {CompressionService} from "@/services/CompressionService";
+import type {CompressionResponse} from "@/services/CompressionService";
 import KGridVisualization from "@/components/KGridVisualization.tsx";
 import {GridObject} from "@/datastructures/kgrid.ts";
-import {QTreeNode, QTreeResponse} from "@/components/QSearchTree3D.tsx";
-import {LabelManager} from "@/functions/labelUtils.ts";
+import type {QTreeNode, QTreeResponse} from "@/types/qsearch";
 import {validateMatrix} from "@/functions/matrix.ts";
+import {IMPORTED_MATRIX_PROVENANCE} from "@/services/CompressionProtocol";
+import type {CompressionProvenance} from "@/types/compression";
+import {getQSearchRunCount} from "@/services/QSearchProtocol";
+import {createDisplayLabelMap, getDisplayLabel} from "@/services/DisplayLabelProtocol";
 import "./Workbench.css";
 
 export interface QSearchProps {
@@ -46,22 +50,14 @@ export const QSearch: React.FC<QSearchProps> = ({
 	const [hasMatrix, setHasMatrix] = useState(false);
 	const [errorMsg, setErrorMsg] = useState("");
 	const [qSearchTreeResult, setQSearchTreeResult] = useState<QTreeResponse | undefined>();
-	const [labelMap, setLabelMap] = useState(new Map());
+	const [qSearchProgress, setQSearchProgress] = useState<{completed: number; total: number} | null>(null);
+	const [matrixProvenance, setMatrixProvenance] = useState<CompressionProvenance>(IMPORTED_MATRIX_PROVENANCE);
+	const [labelMap, setLabelMap] = useState<Map<string, string>>(new Map());
 	const labelMapRef = useRef(labelMap);
 	const [isLoading, setIsLoading] = useState(false);
-	const labelManager = LabelManager.getInstance();
 	
 	// Add gridObjects state for KGridVisualization
 	const [gridObjects, setGridObjects] = useState<GridObject[]>([]);
-	
-	// Add optimization state tracking
-	const [optimizationStartTime, setOptimizationStartTime] = useState<number | null>(null);
-	// @ts-ignore
-	const [optimizationEndTime, setOptimizationEndTime] = useState<number | null>(null);
-	const [totalExecutionTime, setTotalExecutionTime] = useState<number | null>(null);
-	const [iterationsPerSecond, setIterationsPerSecond] = useState<number | null>(null);
-	// @ts-ignore
-	const [iterations, setIterations] = useState(0);
 	
 	const [compressionInfo, setCompressionInfo] = useState<CompressionResponse | null>(null);
 	const [compressionStats, setCompressionStats] = useState<CompressionStats>({
@@ -80,29 +76,36 @@ export const QSearch: React.FC<QSearchProps> = ({
 	);
 	const ncdCache = useNCDCache();
 	
-	// Add refs for tracking optimization performance
-	const iterationCountRef = useRef(0);
-	const lastUpdateTimeRef = useRef(Date.now());
-	const ipsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-	
 	// Handle QSearch worker messages
 	const handleQsearchMessage = (event: MessageEvent) => {
 		if (event.data.action === "treeJSON") {
 			try {
-				const result = JSON.parse(event.data.result);
-				result.nodes = result.nodes.map((node: QTreeNode) => ({
-					...node,
-					label: labelManager.getDisplayLabel(node.label) || ""
-				})) as QTreeResponse;
-				result.nodes.forEach((node: QTreeNode) => {
-					console.log("node id: " + node.label + ", display name: " + labelManager.getDisplayLabel(node.label));
-				})
+				const parsed = JSON.parse(event.data.result) as QTreeResponse;
+				const result: QTreeResponse = {
+					...parsed,
+					nodes: parsed.nodes.map((node: QTreeNode) => ({
+						...node,
+						label: getDisplayLabel(labelMapRef.current, node.label),
+					})),
+				};
 				setQSearchTreeResult(result);
+				setQSearchProgress(null);
+				setIsLoading(false);
 			} catch (error) {
 				console.error("Error processing QSearch result:", error);
+				setErrorMsg("QSearch returned an invalid tree result");
+				setIsLoading(false);
 			}
+		} else if (event.data.action === "qsearchProgress") {
+			setQSearchProgress({
+				completed: event.data.completedRuns,
+				total: event.data.totalRuns,
+			});
+		} else if (event.data.action === "qsearchError") {
+			setErrorMsg(`Tree search failed: ${event.data.message}`);
+			setQSearchProgress(null);
+			setIsLoading(false);
 		}
-		setIsLoading(false);
 	};
 	
 	// Initialize QSearch worker
@@ -115,11 +118,6 @@ export const QSearch: React.FC<QSearchProps> = ({
 		return () => {
 			qSearchWorkerRef.current?.terminate();
 			compressionServiceRef.current.terminate();
-			
-			// Clean up IPS interval
-			if (ipsIntervalRef.current) {
-				clearInterval(ipsIntervalRef.current);
-			}
 		};
 	}, []);
 	
@@ -149,33 +147,31 @@ export const QSearch: React.FC<QSearchProps> = ({
 		}
 		
 		try {
+			const computationInput: NCDInput = {...input, labels: normalizedLabels};
+			const nextLabelMap = createDisplayLabelMap(normalizedLabels, input.displayLabels);
+			labelMapRef.current = nextLabelMap;
+			setLabelMap(nextLabelMap);
+
 			setIsLoading(true);
 			setErrorMsg("");
-				labels.forEach((label) => {
-					labelManager.registerLabel(label, label);
-			})
-			
-			const isImportedMatrix = input.kind === "distance-matrix";
+			setQSearchTreeResult(undefined);
+			setQSearchProgress(null);
+			setCompressionInfo(null);
+			setCompressionStats({
+				processedPairs: 0,
+				totalPairs: 0,
+				bytesProcessed: 0,
+				startTime: 0,
+				currentPair: null,
+				lastNcdScore: null,
+			});
+			const isImportedMatrix = computationInput.kind === "distance-matrix";
 			
 			if (isImportedMatrix) {
 				console.log("Processing imported matrix data without compression");
 				
-				// For imported matrices, we need to explicitly register each label
-				// with itself as the display label
-				input.labels.forEach((label) => {
-					console.log(`Registering imported matrix label: ${label}`);
-					labelManager.registerLabel(label, label);
-					
-					// Also register a sanitized version mapping back to the original
-					const sanitized = labelManager.sanitizeForQSearch(label);
-					if (sanitized !== label) {
-						console.log(`Also registering sanitized version: ${sanitized} → ${label}`);
-						labelManager.registerLabel(sanitized, label);
-					}
-				});
-				
 				// Create NCD matrix directly from imported data
-				const ncdMatrix: number[][] = input.contents.map((content, rowIndex) => {
+				const ncdMatrix: number[][] = computationInput.contents.map((content, rowIndex) => {
 					try {
 						const row: unknown = JSON.parse(content);
 						if (!Array.isArray(row)) throw new Error("row is not an array");
@@ -185,15 +181,16 @@ export const QSearch: React.FC<QSearchProps> = ({
 						throw new Error(`Invalid distance-matrix row ${rowIndex + 1}: ${reason}`);
 					}
 				});
-				const validationError = validateMatrix(input.labels, ncdMatrix);
+				const validationError = validateMatrix(computationInput.labels, ncdMatrix);
 				if (validationError) {
 					throw new Error(`Invalid distance matrix: ${validationError}`);
 				}
 				
 				// Create the response object
 				const response: NCDMatrixResponse = {
-					labels: input.labels,
-					ncdMatrix: ncdMatrix
+					labels: computationInput.labels,
+					ncdMatrix: ncdMatrix,
+					provenance: IMPORTED_MATRIX_PROVENANCE,
 				};
 				
 				// Display the matrix
@@ -201,27 +198,32 @@ export const QSearch: React.FC<QSearchProps> = ({
 				
 				// Send to worker for tree generation
 				console.log("Sending imported matrix to worker for tree generation");
-				qSearchWorkerRef.current?.postMessage({
+				if (!qSearchWorkerRef.current) throw new Error("QSearch worker is not ready");
+				setQSearchProgress({completed: 0, total: getQSearchRunCount(computationInput.labels.length)});
+				qSearchWorkerRef.current.postMessage({
 					action: "processNcdMatrix",
-					labels: input.labels,
+					labels: computationInput.labels,
 					ncdMatrix: ncdMatrix,
 				});
+				setCompressionInfo(null);
 			} else {
-				const emptyObjectIndex = input.contents.findIndex(
+				const emptyObjectIndex = computationInput.contents.findIndex(
 					(content) => typeof content !== "string" || content.trim().length === 0,
 				);
 				if (emptyObjectIndex >= 0) {
-					throw new Error(`Object "${input.labels[emptyObjectIndex]}" has no content`);
+					throw new Error(`Object "${getDisplayLabel(nextLabelMap, computationInput.labels[emptyObjectIndex])}" has no content`);
 				}
 				// Normal compression-based processing for non-imported data
-				const [compressionDecision, cachedSizes] = CompressionService.preprocessNcdInput(input, ncdCache);
+				const prepared = await CompressionService.preprocessNcdInput(computationInput, ncdCache);
+				const compressionDecision: CompressionResponse = prepared;
 				
 				setCompressionInfo(compressionDecision);
 				
 				const result = await compressionServiceRef.current.processContent(
 					{
-						...input,
-						cachedSizes: cachedSizes.size > 0 ? cachedSizes : undefined,
+						...computationInput,
+						contentKeys: prepared.contentKeys,
+						cachedSizes: prepared.cachedSizes.size > 0 ? prepared.cachedSizes : undefined,
 						algorithm: compressionDecision.algorithm,
 					},
 					(message) => {
@@ -259,7 +261,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 				}
 				
 				// Display results
-				const response: NCDMatrixResponse = result as NCDMatrixResponse;
+				const response: NCDMatrixResponse = result;
 				displayNcdMatrix(response);
 				const {labels, ncdMatrix} = response;
 				
@@ -267,38 +269,25 @@ export const QSearch: React.FC<QSearchProps> = ({
 					labelCount: labels.length,
 					matrixSize: ncdMatrix.length,
 				});
-				
-				qSearchWorkerRef.current?.postMessage({
+				setCompressionInfo(null);
+				if (!qSearchWorkerRef.current) throw new Error("QSearch worker is not ready");
+				setQSearchProgress({completed: 0, total: getQSearchRunCount(labels.length)});
+				qSearchWorkerRef.current.postMessage({
 					action: "processNcdMatrix",
 					labels: labels,
 					ncdMatrix: ncdMatrix,
 				});
 				
 				// Update cache with new compression data
-				if ("newCompressionData" in result && result.newCompressionData) {
-					result.newCompressionData.forEach((data) => {
-						ncdCache.storeCompressedSize(
-							compressionDecision.algorithm,
-							[data.key1],
-							data.size1
-						);
-						ncdCache.storeCompressedSize(
-							compressionDecision.algorithm,
-							[data.key2],
-							data.size2
-						);
-						ncdCache.storeCompressedSize(
-							compressionDecision.algorithm,
-							[data.key1, data.key2].sort(),
-							data.combinedSize
-						);
-					});
-				}
+				ncdCache.storeCompressionRecords(
+					compressionDecision.algorithm,
+					result.singleCompressionData,
+					result.pairCompressionData,
+				);
 			}
 		} catch (error) {
 			console.error("Error in onNcdInput:", error);
 			setErrorMsg(error instanceof Error ? error.message : "Processing failed");
-		} finally {
 			setIsLoading(false);
 		}
 	};
@@ -311,48 +300,30 @@ export const QSearch: React.FC<QSearchProps> = ({
 	 */
 	const displayNcdMatrix = (response: NCDMatrixResponse) => {
 		const {labels: responseLabels, ncdMatrix: matrix} = response;
-		console.log('Display matrix called with labels: ' + JSON.stringify(responseLabels));
-		
-		// Debug labelManager state before processing
-		console.log('Initial LabelManager state:');
-		labelManager.logMappings();
 		
 		// Update state variables
 		setLabels(responseLabels);
 		setNcdMatrix(matrix);
+		setMatrixProvenance(response.provenance);
 		setHasMatrix(true);
 		
 		// Create grid objects from the labels
 		const objects: GridObject[] = responseLabels.map((label, index) => {
-			// Get the existing display label if it exists
-			const displayLabel = labelManager.getDisplayLabel(label);
-			
-			console.log(`Creating grid object for ${label} with display label: ${displayLabel || 'none'}`);
-			
 			return {
 				id: label,
-				label: displayLabel || label,
+				label: getDisplayLabel(labelMapRef.current, label),
 				content: matrix[index]
 			};
 		});
-		
-		console.log('Created grid objects:', objects);
 		setGridObjects(objects);
 		
 		// Update labelMap reference for components that need it
 		const newMapping = new Map<string, string>();
 		responseLabels.forEach(label => {
-			const displayLabel = labelManager.getDisplayLabel(label) || label;
-			newMapping.set(label, displayLabel);
+			newMapping.set(label, getDisplayLabel(labelMapRef.current, label));
 		});
-		
-		console.log('New label mapping:', Array.from(newMapping.entries()));
 		labelMapRef.current = newMapping;
 		setLabelMap(newMapping);
-		
-		// Log the final state of the LabelManager
-		console.log('Final LabelManager state:');
-		labelManager.logMappings();
 	};
 	
 	// Reset display state
@@ -365,6 +336,8 @@ export const QSearch: React.FC<QSearchProps> = ({
 		setLabelMap(new Map());
 		setHasMatrix(false);
 		setQSearchTreeResult(undefined);
+		setQSearchProgress(null);
+		setMatrixProvenance(IMPORTED_MATRIX_PROVENANCE);
 		setCompressionInfo(null);
 		setCompressionStats({
 			processedPairs: 0,
@@ -375,68 +348,8 @@ export const QSearch: React.FC<QSearchProps> = ({
 			lastNcdScore: null,
 		});
 		
-		// Reset optimization state
-		setOptimizationStartTime(null);
-		setOptimizationEndTime(null);
-		setTotalExecutionTime(null);
-		setIterationsPerSecond(null);
-		setIterations(0);
-		
-		// Clear any interval
-		if (ipsIntervalRef.current) {
-			clearInterval(ipsIntervalRef.current);
-			ipsIntervalRef.current = null;
-		}
 	};
 	
-	// Optimization handlers for KGridVisualization
-	const handleOptimizationStart = () => {
-		const startTime = Date.now();
-		setOptimizationStartTime(startTime);
-		setOptimizationEndTime(null);
-		iterationCountRef.current = 0;
-		lastUpdateTimeRef.current = startTime;
-		
-		// Set up interval to calculate iterations per second
-		ipsIntervalRef.current = setInterval(() => {
-			const currentTime = Date.now();
-			const elapsedSecs = (currentTime - lastUpdateTimeRef.current) / 1000;
-			
-			if (elapsedSecs > 0) {
-				const ips = iterationCountRef.current / elapsedSecs;
-				setIterationsPerSecond(ips);
-				iterationCountRef.current = 0;
-				lastUpdateTimeRef.current = currentTime;
-			}
-		}, 1000); // Update metrics every second
-	};
-	
-	const handleIterationUpdate = (iteration: number) => {
-		setIterations(iteration);
-		iterationCountRef.current++;
-	};
-	
-	const handleOptimizationEnd = () => {
-		if (optimizationStartTime) {
-			const endTime = Date.now();
-			setOptimizationEndTime(endTime);
-			setTotalExecutionTime(endTime - optimizationStartTime);
-			
-			// Clear the IPS update interval
-			if (ipsIntervalRef.current) {
-				clearInterval(ipsIntervalRef.current);
-				ipsIntervalRef.current = null;
-			}
-		}
-	};
-	
-	
-	const getNcdMatrixResponse = (labels: string[], ncdMatrix: number[][]): NCDMatrixResponse => {
-		return {
-			labels,
-			ncdMatrix
-		}
-	}
 	
 	return (
 		<div className="ncd-workbench">
@@ -449,8 +362,6 @@ export const QSearch: React.FC<QSearchProps> = ({
 				<ListEditor
 					qTreeResponse={qSearchTreeResult}
 					onComputedNcdInput={onNcdInput}
-					labelMapRef={labelMapRef}
-					setLabelMap={setLabelMap}
 					setIsLoading={setIsLoading}
 					resetDisplay={resetDisplay}
 					setOpenLogin={setOpenLogin}
@@ -462,7 +373,10 @@ export const QSearch: React.FC<QSearchProps> = ({
 						{compressionInfo && (
 							<p>Computing pairwise distances with {compressionInfo.algorithm.toUpperCase()}.</p>
 						)}
-						<NCDProgress stats={compressionStats}/>
+						{qSearchProgress && (
+							<p>Building the quartet tree…</p>
+						)}
+						{!qSearchProgress && <NCDProgress stats={compressionStats}/>}
 					</section>
 				)}
 				
@@ -475,17 +389,12 @@ export const QSearch: React.FC<QSearchProps> = ({
 							<span>{labels.length} objects · {labels.length * (labels.length - 1) / 2} pairs</span>
 						</header>
 						<KGridVisualization
-							labelManager={labelManager}
+							labelMap={labelMap}
 							objects={gridObjects}
 							maxIterations={100000}
-							onOptimizationStart={handleOptimizationStart}
-							onOptimizationEnd={handleOptimizationEnd}
-							onIterationUpdate={handleIterationUpdate}
 							qSearchTreeResult={qSearchTreeResult}
 							autoStart={true}
-							totalExecutionTime={totalExecutionTime || undefined}
-							iterationsPerSecond={iterationsPerSecond || undefined}
-							ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
+							ncdMatrixResponse={{labels, ncdMatrix, provenance: matrixProvenance}}
 						/>
 					</section>
 				)}

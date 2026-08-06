@@ -2,14 +2,16 @@
 /// <reference lib="webworker" />
 
 declare const self: DedicatedWorkerGlobalScope;
-import {calculateCRC32, encodeText, getPairFileConcatenated, processChunk} from './shared/utils';
+import {encodeText, getPairFileConcatenated, processChunk} from './shared/utils';
 import {NCDInput, WorkerErrorMessage, WorkerReadyMessage, WorkerResultMessage, WorkerStartMessage} from "@/types/ncd";
+import {createSingleCacheKey, getCompressionProvenance} from "@/services/CompressionProtocol";
+import type {PairCompressionRecord, SingleCompressionRecord} from "@/types/compression";
 
 // ZSTD Configuration Constants
-const ZSTD_CONFIG = {
+const ZSTD_CONFIG: {COMPRESSION_LEVEL: number; MAX_DICT_SIZE: number} = {
 	COMPRESSION_LEVEL: 22, // Maximum compression level
 	MAX_DICT_SIZE: 0 // Will be set during initialization
-} as const;
+};
 
 let wasmModule: any = null;
 
@@ -93,15 +95,24 @@ async function compressedSizeSingle(str: string): Promise<number> {
 }
 
 async function getCompressedPairSize(str1: string, str2: string): Promise<number> {
-	const arr: Uint8Array = await getPairFileConcatenated(str1, str2);
+	const arr = getPairFileConcatenated(str1, str2);
 	return await compressWithZSTD(arr);
+}
+
+async function getCompressedPairSizes(
+	str1: string,
+	str2: string,
+): Promise<{forwardSize: number; reverseSize: number}> {
+	const forwardSize = await getCompressedPairSize(str1, str2);
+	const reverseSize = await getCompressedPairSize(str2, str1);
+	return {forwardSize, reverseSize};
 }
 
 async function handleMessage(event: MessageEvent<NCDInput>) {
 	try {
-		const {labels, contents, cachedSizes} = event.data;
+		const {labels, contents, contentKeys, cachedSizes} = event.data;
 		
-		if (!labels?.length || !contents?.length) {
+		if (!labels?.length || !contents?.length || contentKeys?.length !== contents.length) {
 			throw new Error('Invalid input data');
 		}
 		
@@ -114,37 +125,42 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 			totalPairs
 		} as WorkerStartMessage);
 		
-		const singleCompressedSizes = new Array(n);
+		const singleCompressedSizes: number[] = new Array(n);
 		const ncdMatrix = Array.from({length: n}, () => Array(n).fill(0));
+		const singleCompressionData: SingleCompressionRecord[] = [];
 		
 		for (let i = 0; i < n; i++) {
-			const encoded = encodeText(contents[i]);
-			const crc = calculateCRC32(encoded);
-			const key = `zstd:${crc}`;
+			const key = createSingleCacheKey("zstd", contentKeys[i]);
 			const cached = cachedSizes?.get(key);
 			
 			if (cached) {
 				singleCompressedSizes[i] = cached;
 			} else {
 				singleCompressedSizes[i] = await compressedSizeSingle(contents[i]);
+				singleCompressionData.push({
+					contentKey: contentKeys[i],
+					compressedSize: singleCompressedSizes[i],
+				});
 			}
 		}
 		
 		const CHUNK_SIZE = 5;
-		const allResults = [];
+		const pairCompressionData: PairCompressionRecord[] = [];
 		
 		for (let i = 0; i < n; i += CHUNK_SIZE) {
 			const endI = Math.min(i + CHUNK_SIZE, n);
 			const chunkResults = await processChunk(
-				i, endI, n, contents,
+				i, endI, n, contents, contentKeys,
 				singleCompressedSizes,
 				'zstd',
 				cachedSizes,
-				getCompressedPairSize,
+				getCompressedPairSizes,
 				self
 			);
-			
-			allResults.push(...chunkResults);
+
+			pairCompressionData.push(
+				...chunkResults.flatMap((result) => result.pairRecord ? [result.pairRecord] : []),
+			);
 			
 			for (const {i, j, ncd} of chunkResults) {
 				ncdMatrix[i][j] = ncd;
@@ -156,13 +172,9 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 			type: 'result',
 			labels,
 			ncdMatrix,
-			newCompressionData: allResults.map(result => ({
-				key1: result.key1,
-				key2: result.key2,
-				size1: result.size1,
-				size2: result.size2,
-				combinedSize: result.combinedSize
-			}))
+			provenance: getCompressionProvenance("zstd"),
+			singleCompressionData,
+			pairCompressionData,
 		} as WorkerResultMessage);
 		
 	} catch (error) {

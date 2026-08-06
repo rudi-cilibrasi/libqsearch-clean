@@ -798,6 +798,24 @@
     color: #6e2514;
 }
 
+.quartet-planar__message button {
+    justify-self: center;
+    min-height: 36px;
+    padding: 7px 12px;
+    color: #fffdf7;
+    background: #173c2e;
+    border: 1px solid #173c2e;
+    border-radius: 0;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.quartet-planar__message button:hover,
+.quartet-planar__message button:focus-visible {
+    background: #234c3c;
+    border-color: #234c3c;
+}
+
 .quartet-tree__footer,
 .quartet-tree__selection {
     display: flex;
@@ -858,14 +876,6 @@
     background: #173c2e;
     border-top: 1px solid #315b4b;
     text-align: center;
-}
-
-.ncd-visualization__status {
-    padding: 10px 14px;
-    color: #d5dcd7;
-    border-top: 1px solid #53635a;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
 }
 
 .ncd-visualization__error {

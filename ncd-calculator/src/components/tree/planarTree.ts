@@ -6,6 +6,25 @@ export interface PlanarTreeNode {
 
 export interface PlanarTreeData {
     nodes: PlanarTreeNode[];
+    edgeSupport?: Record<string, number>;
+    search?: {
+        pipelineVersion: string;
+        runCount: number;
+        selectedSeed: number;
+        selectedScore: number;
+        selectedTopologyCount: number;
+        selectedTopologySupport: number;
+        uniqueTopologyCount: number;
+    };
+    balancedSplit?: {
+        edgeKey: string;
+        support: number;
+    };
+}
+
+export interface PlanarTreeOptions {
+    /** Include reproducibility metadata in exported DOT, never in the live canvas. */
+    includeDiagnostics?: boolean;
 }
 
 const escapeDotLabel = (label: string): string => label
@@ -14,12 +33,31 @@ const escapeDotLabel = (label: string): string => label
     .replace(/[\r\n]+/g, " ");
 
 /** Build a high-contrast, left-to-right planar representation of a quartet tree. */
-export const createPlanarTreeDot = (data: PlanarTreeData): string => {
+export const createPlanarTreeDot = (
+    data: PlanarTreeData,
+    options: PlanarTreeOptions = {},
+): string => {
     const lines = [
         "digraph G {",
         '  graph [bgcolor="#f7f3e8", rankdir=LR, overlap=false, splines=polyline, nodesep=0.38, ranksep=0.32, pad=0.15, margin=0];',
         '  edge [color="#315b4b", penwidth=1.8, arrowhead=none];'
     ];
+
+    if (options.includeDiagnostics && data.search) {
+        lines.push(
+            `  // qsearch protocol: ${escapeDotLabel(data.search.pipelineVersion)}`,
+            `  // searches: ${data.search.runCount}`,
+            `  // selected seed: ${data.search.selectedSeed}`,
+            `  // selected score: ${data.search.selectedScore}`,
+            `  // selected topology: ${data.search.selectedTopologyCount}/${data.search.runCount} (${data.search.selectedTopologySupport})`,
+            `  // distinct topologies: ${data.search.uniqueTopologyCount}`,
+        );
+    }
+    if (options.includeDiagnostics && data.balancedSplit) {
+        lines.push(
+            `  // most balanced split: ${escapeDotLabel(data.balancedSplit.edgeKey)} (${data.balancedSplit.support})`,
+        );
+    }
 
     for (const node of data.nodes) {
         const label = escapeDotLabel(node.label?.trim() ?? "");
@@ -54,7 +92,12 @@ export const createPlanarTreeDot = (data: PlanarTreeData): string => {
                 if (visited.has(target)) continue;
                 visited.add(target);
                 queue.push(target);
-                lines.push(`  "${source}" -> "${target}";`);
+                const edgeKey = `${Math.min(source, target)}-${Math.max(source, target)}`;
+                const support = data.edgeSupport?.[edgeKey];
+                const supportAttributes = !options.includeDiagnostics || support === undefined
+                    ? ""
+                    : ` [xlabel="${Math.round(support * 100)}%", fontname="Arial", fontsize=10, fontcolor="#6e2514"]`;
+                lines.push(`  "${source}" -> "${target}"${supportAttributes};`);
             }
         }
     }

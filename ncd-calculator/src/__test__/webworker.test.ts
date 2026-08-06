@@ -1,10 +1,10 @@
 import '@vitest/web-worker'
 import { test, expect, beforeEach, afterEach, describe } from "vitest";
 import { CompressionService } from "@/services/CompressionService.ts";
-import { CRCCache } from "@/cache/CRCCache.ts";
+import { CompressionCache } from "@/cache/CompressionCache.ts";
 import fs from 'fs';
 import path from 'path';
-import {TestCRCCache} from "@/__test__/mocks.ts";
+import {TestCompressionCache} from "@/__test__/mocks.ts";
 import { NCDInput } from '@/types/ncd';
 
 // Test fixtures - we'll use these consistently across all algorithm tests
@@ -88,8 +88,8 @@ describe('Compression Worker Tests', () => {
         console.log(`Total content size: ${input.contents.reduce((sum, content) => sum + content.length, 0)} characters`);
         
         // Prepare cache and compression settings
-        const crcCache = new CRCCache();
-        const [_, cachedSizes] = CompressionService.preprocessNcdInput(input, crcCache);
+        const crcCache = new CompressionCache(null);
+        const prepared = await CompressionService.preprocessNcdInput(input, crcCache);
         
         console.time('lzma-gif-compression');
         
@@ -97,7 +97,8 @@ describe('Compression Worker Tests', () => {
             // Process with LZMA algorithm
             const result = await compressionService.processContent({
                 ...input,
-                cachedSizes: cachedSizes.size > 0 ? cachedSizes : undefined,
+                contentKeys: prepared.contentKeys,
+                cachedSizes: prepared.cachedSizes.size > 0 ? prepared.cachedSizes : undefined,
                 algorithm: "lzma",
             }, (message) => {
                 // Log progress updates
@@ -128,8 +129,8 @@ describe('Compression Worker Tests', () => {
         console.log(`Total content size: ${input.contents.reduce((sum, content) => sum + content.length, 0)} characters`);
         
         // Prepare cache and compression settings
-        const crcCache = new CRCCache();
-        const [_, cachedSizes] = CompressionService.preprocessNcdInput(input, crcCache);
+        const crcCache = new CompressionCache(null);
+        const prepared = await CompressionService.preprocessNcdInput(input, crcCache);
         
         console.time('zstd-fasta-compression');
         
@@ -137,7 +138,8 @@ describe('Compression Worker Tests', () => {
             // Process with ZSTD algorithm
             const result = await compressionService.processContent({
                 ...input,
-                cachedSizes: cachedSizes.size > 0 ? cachedSizes : undefined,
+                contentKeys: prepared.contentKeys,
+                cachedSizes: prepared.cachedSizes.size > 0 ? prepared.cachedSizes : undefined,
                 algorithm: "zstd",
             }, (message) => {
                 // Log progress updates
@@ -168,8 +170,8 @@ describe('Compression Worker Tests', () => {
         console.log(`Total content size: ${input.contents.reduce((sum, content) => sum + content.length, 0)} characters`);
         
         // Prepare cache and compression settings
-        const crcCache = new CRCCache();
-        const [_, cachedSizes] = CompressionService.preprocessNcdInput(input, crcCache);
+        const crcCache = new CompressionCache(null);
+        const prepared = await CompressionService.preprocessNcdInput(input, crcCache);
         
         console.time('zstd-gif-compression');
         
@@ -177,7 +179,8 @@ describe('Compression Worker Tests', () => {
             // Process with ZSTD algorithm
             const result = await compressionService.processContent({
                 ...input,
-                cachedSizes: cachedSizes.size > 0 ? cachedSizes : undefined,
+                contentKeys: prepared.contentKeys,
+                cachedSizes: prepared.cachedSizes.size > 0 ? prepared.cachedSizes : undefined,
                 algorithm: "zstd",
             }, (message) => {
                 // Log progress updates
@@ -219,10 +222,12 @@ describe('Compression Worker Tests', () => {
         const input = await loadTestData(FASTA_FILES.slice(0, 2));
         
         // Initialize a new cache
-        const crcCache: TestCRCCache = new TestCRCCache();
+        const crcCache = new TestCompressionCache();
         
         // Preprocess the input
-        const [compressionDecision, cachedSizes] = CompressionService.preprocessNcdInput(input, crcCache);
+        const prepared = await CompressionService.preprocessNcdInput(input, crcCache);
+        const compressionDecision = prepared;
+        const cachedSizes = prepared.cachedSizes;
         
         // Verify the compression decision
         expect(compressionDecision).toHaveProperty('algorithm');
@@ -238,46 +243,23 @@ describe('Compression Worker Tests', () => {
         // Process the content
         const result = await compressionService.processContent({
             ...input,
+            contentKeys: prepared.contentKeys,
             cachedSizes: cachedSizes,
             algorithm: compressionDecision.algorithm,
         });
         
         // Manually update the cache with compression results
-        if (result.newCompressionData) {
-            for (const data of result.newCompressionData) {
-                if (data.key1 && data.key2) {
-                    // Store the combined compression result
-                    crcCache.storeCompressedSize(
-                      compressionDecision.algorithm,
-                      [data.key1, data.key2],
-                      data.combinedSize
-                    );
-                }
-                
-                // Store individual file compression results if available
-                if (data.key1 && data.size1) {
-                    crcCache.storeCompressedSize(
-                      compressionDecision.algorithm,
-                      [data.key1],
-                      data.size1
-                    );
-                }
-                
-                if (data.key2 && data.size2) {
-                    crcCache.storeCompressedSize(
-                      compressionDecision.algorithm,
-                      [data.key2],
-                      data.size2
-                    );
-                }
-            }
-        }
+        crcCache.storeCompressionRecords(
+          compressionDecision.algorithm,
+          result.singleCompressionData,
+          result.pairCompressionData,
+        );
         
         // Now run the preprocess again - we should see cached values
-        const [_, newCachedSizes] = CompressionService.preprocessNcdInput(input, crcCache);
+        const cachedAgain = await CompressionService.preprocessNcdInput(input, crcCache);
         
         // There should be some cached values now
-        expect(newCachedSizes.size).toBeGreaterThan(0);
+        expect(cachedAgain.cachedSizes.size).toBeGreaterThan(0);
     });
     
     test('CompressionService handles worker errors gracefully', async () => {
@@ -288,14 +270,15 @@ describe('Compression Worker Tests', () => {
         };
         
         // Prepare compression settings
-        const [compressionDecision, _] = CompressionService.preprocessNcdInput(
+        const compressionDecision = await CompressionService.preprocessNcdInput(
           { ...invalidInput, contents: ['a', 'b'] }, // Add dummy contents for preprocess
-          new TestCRCCache()
+          new TestCompressionCache()
         );
         
         // Process with invalid data - should throw an error
         await expect(compressionService.processContent({
             ...invalidInput,
+            contentKeys: compressionDecision.contentKeys,
             cachedSizes: undefined,
             algorithm: compressionDecision.algorithm,
         })).rejects.toThrow();

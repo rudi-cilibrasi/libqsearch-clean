@@ -23,16 +23,28 @@ The example data contains two intentionally related sequence pairs. It exercises
 
 The quartet-tree result opens in a planar 2D presentation so topology and labels can be read without manipulating a camera. The view automatically fits after layout and when the viewport changes, and provides explicit zoom, fit, and reset controls. **Interactive 3D** remains available for spatial exploration; its camera also fits the complete tree on entry and resize, while node selection reports whether the selected point is a leaf or an internal node.
 
+Pair compression is order-invariant at the protocol level: the matrix uses the smaller of `C(x || y)` and `C(y || x)`. Compression results are stored in a SHA-256 content-addressed, versioned cache; incompatible legacy caches are removed automatically. QSearch uses a deterministic multi-start seed schedule and records selected-topology frequency and per-edge split stability for reproducibility. These diagnostics are kept out of the primary interface and retained in the typed result, explicit DOT exports, and technical documentation. The complete numerical contract is in [`docs/NCD_QSEARCH_REPRODUCIBILITY.md`](docs/NCD_QSEARCH_REPRODUCIBILITY.md).
+
 ## Verification
 
 ```bash
 npm run build
+npm run graphviz:verify-dev
 npm run lint
 npm run test
 npm run typecheck
+cd .. && make wasm-calculator
 ```
 
-Production builds also verify that the Graphviz renderer was bundled into relative assets. The build fails if an unresolved `@hpcc-js/wasm` module specifier would reach the browser.
+The planar renderer remains a lazy Graphviz/WASM chunk so it does not delay the landing page. In development, Graphviz is served directly rather than through Vite's disposable hashed dependency cache; `graphviz:verify-dev` checks that resolution and runs automatically during a build. Production builds separately verify that Graphviz was bundled into relative assets and fail if an unresolved `@hpcc-js/wasm` module specifier would reach the browser.
+
+After changing dependencies or switching branches while the development server is running, restart Vite so its module graph matches the installed packages:
+
+```bash
+npm run dev -- --force
+```
+
+The planar-tree interface reports initialization failures and offers **Retry renderer**. The shared loader deduplicates concurrent initialization and clears failed attempts before retrying.
 
 Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__test__/workbench.test.tsx`.
 
@@ -54,5 +66,7 @@ Compressor-based NCD converges toward its theoretical properties as compressed i
 ## Visual system
 
 The landing page and workbench share a restrained scientific/editorial system: warm paper, dark green structural surfaces, oxide annotations, serif headings, monospace metadata, square controls, and thin rules. Decorative gradients, glow effects, generic cards, and promotional copy are intentionally avoided. The design keeps the NCD equation, comparison set, computation state, and result matrix visually primary.
+
+The production interface is for end users. Internal identifiers, seeds, protocol versions, worker throughput, iteration counts, objective values, cache state, and raw optimizer diagnostics belong in exports, logs, tests, or technical documents rather than the GUI. See [`docs/END_USER_UI_POLICY.md`](docs/END_USER_UI_POLICY.md).
 
 Updated 2026-08-06 (Asia/Ho_Chi_Minh).
