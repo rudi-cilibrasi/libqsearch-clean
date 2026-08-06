@@ -1,13 +1,13 @@
 import type {
   CompressionAlgorithm,
   CompressionProvenance,
-  PairSymmetrization,
+  MatrixReduction,
 } from "@/types/compression";
 
-export const COMPRESSION_PIPELINE_VERSION = "ncd-pipeline-v2";
-export const COMPRESSION_CACHE_SCHEMA_VERSION = 2;
+export const COMPRESSION_PIPELINE_VERSION = "ncd-pipeline-v3";
+export const COMPRESSION_CACHE_SCHEMA_VERSION = 3;
 export const PAIR_SEPARATOR = "\n###\n";
-export const PAIR_SYMMETRIZATION: PairSymmetrization = "minimum-bidirectional";
+export const MATRIX_REDUCTION: MatrixReduction = "reflected-minimum";
 
 export const COMPRESSOR_REVISIONS: Readonly<Record<CompressionAlgorithm, string>> = Object.freeze({
   lzma: "nmrugg-lzma-mode-9-v1",
@@ -38,23 +38,35 @@ export const createSingleCacheKey = (
 
 export const createPairCacheKey = (
   algorithm: CompressionAlgorithm,
-  contentKey1: string,
-  contentKey2: string,
-): string => {
-  const [first, second] = [contentKey1, contentKey2].sort();
-  return `${cachePrefix(algorithm)}:pair:${PAIR_SYMMETRIZATION}:${first}:${second}`;
-};
+  sourceContentKey: string,
+  targetContentKey: string,
+): string => `${cachePrefix(algorithm)}:directed-pair:${sourceContentKey}:${targetContentKey}`;
 
-export const symmetrizePairSizes = (forwardSize: number, reverseSize: number): number => {
-  if (
-    !Number.isFinite(forwardSize)
-    || !Number.isFinite(reverseSize)
-    || forwardSize <= 0
-    || reverseSize <= 0
-  ) {
-    throw new Error("Pair compression produced an invalid size");
+export const reduceDirectedMatrix = (directedMatrix: readonly (readonly number[])[]): number[][] => {
+  const size = directedMatrix.length;
+  if (size === 0) throw new Error("Directed NCD matrix must not be empty");
+
+  for (let rowIndex = 0; rowIndex < size; rowIndex += 1) {
+    const row = directedMatrix[rowIndex];
+    if (!Array.isArray(row) || row.length !== size) {
+      throw new Error(`Directed NCD matrix row ${rowIndex} must contain ${size} values`);
+    }
+    for (let columnIndex = 0; columnIndex < size; columnIndex += 1) {
+      const value = row[columnIndex];
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`Directed NCD matrix contains an invalid value at [${rowIndex}][${columnIndex}]`);
+      }
+    }
+    if (row[rowIndex] !== 0) {
+      throw new Error(`Directed NCD matrix diagonal must be zero at [${rowIndex}][${rowIndex}]`);
+    }
   }
-  return Math.min(forwardSize, reverseSize);
+
+  return directedMatrix.map((row, rowIndex) => row.map((value, columnIndex) => (
+    rowIndex === columnIndex
+      ? 0
+      : Math.min(value, directedMatrix[columnIndex][rowIndex])
+  )));
 };
 
 export const getCompressionProvenance = (
@@ -65,7 +77,8 @@ export const getCompressionProvenance = (
   compressorRevision: COMPRESSOR_REVISIONS[algorithm],
   pipelineVersion: COMPRESSION_PIPELINE_VERSION,
   cacheSchemaVersion: COMPRESSION_CACHE_SCHEMA_VERSION,
-  pairSymmetrization: PAIR_SYMMETRIZATION,
+  directedMatrixForm: "ordered",
+  matrixReduction: MATRIX_REDUCTION,
   pairSeparator: PAIR_SEPARATOR,
 });
 
@@ -75,6 +88,7 @@ export const IMPORTED_MATRIX_PROVENANCE: CompressionProvenance = Object.freeze({
   compressorRevision: "not provided",
   pipelineVersion: "external",
   cacheSchemaVersion: COMPRESSION_CACHE_SCHEMA_VERSION,
-  pairSymmetrization: "unknown",
+  directedMatrixForm: "unknown",
+  matrixReduction: "unknown",
   pairSeparator: "unknown",
 });

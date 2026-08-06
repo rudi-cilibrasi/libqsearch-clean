@@ -5,7 +5,7 @@ import { CompressionCache } from "@/cache/CompressionCache.ts";
 import fs from 'fs';
 import path from 'path';
 import {TestCompressionCache} from "@/__test__/mocks.ts";
-import { NCDInput } from '@/types/ncd';
+import { NCDInput, WorkerResultMessage } from '@/types/ncd';
 
 // Test fixtures - we'll use these consistently across all algorithm tests
 const FASTA_FILES = [
@@ -65,6 +65,28 @@ function validateNcdMatrix(matrix: number[][], length: number) {
     }
 }
 
+function validateWorkerMatrices(result: WorkerResultMessage, length: number) {
+    expect(result.directedNcdMatrix).toHaveLength(length);
+    validateNcdMatrix(result.ncdMatrix, length);
+
+    for (let row = 0; row < length; row++) {
+        expect(result.directedNcdMatrix[row]).toHaveLength(length);
+        for (let column = 0; column < length; column++) {
+            const directedValue = result.directedNcdMatrix[row][column];
+            expect(Number.isFinite(directedValue)).toBe(true);
+            expect(directedValue).toBeGreaterThanOrEqual(0);
+            if (row === column) {
+                expect(directedValue).toBe(0);
+            } else {
+                expect(result.ncdMatrix[row][column]).toBeCloseTo(Math.min(
+                    directedValue,
+                    result.directedNcdMatrix[column][row],
+                ));
+            }
+        }
+    }
+}
+
 describe('Compression Worker Tests', () => {
     let compressionService: CompressionService;
     
@@ -114,7 +136,7 @@ describe('Compression Worker Tests', () => {
             expect(result.labels).toEqual(input.labels);
             
             // Validate NCD matrix properties
-            validateNcdMatrix(result.ncdMatrix, input.labels.length);
+            validateWorkerMatrices(result, input.labels.length);
         } finally {
             compressionService.terminate();
             console.log("LZMA worker terminated after GIF test");
@@ -155,7 +177,7 @@ describe('Compression Worker Tests', () => {
             expect(result.labels).toEqual(input.labels);
             
             // Validate NCD matrix properties
-            validateNcdMatrix(result.ncdMatrix, input.labels.length);
+            validateWorkerMatrices(result, input.labels.length);
         } finally {
             compressionService.terminate();
             console.log("ZSTD worker terminated after FASTA test");
@@ -196,7 +218,7 @@ describe('Compression Worker Tests', () => {
             expect(result.labels).toEqual(input.labels);
             
             // Validate NCD matrix properties
-            validateNcdMatrix(result.ncdMatrix, input.labels.length);
+            validateWorkerMatrices(result, input.labels.length);
         } finally {
             compressionService.terminate();
             console.log("ZSTD worker terminated after GIF test");

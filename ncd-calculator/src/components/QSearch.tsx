@@ -44,8 +44,9 @@ export const QSearch: React.FC<QSearchProps> = ({
 	                                                setOpenLogin,
 	                                                authenticated,
 	                                                setAuthenticated,
-                                                }) => {
+	                                                }) => {
 	const [ncdMatrix, setNcdMatrix] = useState<number[][]>([]);
+	const [directedNcdMatrix, setDirectedNcdMatrix] = useState<number[][] | undefined>();
 	const [labels, setLabels] = useState<string[]>([]);
 	const [hasMatrix, setHasMatrix] = useState(false);
 	const [errorMsg, setErrorMsg] = useState("");
@@ -304,6 +305,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 		// Update state variables
 		setLabels(responseLabels);
 		setNcdMatrix(matrix);
+		setDirectedNcdMatrix(response.directedNcdMatrix);
 		setMatrixProvenance(response.provenance);
 		setHasMatrix(true);
 		
@@ -330,6 +332,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 	const resetDisplay = () => {
 		setErrorMsg("");
 		setNcdMatrix([]);
+		setDirectedNcdMatrix(undefined);
 		setLabels([]);
 		setGridObjects([]);
 		labelMapRef.current = new Map();
@@ -394,7 +397,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 							maxIterations={100000}
 							qSearchTreeResult={qSearchTreeResult}
 							autoStart={true}
-							ncdMatrixResponse={{labels, ncdMatrix, provenance: matrixProvenance}}
+							ncdMatrixResponse={{labels, directedNcdMatrix, ncdMatrix, provenance: matrixProvenance}}
 						/>
 					</section>
 				)}

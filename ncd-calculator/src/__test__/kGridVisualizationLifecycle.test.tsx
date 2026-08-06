@@ -27,9 +27,10 @@ const MATRIX: NCDMatrixResponse = {
     source: "computed",
     algorithm: "lzma",
     compressorRevision: "test",
-    pipelineVersion: "ncd-pipeline-v2",
-    cacheSchemaVersion: 2,
-    pairSymmetrization: "minimum-bidirectional",
+    pipelineVersion: "ncd-pipeline-v3",
+    cacheSchemaVersion: 3,
+    directedMatrixForm: "ordered",
+    matrixReduction: "reflected-minimum",
     pairSeparator: "\n###\n",
   },
 };
@@ -111,7 +112,7 @@ describe("K-grid visualization lifecycle", () => {
     await waitFor(() => expect(onOptimizationEnd).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("button", {name: "Quartet tree"})).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(/Status:/)).not.toBeInTheDocument();
-    expect(screen.queryByText("ncd-pipeline-v2")).not.toBeInTheDocument();
+    expect(screen.queryByText("ncd-pipeline-v3")).not.toBeInTheDocument();
   });
 
   test("renders canonical object names rather than stable language identifiers", () => {

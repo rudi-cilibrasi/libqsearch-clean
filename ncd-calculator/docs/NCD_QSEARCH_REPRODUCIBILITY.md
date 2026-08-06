@@ -4,19 +4,27 @@ Updated 2026-08-06 (Asia/Ho_Chi_Minh).
 
 This document defines the numerical and provenance contract used by the browser workbench. It is intended to make a result repeatable and to prevent cache or search behavior from being mistaken for scientific evidence.
 
-## Symmetric empirical NCD
+## Directed empirical NCD and matrix reduction
 
-For objects `x` and `y`, separator `s = "\n###\n"`, and compressor `C`, the implementation computes both concatenation orders:
+For objects `x` and `y`, separator `s = "\n###\n"`, and compressor `C`, compression is defined for an ordered pair:
 
 ```text
-C*(x, y) = min(C(x || s || y), C(y || s || x))
-
-NCD*(x, y) = (C*(x, y) - min(C(x), C(y))) / max(C(x), C(y))
+C(x, y) = C(x || s || y)
+D(x, y) = (C(x, y) - min(C(x), C(y))) / max(C(x), C(y))
 ```
 
-The minimum is a conservative symmetrization of the order-dependent behavior of a real compressor. Every off-diagonal matrix entry uses the same `C*(x, y)` value in both positions. The diagonal is defined as zero and is not estimated by compressing an object twice. Slight empirical values above one are retained because compressor overhead and finite input length can violate the ideal bounds. Negative values are floored at zero for use as distances.
+The pipeline first constructs the complete directed matrix `D`. No equality between `C(x, y)` and `C(y, x)` is assumed or imposed: the two ordered compressed lengths and the two directed NCD cells are computed and cached independently. The diagonal is defined as zero and is not estimated by compressing an object twice. Slight empirical values above one are retained because compressor overhead and finite input length can violate the ideal bounds. Negative values are floored at zero.
 
-This policy fixes the former pair-order cache defect. Previously, a sorted cache key could store whichever directional compressed size happened to be calculated first. Later calculations could therefore depend on object ordering and cache history. Version 2 never stores a directional pair size as the matrix value.
+QSearch and the current K-grid require a symmetric distance matrix. Their input is derived only after the directed matrix is complete, by applying one reflected-cell operation:
+
+```text
+R[i, j] = min(D[i, j], D[j, i])
+R[i, i] = 0
+```
+
+Thus directionality belongs to compression and the full matrix, while the minimum belongs to an explicit matrix reduction. The worker result preserves both `directedNcdMatrix = D` and the reduced `ncdMatrix = R` so downstream code cannot confuse the two stages.
+
+This policy fixes the former pair-order cache defect. A sorted cache key previously allowed one direction to occupy both reflected positions. Version 3 instead stores ordered cells under distinct keys and performs no reduction inside the cache or pair-compression operation.
 
 ## Content-addressed, versioned cache
 
@@ -26,9 +34,9 @@ Object identities are SHA-256 digests of the exact UTF-8 bytes sent to the compr
 pipeline version / compressor revision / object-or-pair / pair policy / content digest(s)
 ```
 
-Pair digests are sorted only after the pair has been reduced with the minimum-bidirectional policy. Cache writes are validated, batched once per matrix calculation, and bounded to the newest 20,000 entries. This avoids one local-storage serialization per pair and limits unbounded browser growth.
+Pair digests preserve source-target order. `x → y` and `y → x` therefore occupy separate entries even when their compressed sizes happen to match. Cache writes are validated, batched once per matrix calculation, and bounded to the newest 20,000 entries. This avoids one local-storage serialization per cell and limits unbounded browser growth.
 
-`CompressionCache` removes `compression_cache`, schema 1, and every stale `ncd-compression-cache:*` namespace during initialization. It also rejects a current-schema envelope whose pipeline version or numeric values are invalid. This migration is intentionally destructive: an old directional result cannot be safely interpreted under the symmetric protocol.
+`CompressionCache` removes `compression_cache`, schemas 1 and 2, and every stale `ncd-compression-cache:*` namespace during initialization. It also rejects a current-schema envelope whose pipeline version or numeric values are invalid. This migration is intentionally destructive: a previously reduced pair entry cannot be reconstructed into two directed cells.
 
 Changing a compressor build, compression level, separator, pair policy, or formula behavior requires a new compressor revision or pipeline version. Changing the serialized envelope requires a new cache schema version.
 
@@ -66,12 +74,12 @@ These diagnostics remain in the typed QSearch result and are included as comment
 
 ## Fail-fast boundaries
 
-The pipeline stops when content hashing is unavailable, a compressed size is non-finite or non-positive, a matrix is malformed or asymmetric, a native run has a non-finite score, or a returned graph is disconnected, cyclic, or has non-reciprocal edges. It does not draw a synthetic fallback tree. A visible error is preferable to a plausible but fabricated result.
+The pipeline stops when content hashing is unavailable, a compressed size is non-finite or non-positive, the directed matrix is malformed, the reflected-minimum matrix is malformed or asymmetric, a native run has a non-finite score, or a returned graph is disconnected, cyclic, or has non-reciprocal edges. It does not draw a synthetic fallback tree. A visible error is preferable to a plausible but fabricated result.
 
 Regression coverage includes pair-order reduction, cache migration and reload, empirical values above one, stable-ID/display-name separation, canonical unrooted splits, deterministic seed schedules, topology support aggregation, native seed repeatability, and a complete browser-worker/WASM repeatability test.
 
 ## Scientific references
 
-The minimum of both concatenation orders is discussed as a conservative symmetry option in Cilibrasi and Vitányi, *Clustering by Compression*: <https://homepages.cwi.nl/~paulv/papers/cluster.pdf>.
+Using the minimum of reflected ordered comparisons as a conservative matrix reduction is discussed in the context of compression clustering by Cilibrasi and Vitányi, *Clustering by Compression*: <https://homepages.cwi.nl/~paulv/papers/cluster.pdf>.
 
 QSearch is described as a randomized hill-climbing method in Cilibrasi and Vitányi, *A fast quartet tree heuristic for hierarchical clustering*: <https://arxiv.org/abs/cs/0606048>.

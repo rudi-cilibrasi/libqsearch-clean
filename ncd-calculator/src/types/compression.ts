@@ -1,6 +1,7 @@
 export type CompressionAlgorithm = "lzma" | "zstd";
 
-export type PairSymmetrization = "minimum-bidirectional";
+export type DirectedMatrixForm = "ordered";
+export type MatrixReduction = "reflected-minimum";
 
 export interface CompressionProvenance {
   readonly source: "computed" | "imported";
@@ -8,7 +9,8 @@ export interface CompressionProvenance {
   readonly compressorRevision: string;
   readonly pipelineVersion: string;
   readonly cacheSchemaVersion: number;
-  readonly pairSymmetrization: PairSymmetrization | "unknown";
+  readonly directedMatrixForm: DirectedMatrixForm | "unknown";
+  readonly matrixReduction: MatrixReduction | "unknown";
   readonly pairSeparator: string;
 }
 
@@ -26,9 +28,7 @@ export interface SingleCompressionRecord {
 }
 
 export interface PairCompressionRecord {
-  readonly contentKey1: string;
-  readonly contentKey2: string;
+  readonly sourceContentKey: string;
+  readonly targetContentKey: string;
   readonly compressedSize: number;
-  readonly forwardSize: number;
-  readonly reverseSize: number;
 }

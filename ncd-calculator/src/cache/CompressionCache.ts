@@ -3,7 +3,6 @@ import {
   COMPRESSION_PIPELINE_VERSION,
   createPairCacheKey,
   createSingleCacheKey,
-  symmetrizePairSizes,
 } from "@/services/CompressionProtocol";
 import type {
   CompressionAlgorithm,
@@ -21,6 +20,7 @@ export const COMPRESSION_CACHE_STORAGE_KEY = `ncd-compression-cache:${COMPRESSIO
 export const LEGACY_COMPRESSION_CACHE_KEYS = Object.freeze([
   "compression_cache",
   "ncd-compression-cache:1",
+  "ncd-compression-cache:2",
 ]);
 
 const MAX_CACHE_ENTRIES = 20_000;
@@ -32,9 +32,9 @@ const isValidSize = (value: unknown): value is number => (
 /**
  * Versioned, bounded browser cache for deterministic compression lengths.
  *
- * Entries are namespaced by the complete compression protocol. Legacy schemas
- * are removed during construction because reusing an order-dependent pair size
- * would silently change a matrix produced by the v2 symmetric pipeline.
+ * Entries are namespaced by the complete compression protocol. Directed pair
+ * keys preserve source and target order. Legacy schemas are removed because a
+ * previously reduced pair size cannot represent either ordered matrix cell.
  */
 export class CompressionCache {
   private readonly storage: Storage | null;
@@ -67,7 +67,8 @@ export class CompressionCache {
     }
 
     for (let i = 0; i < contentKeys.length; i += 1) {
-      for (let j = i + 1; j < contentKeys.length; j += 1) {
+      for (let j = 0; j < contentKeys.length; j += 1) {
+        if (i === j) continue;
         const key = createPairCacheKey(algorithm, contentKeys[i], contentKeys[j]);
         const value = this.touch(key);
         if (value !== undefined) result.set(key, value);
@@ -91,15 +92,15 @@ export class CompressionCache {
 
     for (const record of pairs) {
       if (
-        !record.contentKey1
-        || !record.contentKey2
+        !record.sourceContentKey
+        || !record.targetContentKey
+        || record.sourceContentKey === record.targetContentKey
         || !isValidSize(record.compressedSize)
-        || record.compressedSize !== symmetrizePairSizes(record.forwardSize, record.reverseSize)
       ) {
-        throw new Error("Cannot cache an invalid symmetric pair compressed size");
+        throw new Error("Cannot cache an invalid directed pair compressed size");
       }
       this.set(
-        createPairCacheKey(algorithm, record.contentKey1, record.contentKey2),
+        createPairCacheKey(algorithm, record.sourceContentKey, record.targetContentKey),
         record.compressedSize,
       );
     }

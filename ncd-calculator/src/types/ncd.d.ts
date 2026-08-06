@@ -53,13 +53,14 @@ export type WorkerProgressMessage = {
     sizeX: number;
     sizeY: number;
     sizeXY: number;
-    sizeXYForward?: number;
-    sizeXYReverse?: number;
 }
 
 export type WorkerResultMessage = {
     type: 'result';
     labels: string[];
+    /** Full ordered matrix where [i][j] may differ from [j][i]. */
+    directedNcdMatrix: number[][];
+    /** Reflected-minimum reduction used by symmetric downstream algorithms. */
     ncdMatrix: number[][];
     provenance: CompressionProvenance;
     singleCompressionData: SingleCompressionRecord[];
@@ -75,6 +76,7 @@ export type WorkerErrorMessage = {
 
 export type NCDMatrixResponse = {
     labels: string[];
+    directedNcdMatrix?: number[][];
     ncdMatrix: number[][];
     provenance: CompressionProvenance;
 }

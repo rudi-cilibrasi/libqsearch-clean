@@ -4,7 +4,7 @@
 declare const self: DedicatedWorkerGlobalScope;
 import {encodeText, getPairFileConcatenated, processChunk} from './shared/utils';
 import {NCDInput, WorkerErrorMessage, WorkerReadyMessage, WorkerResultMessage, WorkerStartMessage} from "@/types/ncd";
-import {createSingleCacheKey, getCompressionProvenance} from "@/services/CompressionProtocol";
+import {createSingleCacheKey, getCompressionProvenance, reduceDirectedMatrix} from "@/services/CompressionProtocol";
 import type {PairCompressionRecord, SingleCompressionRecord} from "@/types/compression";
 
 // ZSTD Configuration Constants
@@ -99,15 +99,6 @@ async function getCompressedPairSize(str1: string, str2: string): Promise<number
 	return await compressWithZSTD(arr);
 }
 
-async function getCompressedPairSizes(
-	str1: string,
-	str2: string,
-): Promise<{forwardSize: number; reverseSize: number}> {
-	const forwardSize = await getCompressedPairSize(str1, str2);
-	const reverseSize = await getCompressedPairSize(str2, str1);
-	return {forwardSize, reverseSize};
-}
-
 async function handleMessage(event: MessageEvent<NCDInput>) {
 	try {
 		const {labels, contents, contentKeys, cachedSizes} = event.data;
@@ -117,7 +108,7 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 		}
 		
 		const n = contents.length;
-		const totalPairs = (n * (n - 1)) / 2;
+		const totalPairs = n * (n - 1);
 		
 		self.postMessage({
 			type: 'start',
@@ -126,7 +117,7 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 		} as WorkerStartMessage);
 		
 		const singleCompressedSizes: number[] = new Array(n);
-		const ncdMatrix = Array.from({length: n}, () => Array(n).fill(0));
+		const directedNcdMatrix = Array.from({length: n}, () => Array(n).fill(0));
 		const singleCompressionData: SingleCompressionRecord[] = [];
 		
 		for (let i = 0; i < n; i++) {
@@ -154,7 +145,7 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 				singleCompressedSizes,
 				'zstd',
 				cachedSizes,
-				getCompressedPairSizes,
+				getCompressedPairSize,
 				self
 			);
 
@@ -163,14 +154,16 @@ async function handleMessage(event: MessageEvent<NCDInput>) {
 			);
 			
 			for (const {i, j, ncd} of chunkResults) {
-				ncdMatrix[i][j] = ncd;
-				ncdMatrix[j][i] = ncd;
+				directedNcdMatrix[i][j] = ncd;
 			}
 		}
+
+		const ncdMatrix = reduceDirectedMatrix(directedNcdMatrix);
 		
 		self.postMessage({
 			type: 'result',
 			labels,
+			directedNcdMatrix,
 			ncdMatrix,
 			provenance: getCompressionProvenance("zstd"),
 			singleCompressionData,

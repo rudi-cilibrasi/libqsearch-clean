@@ -13,7 +13,7 @@ A similarity metric based on Kolmogorov complexity. For two strings x and y:
 NCD(x, y) = (C(xy) - min(C(x), C(y))) / max(C(x), C(y))
 ```
 
-Where `C(x)` is the compressed size of x. The empirical implementation uses `min(C(x || s || y), C(y || s || x))` for the pair term. Values are normally near the interval from zero to one, but finite compressor effects can produce values above one.
+Where `C(x)` is the compressed size of x. The empirical implementation first builds the complete ordered matrix, so `C(x || s || y)` and `C(y || s || x)` remain distinct. A later matrix operation takes the minimum of reflected cells to produce the symmetric distance matrix required by QSearch and K-grid. Values are normally near the interval from zero to one, but finite compressor effects can produce values above one.
 
 ### QSearch Quartet Trees
 An algorithm that builds phylogenetic-like trees from a distance matrix. The randomized native search runs multiple times with a deterministic seed schedule. The highest-scoring result is selected and canonical unrooted splits are counted across runs. The reported percentages are search stability, not bootstrap confidence. QSearch runs in a WebAssembly module compiled from C++.
@@ -63,7 +63,7 @@ ncd-calculator/
 │   │   └── ui/                     # Reusable UI primitives
 │   ├── workers/
 │   │   ├── shared/
-│   │   │   └── utils.ts            # NCD math and bidirectional pair processing
+│   │   │   └── utils.ts            # NCD math and ordered-pair processing
 │   │   ├── lzmaWorker.ts           # LZMA compression web worker
 │   │   ├── zstdWorker.ts           # ZSTD compression web worker
 │   │   ├── qsearchWorker.ts        # QSearch tree algorithm worker
@@ -137,8 +137,8 @@ User Input (FASTA sequences / files / UDHR translations)
 ┌─────────────────────┐
 │  lzmaWorker.ts /    │  For each pair (i,j):
 │  zstdWorker.ts      │    1. Compress x, y, x||y, and y||x
-│                     │    2. Use min(C(x||y), C(y||x))
-│                     │    3. Calculate NCD(x,y)
+│                     │    2. Build every directed NCD matrix cell
+│                     │    3. Reduce reflected cells by minimum
 │  (uses utils.ts)    │  Reports progress back to main thread
 └────────┬────────────┘
          │ NCD matrix (n×n)
@@ -217,7 +217,7 @@ npx vitest --run --exclude='**/webworker*'
 
 - **Web Workers** — All heavy computation (compression, QSearch, grid optimization) runs in dedicated web workers to keep the UI responsive.
 - **Singleton Services** — `CompressionService` uses a singleton pattern with factory injection for testability.
-- **Protocol-versioned caching** — Compression results use SHA-256 content identities and cache keys that include the pipeline, compressor revision, and pair policy. Stale schemas are removed rather than reused.
+- **Protocol-versioned caching** — Compression results use SHA-256 content identities and ordered source-target cache keys that include the pipeline and compressor revision. Stale schemas are removed rather than reused.
 - **Seeded multi-start QSearch** — A bounded deterministic schedule explores multiple randomized starts. Canonical split counting reports optimization stability.
 - **Pinned QSearch WASM** — `make wasm-calculator` builds the checked-in module with Emscripten 3.1.74. CI verifies that regeneration is clean.
 

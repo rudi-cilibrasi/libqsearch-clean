@@ -9,7 +9,7 @@ import type {
   WorkerReadyMessage,
 } from "@/types/ncd";
 import { LZMA } from '../libs/lzma';
-import {createSingleCacheKey, getCompressionProvenance} from "@/services/CompressionProtocol";
+import {createSingleCacheKey, getCompressionProvenance, reduceDirectedMatrix} from "@/services/CompressionProtocol";
 import type {PairCompressionRecord, SingleCompressionRecord} from "@/types/compression";
 
 // Configuration settings for LZMA compression
@@ -198,15 +198,6 @@ async function compressedSizePair(str1: string, str2: string): Promise<number> {
   }
 }
 
-async function compressedSizePairBoth(
-  str1: string,
-  str2: string,
-): Promise<{forwardSize: number; reverseSize: number}> {
-  const forwardSize = await compressedSizePair(str1, str2);
-  const reverseSize = await compressedSizePair(str2, str1);
-  return {forwardSize, reverseSize};
-}
-
 // Process input data and compute NCD matrix
 async function processInput(input: NCDInput): Promise<void> {
   try {
@@ -222,7 +213,7 @@ async function processInput(input: NCDInput): Promise<void> {
     }
     
     const n = contents.length;
-    const totalPairs = (n * (n - 1)) / 2;
+    const totalPairs = n * (n - 1);
     
     // Send start message with total counts
     self.postMessage({
@@ -233,7 +224,7 @@ async function processInput(input: NCDInput): Promise<void> {
     
     // Initialize data structures
     const singleCompressedSizes: number[] = new Array(n);
-    const ncdMatrix = Array.from({ length: n }, () => Array(n).fill(0));
+    const directedNcdMatrix = Array.from({ length: n }, () => Array(n).fill(0));
     const singleCompressionData: SingleCompressionRecord[] = [];
     
     // Process individual files, using cache when available
@@ -265,7 +256,7 @@ async function processInput(input: NCDInput): Promise<void> {
         singleCompressedSizes,
         'lzma',
         cachedSizes,
-        compressedSizePairBoth,
+        compressedSizePair,
         self
       );
 
@@ -274,15 +265,17 @@ async function processInput(input: NCDInput): Promise<void> {
       );
       
       for (const {i, j, ncd} of chunkResults) {
-        ncdMatrix[i][j] = ncd;
-        ncdMatrix[j][i] = ncd;
+        directedNcdMatrix[i][j] = ncd;
       }
     }
+
+    const ncdMatrix = reduceDirectedMatrix(directedNcdMatrix);
     
     // Send final results
     self.postMessage({
       type: "result",
       labels,
+      directedNcdMatrix,
       ncdMatrix,
       provenance: getCompressionProvenance("lzma"),
       singleCompressionData,

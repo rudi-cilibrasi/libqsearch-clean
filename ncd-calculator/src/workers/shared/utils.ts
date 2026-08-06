@@ -8,14 +8,13 @@
  * - Cache lookup logic for skipping already-computed compression pairs
  * - A generic chunk processor that drives the pairwise NCD computation loop
  *
- * Pair compression is performed in both directions by the algorithm-specific
- * worker and reduced with the documented minimum-bidirectional policy.
+ * Pair compression is directional. The complete ordered NCD matrix is built
+ * before a separate reflected-cell matrix reduction is applied downstream.
  */
 
 import {
     createPairCacheKey,
     PAIR_SEPARATOR,
-    symmetrizePairSizes,
 } from "@/services/CompressionProtocol";
 import type {CompressionAlgorithm, PairCompressionRecord} from "@/types/compression";
 
@@ -79,18 +78,19 @@ export function isValidCompressionSize(size: number) {
 }
 
 export function getCachedPairSize(
-    contentKey1: string,
-    contentKey2: string,
+    sourceContentKey: string,
+    targetContentKey: string,
     algorithm: CompressionAlgorithm,
     cachedSizes?: Map<string, number>
 ): number | undefined {
-    return cachedSizes?.get(createPairCacheKey(algorithm, contentKey1, contentKey2));
+    return cachedSizes?.get(createPairCacheKey(algorithm, sourceContentKey, targetContentKey));
 }
 
 /**
  * Process a chunk of pairwise NCD computations within a web worker.
- * Iterates over pairs (i, j) where startI ≤ i < endI and i ≤ j < n,
- * computing NCD for each pair either from cache or by compressing.
+ * Iterates over one triangular set of object pairs but emits both ordered
+ * cells, (i,j) and (j,i), independently. This avoids duplicate scheduling
+ * while preserving the complete directional matrix.
  * Sends progress messages back to the main thread via `self.postMessage`.
  *
  * @param startI - Starting row index (inclusive)
@@ -100,7 +100,7 @@ export function getCachedPairSize(
  * @param singleCompressedSizes - Pre-computed compressed sizes for each individual input
  * @param algorithm - Compression algorithm name
  * @param cachedSizes - Optional cache of previously computed sizes
- * @param compressPair - Function that compresses both concatenation orders
+ * @param compressPair - Function that compresses one ordered concatenation
  * @param self - The worker's global scope for posting messages
  * @returns Array of results with NCD values and metadata for each pair
  */
@@ -113,7 +113,7 @@ export async function processChunk(
     singleCompressedSizes: number[],
     algorithm: CompressionAlgorithm,
     cachedSizes: Map<string, number> | undefined,
-    compressPair: (str1: string, str2: string) => Promise<{forwardSize: number; reverseSize: number}>,
+    compressPair: (str1: string, str2: string) => Promise<number>,
     self: DedicatedWorkerGlobalScope
 ) {
     const results = [];
@@ -125,49 +125,48 @@ export async function processChunk(
                 continue;
             }
 
-            const contentKey1 = contentKeys[i];
-            const contentKey2 = contentKeys[j];
-            const cachedPairSize = getCachedPairSize(contentKey1, contentKey2, algorithm, cachedSizes);
-            let combinedSize: number;
-            let forwardSize: number | undefined;
-            let reverseSize: number | undefined;
-            let pairRecord: PairCompressionRecord | undefined;
+            const orderedPairs = [[i, j], [j, i]] as const;
+            for (const [sourceIndex, targetIndex] of orderedPairs) {
+                const sourceContentKey = contentKeys[sourceIndex];
+                const targetContentKey = contentKeys[targetIndex];
+                let combinedSize = getCachedPairSize(
+                    sourceContentKey,
+                    targetContentKey,
+                    algorithm,
+                    cachedSizes,
+                );
+                let pairRecord: PairCompressionRecord | undefined;
 
-            if (cachedPairSize !== undefined) {
-                combinedSize = cachedPairSize;
-            } else {
-                const compressedPair = await compressPair(contents[i], contents[j]);
-                forwardSize = compressedPair.forwardSize;
-                reverseSize = compressedPair.reverseSize;
-                combinedSize = symmetrizePairSizes(forwardSize, reverseSize);
-                pairRecord = {
-                    contentKey1,
-                    contentKey2,
-                    compressedSize: combinedSize,
-                    forwardSize,
-                    reverseSize,
-                };
+                if (combinedSize === undefined) {
+                    combinedSize = await compressPair(contents[sourceIndex], contents[targetIndex]);
+                    if (!isValidCompressionSize(combinedSize)) {
+                        throw new Error(`Pair compression produced an invalid size at [${sourceIndex}][${targetIndex}]`);
+                    }
+                    pairRecord = {
+                        sourceContentKey,
+                        targetContentKey,
+                        compressedSize: combinedSize,
+                    };
+                }
+
+                const ncd = calculateNCD(
+                    singleCompressedSizes[sourceIndex],
+                    singleCompressedSizes[targetIndex],
+                    combinedSize,
+                );
+
+                self.postMessage({
+                    type: 'progress',
+                    i: sourceIndex,
+                    j: targetIndex,
+                    value: ncd,
+                    sizeX: singleCompressedSizes[sourceIndex],
+                    sizeY: singleCompressedSizes[targetIndex],
+                    sizeXY: combinedSize,
+                });
+
+                results.push({i: sourceIndex, j: targetIndex, ncd, pairRecord});
             }
-
-            const ncd = calculateNCD(
-                singleCompressedSizes[i],
-                singleCompressedSizes[j],
-                combinedSize
-            );
-
-            self.postMessage({
-                type: 'progress',
-                i,
-                j,
-                value: ncd,
-                sizeX: singleCompressedSizes[i],
-                sizeY: singleCompressedSizes[j],
-                sizeXY: combinedSize,
-                sizeXYForward: forwardSize,
-                sizeXYReverse: reverseSize,
-            });
-
-            results.push({i, j, ncd, pairRecord});
         }
     }
 
