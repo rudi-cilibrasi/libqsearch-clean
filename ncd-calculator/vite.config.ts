@@ -83,8 +83,7 @@ export default defineConfig({
     plugins: [wasm()],
   },
   optimizeDeps: {
-    // Add @hpcc-js/wasm to the exclude list along with your existing exclusions
-    exclude: ['zstd.wasm', 'zstd.js', '@hpcc-js/wasm'],
+    exclude: ['zstd.wasm', 'zstd.js'],
     esbuildOptions: {
       target: 'es2020',
       supported: {
@@ -95,7 +94,7 @@ export default defineConfig({
   build: {
     target: 'es2020',
     rollupOptions: {
-      external: ['path', 'fs', '@hpcc-js/wasm'],
+      external: ['path', 'fs'],
       output: {
         format: 'es',
         assetFileNames: (assetInfo) => {

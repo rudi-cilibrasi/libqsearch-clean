@@ -32,6 +32,8 @@ npm run test
 npm run typecheck
 ```
 
+Production builds also verify that the Graphviz renderer was bundled into relative assets. The build fails if an unresolved `@hpcc-js/wasm` module specifier would reach the browser.
+
 Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__test__/workbench.test.tsx`.
 
 UDHR translations are retrieved as PDFs through the configured backend proxy. PDF.js uses the worker bundled from the installed `pdfjs-dist` package so the parser and worker versions remain identical after dependency updates; do not replace it with a separately versioned CDN URL.

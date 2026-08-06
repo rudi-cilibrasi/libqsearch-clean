@@ -1,13 +1,10 @@
 import React, {useCallback, useEffect, useRef, useState} from "react";
+import type {Graphviz as GraphvizRenderer} from "@hpcc-js/wasm/graphviz";
 import {createPlanarTreeDot, PlanarTreeData} from "./tree/planarTree";
 
 interface DotGraphVisualizerProps {
     data: PlanarTreeData;
     onClose?: () => void;
-}
-
-interface GraphvizRenderer {
-    layout: (source: string, format: string, engine: string) => string;
 }
 
 interface ViewTransform {
@@ -54,7 +51,7 @@ export const DotGraphVisualizer: React.FC<DotGraphVisualizerProps> = ({data, onC
         const initializeGraphviz = async (): Promise<void> => {
             try {
                 setLoading(true);
-                const {Graphviz} = await import("@hpcc-js/wasm");
+                const {Graphviz} = await import("@hpcc-js/wasm/graphviz");
                 const renderer = await Graphviz.load();
                 if (!cancelled) setGraphviz(renderer);
             } catch (initializationError) {
