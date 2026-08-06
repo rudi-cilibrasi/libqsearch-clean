@@ -655,6 +655,211 @@
     place-items: center;
 }
 
+.quartet-tree {
+    height: 100%;
+    min-height: 560px;
+    color: #eef0e8;
+    background: #101b17;
+}
+
+.quartet-tree__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 58px;
+    padding: 10px 12px;
+    background: #0f231b;
+    border-bottom: 1px solid #53635a;
+}
+
+.quartet-tree__view-switch,
+.quartet-tree__actions,
+.quartet-planar__controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.quartet-tree__toolbar button,
+.quartet-planar__controls button {
+    min-height: 36px;
+    padding: 7px 11px;
+    color: #eef0e8;
+    background: transparent;
+    border: 1px solid #6f8177;
+    border-radius: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.quartet-tree__toolbar button:hover,
+.quartet-tree__toolbar button:focus-visible,
+.quartet-planar__controls button:hover,
+.quartet-planar__controls button:focus-visible {
+    color: #fffdf7;
+    background: #234c3c;
+    border-color: #eef0e8;
+}
+
+.quartet-tree__view-switch button[aria-pressed="true"] {
+    color: #101b17;
+    background: #eef0e8;
+    border-color: #eef0e8;
+}
+
+.quartet-tree__actions button[aria-label="Zoom out"],
+.quartet-tree__actions button[aria-label="Zoom in"],
+.quartet-planar__controls button[aria-label="Zoom out"],
+.quartet-planar__controls button[aria-label="Zoom in"] {
+    width: 36px;
+    padding-right: 0;
+    padding-left: 0;
+    font-size: 1rem;
+}
+
+.quartet-tree__stage {
+    height: clamp(460px, 64vh, 660px);
+    min-height: 0;
+    overflow: hidden;
+    background: #101b17;
+}
+
+.quartet-planar {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100%;
+    color: #17231d;
+    background: #f7f3e8;
+}
+
+.quartet-planar__controls {
+    position: relative;
+    z-index: 2;
+    padding: 9px 12px;
+    color: #eef0e8;
+    background: #173c2e;
+    border-bottom: 1px solid #315b4b;
+}
+
+.quartet-planar__controls output {
+    min-width: 52px;
+    color: #eef0e8;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-align: center;
+}
+
+.quartet-planar__viewport {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    background: #f7f3e8;
+}
+
+.quartet-planar__surface {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.quartet-planar__surface:active {
+    cursor: grabbing;
+}
+
+.quartet-planar__svg {
+    flex: 0 0 auto;
+    transform-origin: center;
+    transition: transform 100ms ease-out;
+    will-change: transform;
+}
+
+.quartet-planar__message {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-content: center;
+    gap: 8px;
+    padding: 24px;
+    color: #173c2e;
+    background: rgb(247 243 232 / 92%);
+    text-align: center;
+}
+
+.quartet-planar__message--error {
+    color: #6e2514;
+}
+
+.quartet-tree__footer,
+.quartet-tree__selection {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.quartet-tree__footer {
+    min-height: 48px;
+    padding: 9px 12px;
+    color: #d5dcd7;
+    background: #0f231b;
+    border-top: 1px solid #53635a;
+}
+
+.quartet-tree__selection {
+    justify-content: flex-start;
+}
+
+.quartet-tree__selection strong {
+    color: #fffdf7;
+}
+
+.quartet-tree__node-label {
+    display: block;
+    width: max-content;
+    max-width: 142px;
+    padding: 3px 5px;
+    color: #fffdf7;
+    background: rgb(9 17 14 / 88%);
+    border: 1px solid #8da399;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    white-space: normal;
+    pointer-events: none;
+}
+
+.quartet-tree__stage[data-theme="light"] .quartet-tree__node-label {
+    color: #17231d;
+    background: rgb(255 253 247 / 92%);
+    border-color: #315b4b;
+}
+
+.quartet-tree__selection span,
+.quartet-tree__hint {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.67rem;
+}
+
+.quartet-planar > .quartet-tree__hint {
+    padding: 9px 12px;
+    color: #d5dcd7;
+    background: #173c2e;
+    border-top: 1px solid #315b4b;
+    text-align: center;
+}
+
 .ncd-visualization__status {
     padding: 10px 14px;
     color: #d5dcd7;
@@ -987,6 +1192,54 @@ button.genbank-suggestions__status:hover {
     .ncd-visualization__tabs button[aria-pressed="true"] {
         border-bottom-color: #f1a58e;
         border-left: 3px solid #f1a58e;
+    }
+
+    .quartet-tree {
+        min-height: 540px;
+    }
+
+    .quartet-tree__toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .quartet-tree__view-switch {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .quartet-tree__view-switch button,
+    .quartet-tree__actions button {
+        justify-content: center;
+    }
+
+    .quartet-tree__actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .quartet-tree__actions button[aria-label="Zoom out"],
+    .quartet-tree__actions button[aria-label="Zoom in"] {
+        width: auto;
+    }
+
+    .quartet-tree__stage {
+        height: min(68vh, 570px);
+        min-height: 430px;
+    }
+
+    .quartet-planar__controls {
+        display: grid;
+        grid-template-columns: 36px 52px 36px minmax(90px, 1fr);
+    }
+
+    .quartet-planar__controls button:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .quartet-tree__footer {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .distance-matrix__legend {

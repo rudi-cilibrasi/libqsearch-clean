@@ -1,12 +1,13 @@
-import React, {useEffect, useRef, useState} from "react";
-import {Canvas, useFrame} from "@react-three/fiber";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import {Canvas, useThree} from "@react-three/fiber";
+import {Html, OrbitControls} from "@react-three/drei";
+import type {OrbitControls as OrbitControlsImpl} from "three-stdlib";
 import * as THREE from "three";
-import {OrbitControls, PerspectiveCamera, Text} from "@react-three/drei";
 import {saveAs} from "file-saver";
 import createGraph from "../functions/graphExport";
-import { DotGraphVisualizer } from "./DotGraphVisualizer";
+import {DotGraphVisualizer} from "./DotGraphVisualizer";
+import {calculateCameraFitDistance} from "./tree/cameraFit";
 
-// Types for the graph data
 export interface QTreeNode {
     index: number;
     label: string;
@@ -22,578 +23,413 @@ export interface QSearchTree3DProps {
     darkThemeOnly?: boolean;
 }
 
-interface ContainerStyle {
-    width: string;
-    height: string;
-    position: "relative";
-    overflow: "hidden";
-    background: string;
+type TreeView = "planar" | "spatial";
+type CameraAction = "fit" | "reset" | "zoom-in" | "zoom-out";
+
+interface CameraCommand {
+    action: CameraAction;
+    requestId: number;
 }
 
-export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({data}) => {
-    const [theme, setTheme] = useState<"light" | "dark">("dark");
-    const [showDotGraph, setShowDotGraph] = useState<boolean>(false);
-    const scaleFactor = Math.max(1, Math.sqrt(data.nodes.length) / 4);
-    // Create a key that changes whenever data changes to force component remounting
-    const treeKey = useRef(Math.random().toString(36));
-    
-    // Update the key when data changes to force a complete remount
-    useEffect(() => {
-        treeKey.current = Math.random().toString(36);
-    }, [data]);
-    
-    const containerStyle: ContainerStyle = {
-        width: "100%",
-        height: "600px", // Fixed height
-        position: "relative",
-        overflow: "hidden",
-        background: theme === "dark" ? "#1a1a2e" : "#f0f2f5" // Dark navy or light gray
-    };
-    
-    const handleExport = (): void => {
-        const dotFormat = createGraph(data, false);
-        const blob = new Blob([dotFormat], {type: "text/plain;charset=utf-8"});
-        saveAs(blob, "graph.dot");
-    };
-    
-    const toggleTheme = (): void => {
-        setTheme(prev => prev === "dark" ? "light" : "dark");
-    };
-    
-    const toggleDotGraph = (): void => {
-        setShowDotGraph(prev => !prev);
-    };
-    
-    // Render either the 3D Tree or the DOT Graph based on state
-    const renderVisualization = () => {
-        if (showDotGraph) {
-            return (
-              <div className="w-full h-full" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
-                  <DotGraphVisualizer data={data} />
-              </div>
-            );
-        }
-        
-        return (
-          <Canvas
-            key={treeKey.current} // Force Canvas remount when data changes
-            shadows
-            dpr={[1, 2]} // Better render quality on high DPI screens
-          >
-              <PerspectiveCamera
-                makeDefault
-                position={[scaleFactor * 100, scaleFactor * 100, scaleFactor * 100]}
-                fov={60}
-                near={1}
-                far={1000}
-              />
-              <OrbitControls
-                enablePan={true}
-                enableZoom={true}
-                enableRotate={true}
-                autoRotate={true}
-                autoRotateSpeed={0.5}
-                maxDistance={scaleFactor * 300} // Limit zoom out
-                minDistance={scaleFactor * 10}  // Limit zoom in
-              />
-              <color attach="background" args={[theme === "dark" ? "#1a1a2e" : "#f0f2f5"]}/>
-              <fog attach="fog" args={[theme === "dark" ? "#1a1a2e" : "#f0f2f5", 300, 500]}/>
-              <QSearchTree
-                key={treeKey.current} // Force QSearchTree remount when data changes
-                data={data}
-                scaleFactor={scaleFactor}
-                theme={theme}
-              />
-          </Canvas>
-        );
-    };
-    
-    return (
-      <div style={containerStyle}>
-          {/* Fixed horizontal button layout for both views */}
-          <div className="flex absolute top-4 right-4 space-x-2 z-10">
-              {!showDotGraph && (
-                <button
-                  onClick={toggleTheme}
-                  className="bg-blue-600 text-white hover:bg-blue-700 shadow-md px-4 py-2 rounded-md text-sm flex items-center"
-                >
-                    {theme === "dark" ? "Light Theme" : "Dark Theme"}
-                </button>
-              )}
-              {/*<button*/}
-              {/*  onClick={toggleDotGraph}*/}
-              {/*  className="bg-purple-600 text-white hover:bg-purple-700 shadow-md px-4 py-2 rounded-md text-sm flex items-center"*/}
-              {/*>*/}
-              {/*    {showDotGraph ? "Show 3D Tree" : "Show DOT Graph"}*/}
-              {/*</button>*/}
-              <button
-                onClick={handleExport}
-                className="bg-green-600 text-white hover:bg-green-700 shadow-md px-4 py-2 rounded-md text-sm flex items-center"
-              >
-                  Export Graph
-              </button>
-          </div>
-          
-          {/* Render either the 3D Tree or DOT Graph based on state */}
-          {renderVisualization()}
-          
-          {/* Help overlay - only shown when 3D Tree is active */}
-          {!showDotGraph && (
-            <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white p-2 rounded text-xs">
-                <p>Mouse controls: Left-click rotate, Right-click pan, Scroll to zoom</p>
-            </div>
-          )}
-      </div>
+interface TreeBounds {
+    center: THREE.Vector3;
+    size: THREE.Vector3;
+}
+
+interface TreeEdge {
+    source: number;
+    target: number;
+}
+
+const EMPTY_CAMERA_COMMAND: CameraCommand = {action: "fit", requestId: 0};
+const DEFAULT_CAMERA_DIRECTION = new THREE.Vector3(1, 0.72, 1).normalize();
+
+const getTreeRoot = (nodes: QTreeNode[]): QTreeNode | undefined => (
+    [...nodes].sort((left, right) => right.connections.length - left.connections.length)[0]
+);
+
+const countLeaves = (
+    nodeIndex: number,
+    parentIndex: number | null,
+    nodesByIndex: Map<number, QTreeNode>,
+    path: Set<number>
+): number => {
+    if (path.has(nodeIndex)) return 1;
+    const node = nodesByIndex.get(nodeIndex);
+    if (!node) return 1;
+
+    const nextPath = new Set(path).add(nodeIndex);
+    const children = node.connections.filter(connection => connection !== parentIndex && !nextPath.has(connection));
+    if (children.length === 0) return 1;
+
+    return children.reduce(
+        (total, childIndex) => total + countLeaves(childIndex, nodeIndex, nodesByIndex, nextPath),
+        0
     );
 };
 
-// Types for the QSearchTree component
-interface QSearchTreeProps {
+/** Create a deterministic radial layout for the optional spatial explorer. */
+const calculateSpatialPositions = (nodes: QTreeNode[], scaleFactor: number): Map<number, THREE.Vector3> => {
+    const positions = new Map<number, THREE.Vector3>();
+    const root = getTreeRoot(nodes);
+    if (!root) return positions;
+
+    const nodesByIndex = new Map(nodes.map(node => [node.index, node]));
+    const visited = new Set<number>();
+    const levelDistance = 32 * scaleFactor;
+
+    const placeNode = (
+        nodeIndex: number,
+        parentIndex: number | null,
+        depth: number,
+        angleStart: number,
+        angleEnd: number
+    ): void => {
+        if (visited.has(nodeIndex)) return;
+        const node = nodesByIndex.get(nodeIndex);
+        if (!node) return;
+        visited.add(nodeIndex);
+
+        const angle = (angleStart + angleEnd) / 2;
+        const radius = depth * levelDistance;
+        const z = depth === 0 ? 0 : Math.sin(angle * 2) * depth * 3.5 * scaleFactor;
+        positions.set(nodeIndex, new THREE.Vector3(
+            Math.cos(angle) * radius,
+            Math.sin(angle) * radius,
+            z
+        ));
+
+        const children = node.connections
+            .filter(connection => connection !== parentIndex && !visited.has(connection))
+            .sort((left, right) => left - right);
+        if (children.length === 0) return;
+
+        const weights = children.map(child => countLeaves(child, nodeIndex, nodesByIndex, new Set([nodeIndex])));
+        const totalWeight = weights.reduce((total, weight) => total + weight, 0);
+        let cursor = angleStart;
+
+        children.forEach((child, index) => {
+            const share = (angleEnd - angleStart) * weights[index] / totalWeight;
+            placeNode(child, nodeIndex, depth + 1, cursor, cursor + share);
+            cursor += share;
+        });
+    };
+
+    placeNode(root.index, null, 0, -Math.PI, Math.PI);
+
+    const disconnected = nodes.filter(node => !visited.has(node.index));
+    disconnected.forEach((node, index) => {
+        const angle = 2 * Math.PI * index / Math.max(disconnected.length, 1);
+        const radius = levelDistance * 1.5;
+        positions.set(node.index, new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0));
+    });
+
+    return positions;
+};
+
+const collectEdges = (nodes: QTreeNode[]): TreeEdge[] => {
+    const seen = new Set<string>();
+    const edges: TreeEdge[] = [];
+
+    for (const node of nodes) {
+        for (const connection of node.connections) {
+            const source = Math.min(node.index, connection);
+            const target = Math.max(node.index, connection);
+            const key = `${source}-${target}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            edges.push({source, target});
+        }
+    }
+
+    return edges;
+};
+
+const getTreeBounds = (positions: Map<number, THREE.Vector3>, padding: number): TreeBounds | null => {
+    const points = Array.from(positions.values());
+    if (points.length === 0) return null;
+
+    const box = new THREE.Box3().setFromPoints(points).expandByScalar(padding);
+    return {
+        center: box.getCenter(new THREE.Vector3()),
+        size: box.getSize(new THREE.Vector3()),
+    };
+};
+
+interface CameraRigProps {
+    bounds: TreeBounds | null;
+    command: CameraCommand;
+    scaleFactor: number;
+}
+
+const CameraRig: React.FC<CameraRigProps> = ({bounds, command, scaleFactor}) => {
+    const controlsRef = useRef<OrbitControlsImpl>(null);
+    const {camera, size} = useThree();
+
+    const fitCamera = useCallback((resetOrientation: boolean): void => {
+        if (!bounds || !(camera instanceof THREE.PerspectiveCamera)) return;
+
+        const target = bounds.center;
+        const controls = controlsRef.current;
+        const currentDirection = controls
+            ? camera.position.clone().sub(controls.target).normalize()
+            : DEFAULT_CAMERA_DIRECTION.clone();
+        const direction = resetOrientation || currentDirection.lengthSq() === 0
+            ? DEFAULT_CAMERA_DIRECTION.clone()
+            : currentDirection;
+        const distance = calculateCameraFitDistance(
+            bounds.size,
+            camera.fov,
+            size.width / Math.max(size.height, 1)
+        );
+
+        camera.position.copy(target).add(direction.multiplyScalar(distance));
+        camera.near = Math.max(distance / 200, 0.1);
+        camera.far = Math.max(distance * 20, 1000);
+        camera.updateProjectionMatrix();
+        controls?.target.copy(target);
+        controls?.update();
+    }, [bounds, camera, size.height, size.width]);
+
+    useEffect(() => {
+        fitCamera(true);
+    }, [fitCamera]);
+
+    useEffect(() => {
+        if (command.requestId === 0) return;
+        const controls = controlsRef.current;
+
+        if (command.action === "fit") {
+            fitCamera(false);
+            return;
+        }
+        if (command.action === "reset") {
+            fitCamera(true);
+            return;
+        }
+        if (!controls) return;
+
+        const direction = camera.position.clone().sub(controls.target);
+        const factor = command.action === "zoom-in" ? 0.78 : 1.28;
+        const nextDistance = Math.max(scaleFactor * 8, direction.length() * factor);
+        camera.position.copy(controls.target).add(direction.normalize().multiplyScalar(nextDistance));
+        controls.update();
+    }, [camera, command, fitCamera, scaleFactor]);
+
+    return (
+        <OrbitControls
+            ref={controlsRef}
+            makeDefault
+            enableDamping
+            dampingFactor={0.08}
+            enablePan
+            enableRotate
+            enableZoom
+            autoRotate={false}
+            minDistance={scaleFactor * 8}
+            maxDistance={scaleFactor * 500}
+        />
+    );
+};
+
+interface SpatialEdgeProps {
+    start: THREE.Vector3;
+    end: THREE.Vector3;
+    color: number;
+    scaleFactor: number;
+}
+
+const SpatialEdge: React.FC<SpatialEdgeProps> = ({start, end, color, scaleFactor}) => {
+    const geometry = useMemo(() => {
+        const direction = end.clone().sub(start);
+        const midpoint = start.clone().add(end).multiplyScalar(0.5);
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            direction.clone().normalize()
+        );
+        return {length: direction.length(), midpoint, quaternion};
+    }, [end, start]);
+
+    return (
+        <mesh position={geometry.midpoint} quaternion={geometry.quaternion}>
+            <cylinderGeometry args={[0.7 * scaleFactor, 0.7 * scaleFactor, geometry.length, 10]}/>
+            <meshBasicMaterial color={color}/>
+        </mesh>
+    );
+};
+
+interface SpatialTreeProps {
     data: QTreeResponse;
+    positions: Map<number, THREE.Vector3>;
+    edges: TreeEdge[];
     scaleFactor: number;
     theme: "light" | "dark";
+    selectedNode: number | null;
+    onSelectNode: (index: number | null) => void;
 }
 
-interface BallObject {
-    ball: JSX.Element;
-    label: JSX.Element;
-    ref: React.RefObject<THREE.Mesh>;
-    labelRef: React.RefObject<any>; // Text component from @react-three/drei
-    velocity: THREE.Vector3;
-    index: number;
-    isLeaf: boolean;
-}
-
-interface SpringObject {
-    ballA: React.RefObject<THREE.Mesh>;
-    ballB: React.RefObject<THREE.Mesh>;
-    mesh: JSX.Element;
-    springRef: React.RefObject<THREE.Mesh>;
-}
-
-type SimulationPhase = "initial" | "stabilizing" | "stable";
-
-const QSearchTree: React.FC<QSearchTreeProps> = ({data, scaleFactor, theme}) => {
-    const sceneRef = useRef<THREE.Scene>(null);
-    const ballsRef = useRef<BallObject[]>([]);
-    const springsRef = useRef<SpringObject[]>([]);
-    const [graph, setGraph] = useState<string | null>(null);
-    const simulationPhaseRef = useRef<SimulationPhase>("initial");
-    const frameCountRef = useRef<number>(0);
-    const processedConnectionsRef = useRef<Set<string>>(new Set());
-    const hasInitializedRef = useRef<boolean>(false);
-    
-    // Update when data or theme changes with complete reset
-    useEffect(() => {
-        // Clear all internal state
-        ballsRef.current = [];
-        springsRef.current = [];
-        processedConnectionsRef.current.clear();
-        simulationPhaseRef.current = "initial";
-        frameCountRef.current = 0;
-        hasInitializedRef.current = false;
-        
-        // Force null graph state to ensure useEffect triggers
-        setGraph(null);
-        
-        // Small delay to ensure clean state before loading
-        setTimeout(() => {
-            if (data && data.nodes) {
-                loadGraph(data);
-                setGraph(JSON.stringify(data));
-                hasInitializedRef.current = true;
-            }
-        }, 50);
-    }, [data, theme]);
-    
-    const calculateInitialPositions = (
-      nodes: QTreeNode[]
-    ): Map<number, THREE.Vector3> => {
-        const positions = new Map<number, THREE.Vector3>();
-        const visited = new Set<number>();
-        const spread = 25 * scaleFactor;
-        
-        // Find root nodes (nodes with most connections)
-        const sortedNodes = [...nodes].sort(
-          (a, b) => b.connections.length - a.connections.length
-        );
-        const rootNode = sortedNodes[0];
-        
-        // Recursive function to position nodes in a tree-like structure
-        const positionNode = (
-          node: QTreeNode,
-          angle: number,
-          radius: number,
-          level: number
-        ): void => {
-            if (visited.has(node.index)) return;
-            visited.add(node.index);
-            
-            // Calculate position using spherical coordinates
-            // Add small random offset to prevent perfect symmetry
-            const randOffset = 0.1;
-            const x = Math.cos(angle) * radius * Math.cos(level) + (Math.random() - 0.5) * randOffset * radius;
-            const y = Math.sin(level) * radius + (Math.random() - 0.5) * randOffset * radius;
-            const z = Math.sin(angle) * radius * Math.cos(level) + (Math.random() - 0.5) * randOffset * radius;
-            
-            positions.set(node.index, new THREE.Vector3(x, y, z));
-            
-            // Position connected nodes
-            const connectionCount = node.connections.length;
-            if (connectionCount > 0) {
-                const angleStep = (2 * Math.PI) / connectionCount;
-                node.connections.forEach((connectedIndex, i) => {
-                    const connectedNode = nodes.find((n) => n.index === connectedIndex);
-                    if (connectedNode && !visited.has(connectedIndex)) {
-                        const newAngle = angle + angleStep * i;
-                        const newRadius = radius * 0.8;
-                        const newLevel = level + Math.PI / 6;
-                        positionNode(connectedNode, newAngle, newRadius, newLevel);
-                    }
-                });
-            }
-        };
-        
-        // Start positioning from root node
-        positionNode(rootNode, 0, spread, 0);
-        
-        // Handle any disconnected nodes
-        nodes.forEach((node) => {
-            if (!visited.has(node.index)) {
-                const angle = Math.random() * Math.PI * 2;
-                const radius = spread * (0.5 + Math.random() * 0.5);
-                const level = Math.random() * Math.PI - Math.PI / 2;
-                positionNode(node, angle, radius, level);
-            }
-        });
-        
-        return positions;
-    };
-    
-    const updateSpring = (spring: SpringObject): void => {
-        const {ballA, ballB, springRef} = spring;
-        if (!ballA.current || !ballB.current || !springRef.current) return;
-        
-        const positionA = ballA.current.position;
-        const positionB = ballB.current.position;
-        const midPoint = new THREE.Vector3()
-          .addVectors(positionA, positionB)
-          .multiplyScalar(0.5);
-        springRef.current.position.copy(midPoint);
-        
-        const currentLength = positionA.distanceTo(positionB);
-        springRef.current.scale.set(1, currentLength, 1);
-        
-        const direction = new THREE.Vector3().subVectors(positionB, positionA);
-        if (direction.length() === 0) return;
-        
-        const axis = new THREE.Vector3(0, 1, 0).cross(direction).normalize();
-        if (axis.length() === 0) return;
-        
-        const angle = Math.acos(
-          Math.min(1, Math.max(-1, new THREE.Vector3(0, 1, 0).dot(direction.normalize())))
-        );
-        springRef.current.setRotationFromAxisAngle(axis, angle);
-    };
-    
-    useFrame(({camera}): void => {
-        // Only run simulation if initialized
-        if (!hasInitializedRef.current) return;
-        
-        frameCountRef.current++;
-        const phase = simulationPhaseRef.current;
-        
-        // Shorter phase transitions
-        if (phase === "initial" && frameCountRef.current > 50) {
-            simulationPhaseRef.current = "stabilizing";
-        } else if (phase === "stabilizing" && frameCountRef.current > 100) {
-            simulationPhaseRef.current = "stable";
-        }
-        
-        // Dynamic parameters optimized for faster expansion
-        const dampingFactor = phase === "initial" ? 0.25 : 0.5; // Reduced damping initially
-        
-        // Calculate system energy for adaptive time step
-        const systemEnergy = ballsRef.current.reduce((sum, ball) =>
-          sum + (ball.velocity ? ball.velocity.lengthSq() : 0), 0);
-        const energyFactor = Math.min(1, 0.5 / Math.max(0.1, systemEnergy));
-        
-        // Adaptive time step based on system energy
-        const timeStep = phase === "initial"
-          ? Math.min(0.3, 0.2 * (1 + energyFactor))
-          : 0.2;
-        
-        // Stronger initial repulsion with faster ramp-up
-        const repulsionStrength = (phase === "initial" ? 60 : 30) * scaleFactor;
-        const minDistance = scaleFactor;
-        const springStrength = phase === "initial" ? 0.01 : 0.02;
-        const squishForce = phase === "initial" ? 0.05 : 0.1;
-        
-        const cameraDistance = camera.position.length();
-        const labelScaleFactor = Math.max(
-          1.0,
-          cameraDistance / (100 * scaleFactor)
-        );
-        
-        // For all calculations below, speed up the initial phase using a faster ramp-up
-        const phaseFactor = phase === "initial" ? Math.min(1, frameCountRef.current / 30) : 1;
-        
-        // Calculate total kinetic energy to monitor stability
-        let totalKineticEnergy = 0;
-        
-        ballsRef.current.forEach((ball) => {
-            const force = new THREE.Vector3();
-            
-            ballsRef.current.forEach((otherBall) => {
-                if (ball !== otherBall && ball.ref.current && otherBall.ref.current) {
-                    if (!ball.ref.current || !otherBall.ref.current) return;
-                    const direction = ball.ref.current.position
-                      .clone()
-                      .sub(otherBall.ref.current.position);
-                    let distance = direction.length();
-                    if (distance < minDistance) distance = minDistance;
-                    direction.normalize();
-                    
-                    force.add(
-                      direction.multiplyScalar(
-                        (repulsionStrength * phaseFactor) / (distance * distance)
-                      )
-                    );
-                }
-            });
-            
-            // Continue with spring forces...
-            springsRef.current.forEach((spring) => {
-                if (
-                  (spring.ballA.current === ball.ref.current ||
-                    spring.ballB.current === ball.ref.current) &&
-                  spring.ballA.current &&
-                  spring.ballB.current &&
-                  ball.ref.current
-                ) {
-                    const otherBall =
-                      spring.ballA.current === ball.ref.current
-                        ? spring.ballB
-                        : spring.ballA;
-                    if (!otherBall.current) return;
-                    const direction = new THREE.Vector3().subVectors(
-                      otherBall.current.position,
-                      ball.ref.current.position
-                    );
-                    const currentLength = direction.length();
-                    direction.normalize();
-                    force.add(direction.multiplyScalar(springStrength * currentLength));
-                }
-            });
-            
-            // Apply exponentially-decaying outward force for faster initial expansion
-            if (phase === "initial" && frameCountRef.current < 40) {
-                const dirFromCenter = ball.ref.current?.position.clone().normalize() || new THREE.Vector3();
-                const expansionForce = 3.0 * Math.exp(-frameCountRef.current / 20);
-                force.add(dirFromCenter.multiplyScalar(expansionForce));
-            }
-            
-            if (ball && ball.ref.current) {
-                const ballRef = ball.ref.current;
-                const distanceToXY = Math.abs(ballRef.position.z);
-                force.add(
-                  new THREE.Vector3(
-                    0,
-                    0,
-                    -Math.sign(ballRef.position.z) * squishForce * distanceToXY
-                  )
-                );
-                force.add(ball.velocity.clone().multiplyScalar(-dampingFactor));
-                
-                // Apply force limiting to prevent instability
-                const maxForce = 8; // Increased max force for faster expansion
-                if (force.length() > maxForce) {
-                    force.normalize().multiplyScalar(maxForce);
-                }
-                
-                ball.velocity.add(force.multiplyScalar(timeStep));
-                
-                // Apply velocity limiting with higher initial limit
-                const maxVelocity = phase === "initial" ? 5 : 2;
-                if (ball.velocity.length() > maxVelocity) {
-                    ball.velocity.normalize().multiplyScalar(maxVelocity);
-                }
-                
-                ballRef.position.add(ball.velocity.clone().multiplyScalar(timeStep));
-                
-                totalKineticEnergy += ball.velocity.lengthSq();
-                
-                if (ball.labelRef.current) {
-                    const labelOffset = (ball.isLeaf ? 6 : 4) * scaleFactor;
-                    ball.labelRef.current.position.copy(ballRef.position);
-                    ball.labelRef.current.position.y += labelOffset;
-                    ball.labelRef.current.quaternion.copy(camera.quaternion);
-                    ball.labelRef.current.scale.setScalar(labelScaleFactor);
-                }
-            }
-        });
-        
-        springsRef.current.forEach(updateSpring);
-    });
-    
-    const loadGraph = (graph: QTreeResponse): void => {
-        ballsRef.current = [];
-        springsRef.current = [];
-        processedConnectionsRef.current.clear();
-        
-        const nodeMap = new Map<number, BallObject>();
-        const initialPositions = calculateInitialPositions(graph.nodes);
-        
-        // Get theme-appropriate colors
-        const leafNodeColor = theme === "dark" ? 0x4287f5 : 0x0047AB; // Blue
-        const internalNodeColor = theme === "dark" ? 0xAA336A : 0x800080; // Purple
-        const springColor = theme === "dark" ? 0x555555 : 0xAAAAAA; // Gray
-        const textColor = theme === "dark" ? "white" : "black";
-        
-        // Create balls and labels
-        graph.nodes.forEach((node) => {
-            const position = initialPositions.get(node.index)!;
-            const isLeaf = node.connections.length === 1;
-            const color = isLeaf ? leafNodeColor : internalNodeColor;
-            
-            const ballRef = React.createRef<THREE.Mesh>();
-            const labelRef = React.createRef<any>(); // Text component from @react-three/drei
-            
-            const ballSize = (isLeaf ? 4 : 2) * scaleFactor;
-            const ball = (
-              <mesh
-                ref={ballRef}
-                position={[position.x, position.y, position.z]}
-                key={`ball-${node.index}`}
-                castShadow
-                receiveShadow
-              >
-                  <sphereGeometry args={[ballSize, 32, 32]}/>
-                  <meshStandardMaterial color={color} roughness={0.5} metalness={0.5}/>
-              </mesh>
-            );
-            
-            // Create label with background for better visibility
-            const label = (
-              <Text
-                ref={labelRef}
-                position={[
-                    position.x,
-                    position.y + (isLeaf ? 8 : 6) * scaleFactor, // Increased offset
-                    position.z,
-                ]}
-                fontSize={2.2 * scaleFactor} // Increased font size
-                color={textColor}
-                anchorX="center"
-                anchorY="middle"
-                key={`label-${node.index}`}
-                renderOrder={1}
-                material-depthTest={false}
-                outlineColor={theme === "dark" ? "#000000" : "#ffffff"}
-                outlineWidth={0.1} // Thicker outline
-                backgroundColor={theme === "dark" ? "#00000080" : "#ffffff80"} // Semi-transparent background
-                padding={0.5 * scaleFactor} // Add padding
-                maxWidth={20 * scaleFactor} // Limit width for long labels
-                overflowWrap="break-word" // Break long words if needed
-              >
-                  {node.label}
-              </Text>
-            );
-            
-            // Add some initial outward velocity to help with expansion
-            const dirFromCenter = new THREE.Vector3(position.x, position.y, position.z);
-            dirFromCenter.normalize();
-            
-            const velocity = new THREE.Vector3(
-              dirFromCenter.x * 0.5 + (Math.random() - 0.5) * 0.1,
-              dirFromCenter.y * 0.5 + (Math.random() - 0.5) * 0.1,
-              dirFromCenter.z * 0.5 + (Math.random() - 0.5) * 0.1
-            );
-            
-            const ballObj: BallObject = {
-                ball,
-                label,
-                ref: ballRef,
-                labelRef,
-                velocity,
-                index: node.index,
-                isLeaf,
-            };
-            
-            ballsRef.current.push(ballObj);
-            nodeMap.set(node.index, ballObj);
-        });
-        
-        // Create springs - handle duplicate connections
-        const processedConnections = processedConnectionsRef.current;
-        
-        graph.nodes.forEach((node) => {
-            node.connections.forEach((connectionIndex) => {
-                // Create unique ID for this connection
-                const connectionId = [Math.min(node.index, connectionIndex),
-                    Math.max(node.index, connectionIndex)].join('-');
-                
-                // Skip if we've already processed this connection
-                if (processedConnections.has(connectionId)) return;
-                processedConnections.add(connectionId);
-                
-                const ballA = nodeMap.get(node.index);
-                const ballB = nodeMap.get(connectionIndex);
-                
-                if (ballA && ballB) {
-                    const springRef = React.createRef<THREE.Mesh>();
-                    const spring = (
-                      <mesh
-                        ref={springRef}
-                        key={`${ballA.index}-${ballB.index}`}
-                        castShadow
-                      >
-                          <cylinderGeometry
-                            args={[0.5 * scaleFactor, 0.5 * scaleFactor, 1, 8]}
-                          />
-                          <meshStandardMaterial
-                            color={springColor}
-                            roughness={0.7}
-                            metalness={0.3}
-                          />
-                      </mesh>
-                    );
-                    
-                    springsRef.current.push({
-                        ballA: ballA.ref,
-                        ballB: ballB.ref,
-                        mesh: spring,
-                        springRef,
-                    });
-                }
-            });
-        });
-    };
-    
+const SpatialTree: React.FC<SpatialTreeProps> = ({
+    data,
+    positions,
+    edges,
+    scaleFactor,
+    theme,
+    selectedNode,
+    onSelectNode,
+}) => {
+    const edgeColor = theme === "dark" ? 0xb8c9bf : 0x315b4b;
+    const leafColor = theme === "dark" ? 0x5d9cec : 0x245c91;
+    const internalColor = theme === "dark" ? 0xd66f55 : 0xa6402c;
     return (
-      <scene ref={sceneRef}>
-          <ambientLight intensity={0.5}/>
-          <directionalLight
-            color={0xffffff}
-            intensity={0.8}
-            position={[10, 10, 10]}
-            castShadow
-            key="direction1"
-          />
-          <directionalLight
-            color={0xffffff}
-            intensity={0.5}
-            position={[-10, -10, -10]}
-            key="direction2"
-          />
-          {ballsRef.current.map((ballObj) => (
-            <group key={`group-${ballObj.index}`}>
-                {ballObj.ball}
-                {ballObj.label}
-            </group>
-          ))}
-          {springsRef.current.map((springObj) => springObj.mesh)}
-      </scene>
+        <group>
+            {edges.map(edge => {
+                const start = positions.get(edge.source);
+                const end = positions.get(edge.target);
+                if (!start || !end) return null;
+                return (
+                    <SpatialEdge
+                        key={`${edge.source}-${edge.target}`}
+                        start={start}
+                        end={end}
+                        color={edgeColor}
+                        scaleFactor={scaleFactor}
+                    />
+                );
+            })}
+
+            {data.nodes.map(node => {
+                const position = positions.get(node.index);
+                if (!position) return null;
+                const isLeaf = node.connections.length <= 1;
+                const isSelected = selectedNode === node.index;
+                const displayLabel = node.label?.trim();
+
+                return (
+                    <group key={node.index} position={position}>
+                        <mesh
+                            scale={isSelected ? 1.28 : 1}
+                            onClick={event => {
+                                event.stopPropagation();
+                                onSelectNode(isSelected ? null : node.index);
+                            }}
+                        >
+                            <sphereGeometry args={[(isLeaf ? 4.2 : 2.6) * scaleFactor, 24, 24]}/>
+                            <meshStandardMaterial
+                                color={isSelected ? 0xf0b44d : (isLeaf ? leafColor : internalColor)}
+                                roughness={0.72}
+                                metalness={0.04}
+                            />
+                        </mesh>
+
+                        {isLeaf && displayLabel && (
+                            <Html position={[0, 7 * scaleFactor, 0]} center zIndexRange={[10, 0]}>
+                                <span className="quartet-tree__node-label">{displayLabel}</span>
+                            </Html>
+                        )}
+                    </group>
+                );
+            })}
+        </group>
+    );
+};
+
+export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({data}) => {
+    const [view, setView] = useState<TreeView>("planar");
+    const [theme, setTheme] = useState<"light" | "dark">("dark");
+    const [selectedNode, setSelectedNode] = useState<number | null>(null);
+    const [cameraCommand, setCameraCommand] = useState<CameraCommand>(EMPTY_CAMERA_COMMAND);
+    const scaleFactor = Math.max(1, Math.sqrt(data.nodes.length) / 4);
+    const positions = useMemo(() => calculateSpatialPositions(data.nodes, scaleFactor), [data.nodes, scaleFactor]);
+    const edges = useMemo(() => collectEdges(data.nodes), [data.nodes]);
+    const bounds = useMemo(() => getTreeBounds(positions, 10 * scaleFactor), [positions, scaleFactor]);
+    const selected = data.nodes.find(node => node.index === selectedNode);
+
+    useEffect(() => {
+        setSelectedNode(null);
+    }, [data]);
+
+    const requestCameraAction = (action: CameraAction): void => {
+        setCameraCommand(current => ({action, requestId: current.requestId + 1}));
+    };
+
+    const handleExport = (): void => {
+        const dotFormat = createGraph(data, false);
+        const blob = new Blob([dotFormat], {type: "text/plain;charset=utf-8"});
+        saveAs(blob, "quartet-tree.dot");
+    };
+
+    return (
+        <section className={`quartet-tree quartet-tree--${view}`} aria-label="Quartet tree explorer">
+            <header className="quartet-tree__toolbar">
+                <div className="quartet-tree__view-switch" role="group" aria-label="Tree presentation">
+                    <button type="button" onClick={() => setView("planar")} aria-pressed={view === "planar"}>
+                        Planar 2D
+                    </button>
+                    <button type="button" onClick={() => setView("spatial")} aria-pressed={view === "spatial"}>
+                        Interactive 3D
+                    </button>
+                </div>
+
+                <div className="quartet-tree__actions">
+                    {view === "spatial" && (
+                        <>
+                            <button type="button" onClick={() => requestCameraAction("zoom-out")} aria-label="Zoom out">−</button>
+                            <button type="button" onClick={() => requestCameraAction("zoom-in")} aria-label="Zoom in">+</button>
+                            <button type="button" onClick={() => requestCameraAction("fit")}>Fit tree</button>
+                            <button type="button" onClick={() => requestCameraAction("reset")}>Reset view</button>
+                            <button type="button" onClick={() => setTheme(current => current === "dark" ? "light" : "dark")}>
+                                {theme === "dark" ? "Light canvas" : "Dark canvas"}
+                            </button>
+                        </>
+                    )}
+                    <button type="button" onClick={handleExport}>Export DOT</button>
+                </div>
+            </header>
+
+            <div className="quartet-tree__stage" data-theme={theme}>
+                {view === "planar" ? (
+                    <DotGraphVisualizer data={data}/>
+                ) : (
+                    <Canvas
+                        dpr={[1, 1.75]}
+                        shadows
+                        camera={{position: [100, 75, 100], fov: 50, near: 0.1, far: 2000}}
+                        onPointerMissed={() => setSelectedNode(null)}
+                    >
+                        <color attach="background" args={[theme === "dark" ? "#101b17" : "#f7f3e8"]}/>
+                        <ambientLight intensity={theme === "dark" ? 1.1 : 1.35}/>
+                        <directionalLight position={[50, 80, 70]} intensity={1.3}/>
+                        <directionalLight position={[-40, -20, -60]} intensity={0.55}/>
+                        <SpatialTree
+                            data={data}
+                            positions={positions}
+                            edges={edges}
+                            scaleFactor={scaleFactor}
+                            theme={theme}
+                            selectedNode={selectedNode}
+                            onSelectNode={setSelectedNode}
+                        />
+                        <CameraRig bounds={bounds} command={cameraCommand} scaleFactor={scaleFactor}/>
+                    </Canvas>
+                )}
+            </div>
+
+            {view === "spatial" && (
+                <footer className="quartet-tree__footer">
+                    <div className="quartet-tree__selection" aria-live="polite">
+                        {selected ? (
+                            <>
+                                <strong>{selected.label?.trim() || `Internal node ${selected.index}`}</strong>
+                                <span>{selected.connections.length <= 1 ? "Leaf" : "Internal node"} · {selected.connections.length} connection{selected.connections.length === 1 ? "" : "s"}</span>
+                            </>
+                        ) : (
+                            <span>Select a node to inspect it.</span>
+                        )}
+                    </div>
+                    <p className="quartet-tree__hint">Drag to rotate · Right-drag to pan · Scroll or pinch to zoom</p>
+                </footer>
+            )}
+        </section>
     );
 };
 
