@@ -1,9 +1,10 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-import * as pdfjs from "pdfjs-dist";
 import {sendRequestToProxy} from "./fetchProxy.js";
 
-pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.mjs';
+export const PDF_WORKER_URL = pdfWorkerUrl;
+pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
 
 
 const LANGUAGE_URLS = {

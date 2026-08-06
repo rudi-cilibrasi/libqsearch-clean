@@ -32,6 +32,8 @@ npm run typecheck
 
 Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__test__/workbench.test.tsx`.
 
+UDHR translations are retrieved as PDFs through the configured backend proxy. PDF.js uses the worker bundled from the installed `pdfjs-dist` package so the parser and worker versions remain identical after dependency updates; do not replace it with a separately versioned CDN URL.
+
 ## Visual system
 
 The landing page and workbench share a restrained scientific/editorial system: warm paper, dark green structural surfaces, oxide annotations, serif headings, monospace metadata, square controls, and thin rules. Decorative gradients, glow effects, generic cards, and promotional copy are intentionally avoided. The design keeps the NCD equation, comparison set, computation state, and result matrix visually primary.
