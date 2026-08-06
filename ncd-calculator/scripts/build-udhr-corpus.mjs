@@ -6,6 +6,7 @@ import {fileURLToPath} from "node:url";
 
 import {
   UDHR_CORPUS_VERSION,
+  UDHR_DISPLAY_NAME_OVERRIDES,
   UDHR_LANGUAGE_SOURCES,
   UDHR_SCHEMA_VERSION,
   UDHR_SOURCE_COMMIT,
@@ -129,12 +130,14 @@ const generated = await mapWithConcurrency(UDHR_LANGUAGE_SOURCES, 8, async ([id,
   }
 
   const asset = `${id}.txt`;
+  const displayName = UDHR_DISPLAY_NAME_OVERRIDES[id] ?? canonical.name;
   return {
     text: canonical.text,
     language: {
       id,
       sourceKey,
-      name: canonical.name,
+      name: displayName,
+      ...(displayName === canonical.name ? {} : {sourceName: canonical.name}),
       languageTag: canonical.languageTag,
       iso6393: canonical.iso6393,
       script: canonical.script,

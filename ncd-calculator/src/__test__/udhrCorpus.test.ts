@@ -31,8 +31,8 @@ describe("versioned UDHR corpus", () => {
     test("publishes complete, explicit metadata for every supported source", async () => {
         const {UDHR_CORPUS, UDHR_LANGUAGES} = await import("../functions/udhr");
 
-        expect(UDHR_LANGUAGES).toHaveLength(59);
-        expect(new Set(UDHR_LANGUAGES.map(({id}) => id)).size).toBe(59);
+        expect(UDHR_LANGUAGES).toHaveLength(61);
+        expect(new Set(UDHR_LANGUAGES.map(({id}) => id)).size).toBe(61);
         expect(UDHR_LANGUAGES.every(({articleCount, segmentCount, sourceStage}) => (
             articleCount === 30 && segmentCount === 30 && sourceStage === 4
         ))).toBe(true);
@@ -42,6 +42,21 @@ describe("versioned UDHR corpus", () => {
         expect(UDHR_LANGUAGES.find(({id}) => id === "fil")?.name).toBe("Tagalog");
         expect(UDHR_LANGUAGES.find(({id}) => id === "nor")?.name).toBe("Norwegian, Bokmål");
         expect(UDHR_LANGUAGES.find(({id}) => id === "fas")?.direction).toBe("rtl");
+        expect(UDHR_LANGUAGES.find(({id}) => id === "bel")).toMatchObject({
+            name: "Belarusian",
+            sourceName: "Belarusan",
+        });
+
+        expect(UDHR_LANGUAGES.filter(({id}) => ["rus", "ukr", "bel"].includes(id)).map((language) => ({
+            id: language.id,
+            iso6393: language.iso6393,
+            languageTag: language.languageTag,
+            script: language.script,
+        }))).toEqual([
+            {id: "rus", iso6393: "rus", languageTag: "ru", script: "Cyrl"},
+            {id: "ukr", iso6393: "ukr", languageTag: "uk", script: "Cyrl"},
+            {id: "bel", iso6393: "bel", languageTag: "be", script: "Cyrl"},
+        ]);
     });
 
     test("loads a same-origin UTF-8 asset and verifies its canonical content", async () => {

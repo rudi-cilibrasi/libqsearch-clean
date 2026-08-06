@@ -4,6 +4,7 @@ export interface UdhrLanguageRecord {
   readonly id: string;
   readonly sourceKey: string;
   readonly name: string;
+  readonly sourceName?: string;
   readonly languageTag: string;
   readonly iso6393: string;
   readonly script: string;
@@ -63,6 +64,9 @@ const assertManifest = (value: UdhrManifest): void => {
       || sourceKeys.has(language.sourceKey)
       || typeof language.name !== "string"
       || !language.name
+      || (language.sourceName !== undefined && (
+        typeof language.sourceName !== "string" || !language.sourceName
+      ))
       || typeof language.languageTag !== "string"
       || typeof language.iso6393 !== "string"
       || typeof language.script !== "string"

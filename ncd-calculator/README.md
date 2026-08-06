@@ -50,7 +50,7 @@ Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__
 
 ### Reproducible UDHR inputs
 
-UDHR comparisons use a versioned UTF-8 snapshot generated from the Unicode UDHR Project at a pinned commit. Each of the 59 records is marked complete in the source index and linked there to an OHCHR translation. The comparison corpus contains the body of Articles 1–30 only: preambles, source notes, and localized headings are excluded so every language has identical section coverage. Paragraphs within an article are joined with one space, and the 30 article boundaries are represented by line feeds.
+UDHR comparisons use a versioned UTF-8 snapshot generated from the Unicode UDHR Project at a pinned commit. Each of the 61 records is marked complete in the source index and linked there to an OHCHR translation. The comparison corpus contains the body of Articles 1–30 only: preambles, source notes, and localized headings are excluded so every language has identical section coverage. Paragraphs within an article are joined with one space, and the 30 article boundaries are represented by line feeds.
 
 The browser loads only the selected same-origin text assets. It decodes UTF-8 in fatal mode and verifies the byte count, Unicode code-point count, article count, NFC normalization, and SHA-256 digest before compression. A failed check stops the calculation. Assets use the browser HTTP cache plus request deduplication instead of application-managed local storage.
 
