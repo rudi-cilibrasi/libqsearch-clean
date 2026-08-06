@@ -25,6 +25,8 @@ import KGridVisualization from "@/components/KGridVisualization.tsx";
 import {GridObject} from "@/datastructures/kgrid.ts";
 import {QTreeNode, QTreeResponse} from "@/components/QSearchTree3D.tsx";
 import {LabelManager} from "@/functions/labelUtils.ts";
+import {validateMatrix} from "@/functions/matrix.ts";
+import "./Workbench.css";
 
 export interface QSearchProps {
 	openLogin: boolean;
@@ -128,6 +130,17 @@ export const QSearch: React.FC<QSearchProps> = ({
 			setIsLoading(false);
 			return;
 		}
+		if (input.contents.length !== input.labels.length) {
+			setErrorMsg("Object labels and contents must have the same length");
+			setIsLoading(false);
+			return;
+		}
+		const normalizedLabels = input.labels.map((label) => typeof label === "string" ? label.trim() : "");
+		if (normalizedLabels.some((label) => !label) || new Set(normalizedLabels).size !== normalizedLabels.length) {
+			setErrorMsg("Object labels must be non-empty and unique");
+			setIsLoading(false);
+			return;
+		}
 		
 		// Check authentication for large computations
 		if (input.contents.length > 16 && !authenticated) {
@@ -138,19 +151,11 @@ export const QSearch: React.FC<QSearchProps> = ({
 		try {
 			setIsLoading(true);
 			setErrorMsg("");
-			labels.forEach((label) => {
-				labelManager.registerLabel(label);
+				labels.forEach((label) => {
+					labelManager.registerLabel(label, label);
 			})
 			
-			// Detect if this is imported matrix data by checking content format
-			const isImportedMatrix = input.contents.some(content => {
-				try {
-					const parsed = JSON.parse(content);
-					return Array.isArray(parsed) && parsed.length === input.labels.length;
-				} catch {
-					return false;
-				}
-			});
+			const isImportedMatrix = input.kind === "distance-matrix";
 			
 			if (isImportedMatrix) {
 				console.log("Processing imported matrix data without compression");
@@ -170,14 +175,20 @@ export const QSearch: React.FC<QSearchProps> = ({
 				});
 				
 				// Create NCD matrix directly from imported data
-				const ncdMatrix = input.contents.map(content => {
+				const ncdMatrix: number[][] = input.contents.map((content, rowIndex) => {
 					try {
-						return JSON.parse(content);
-					} catch {
-						// If parsing fails, create a dummy row with zeros
-						return Array(input.labels.length).fill(0);
+						const row: unknown = JSON.parse(content);
+						if (!Array.isArray(row)) throw new Error("row is not an array");
+						return row as number[];
+					} catch (error) {
+						const reason = error instanceof Error ? error.message : "invalid JSON";
+						throw new Error(`Invalid distance-matrix row ${rowIndex + 1}: ${reason}`);
 					}
 				});
+				const validationError = validateMatrix(input.labels, ncdMatrix);
+				if (validationError) {
+					throw new Error(`Invalid distance matrix: ${validationError}`);
+				}
 				
 				// Create the response object
 				const response: NCDMatrixResponse = {
@@ -196,6 +207,12 @@ export const QSearch: React.FC<QSearchProps> = ({
 					ncdMatrix: ncdMatrix,
 				});
 			} else {
+				const emptyObjectIndex = input.contents.findIndex(
+					(content) => typeof content !== "string" || content.trim().length === 0,
+				);
+				if (emptyObjectIndex >= 0) {
+					throw new Error(`Object "${input.labels[emptyObjectIndex]}" has no content`);
+				}
 				// Normal compression-based processing for non-imported data
 				const [compressionDecision, cachedSizes] = CompressionService.preprocessNcdInput(input, ncdCache);
 				
@@ -422,13 +439,13 @@ export const QSearch: React.FC<QSearchProps> = ({
 	}
 	
 	return (
-		<>
+		<div className="ncd-workbench">
 			<Header
 				openLogin={openLogin}
 				setOpenLogin={setOpenLogin}
 				setAuthenticated={setAuthenticated}
 			/>
-			<div className="max-w-7xl mx-auto px-4 py-8">
+			<main className="workbench-page">
 				<ListEditor
 					qTreeResponse={qSearchTreeResult}
 					onComputedNcdInput={onNcdInput}
@@ -440,58 +457,41 @@ export const QSearch: React.FC<QSearchProps> = ({
 					authenticated={authenticated}
 				/>
 				
-				{/* Loading state */}
 				{isLoading && (
-					<div className="flex items-center gap-2 text-slate-600 my-4">
+					<section className="workbench-computation" aria-live="polite" aria-label="NCD computation progress">
 						{compressionInfo && (
-							<span>
-                Computing result using {compressionInfo.algorithm.toUpperCase()}
-								...
-              </span>
+							<p>Computing pairwise distances with {compressionInfo.algorithm.toUpperCase()}.</p>
 						)}
 						<NCDProgress stats={compressionStats}/>
-					</div>
+					</section>
 				)}
 				
-				{/* Error state */}
-				{errorMsg && <div className="text-red-600 my-4">{errorMsg}</div>}
+				{errorMsg && <div className="workbench-message workbench-message--error" role="alert">{errorMsg}</div>}
 				
-				{/* Results */}
 				{!isLoading && hasMatrix && labels.length > 0 && ncdMatrix.length > 0 && (
-					<KGridVisualization
-						labelManager={labelManager}
-						objects={gridObjects}
-						maxIterations={100000}
-						onOptimizationStart={handleOptimizationStart}
-						onOptimizationEnd={handleOptimizationEnd}
-						onIterationUpdate={handleIterationUpdate}
-						qSearchTreeResult={qSearchTreeResult}
-						autoStart={true}
-						totalExecutionTime={totalExecutionTime || undefined}
-						iterationsPerSecond={iterationsPerSecond || undefined}
-						ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
-					/>
+					<section className="workbench-results" aria-labelledby="results-title">
+						<header className="workbench-results__header">
+							<h2 id="results-title">Similarity</h2>
+							<span>{labels.length} objects · {labels.length * (labels.length - 1) / 2} pairs</span>
+						</header>
+						<KGridVisualization
+							labelManager={labelManager}
+							objects={gridObjects}
+							maxIterations={100000}
+							onOptimizationStart={handleOptimizationStart}
+							onOptimizationEnd={handleOptimizationEnd}
+							onIterationUpdate={handleIterationUpdate}
+							qSearchTreeResult={qSearchTreeResult}
+							autoStart={true}
+							totalExecutionTime={totalExecutionTime || undefined}
+							iterationsPerSecond={iterationsPerSecond || undefined}
+							ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
+						/>
+					</section>
 				)}
 				
-				{/* Compression info */}
-				{compressionInfo && !isLoading && (
-					<div className="mt-2 mb-4 flex items-center justify-center gap-2 text-sm">
-						<div
-							className={`px-3 py-1 rounded-full ${
-								compressionInfo.algorithm === "zstd"
-									? "bg-blue-100 text-blue-700"
-									: compressionInfo.algorithm === "lzma"
-										? "bg-purple-100 text-purple-700"
-										: "bg-green-100 text-green-700"
-							}`}
-						>
-							{compressionInfo.algorithm.toUpperCase()}
-						</div>
-						<span className="text-gray-600">{compressionInfo.reason}</span>
-					</div>
-				)}
-			</div>
-		</>
+			</main>
+		</div>
 	);
 };
 

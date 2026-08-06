@@ -1,19 +1,12 @@
 import React from "react";
 import {Dna, FileType2, Globe2, X} from "lucide-react";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
-
-export interface SelectedItem {
-  id: string | undefined;
-  label: string | undefined;
-  content: string | undefined;
-  type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD;
-  cacheKey?: string;
-}
+import type {SelectedItem} from "./workbenchTypes";
 
 export interface InputAccumulatorProps {
   MIN_ITEMS?: number;
   selectedItems: SelectedItem[];
-  onRemoveItem: (id: string | undefined) => void;
+  onRemoveItem: (id: string) => void;
   authenticated?: boolean;
 }
 
@@ -23,6 +16,9 @@ export const InputHolder: React.FC<InputAccumulatorProps> = ({
   onRemoveItem,
   authenticated,
 }) => {
+  const items = Array.isArray(selectedItems) ? selectedItems : [];
+  const remainingItems = Math.max(MIN_ITEMS - items.length, 0);
+
   const renderItemWithIcon = (
     item: SelectedItem,
     type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD
@@ -30,58 +26,63 @@ export const InputHolder: React.FC<InputAccumulatorProps> = ({
     switch (type) {
       case FASTA:
         return (
-          <div className="flex items-center gap-3">
-            <Dna size={18} className="text-blue-500" />
-            <span className="text-gray-600">{item.label}</span>
+          <div className="selected-object__identity">
+            <Dna size={17} aria-hidden="true" />
+            <span>{item.label}</span>
           </div>
         );
       case LANGUAGE:
         return (
-          <div className="flex items-center gap-3">
-            <Globe2 size={18} className="text-blue-500" />
-            <span className="text-gray-600">{item.label}</span>
+          <div className="selected-object__identity">
+            <Globe2 size={17} aria-hidden="true" />
+            <span>{item.label}</span>
           </div>
         );
       default:
         return (
-          <div className="flex items-center gap-3">
-            <FileType2 size={18} className="text-blue-500" />
-            <span className="text-gray-600">{item.label}</span>
+          <div className="selected-object__identity">
+            <FileType2 size={17} aria-hidden="true" />
+            <span>{item.label}</span>
           </div>
         );
     }
   };
-    const items = Array.isArray(selectedItems) ? selectedItems : [];
     return (
-
-        <div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-gray-200">
+        <section className="workbench-panel selected-objects" aria-label="Comparison set">
+            <div className="selected-objects__summary" aria-live="polite">
+                <strong>{items.length} {items.length === 1 ? "object" : "objects"}</strong>
+                {remainingItems > 0 && <span>{remainingItems} more needed</span>}
                 {!authenticated && items.length > 16 && (
-                    <p className="text-sm text-red-500">
-                        Please log in to increase your item selection limit (maximum 16).
+                    <p className="selected-objects__limit" role="alert">
+                        Sign in to prepare a set larger than 16 objects.
                     </p>
                 )}
-                <h3 className="text-lg font-bold text-gray-900">
-                    Selected Items ({items.length}/{MIN_ITEMS} minimum)
-                </h3>
             </div>
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className="flex flex-col gap-2">
+            <div className="selected-objects__progress" aria-label={`${items.length} of ${MIN_ITEMS} required objects selected`}>
+                <span style={{width: `${Math.min((items.length / MIN_ITEMS) * 100, 100)}%`}} />
+            </div>
+            <div className="selected-objects__body">
+                {items.length === 0 ? (
+                    <div className="selected-objects__empty">
+                        <span aria-hidden="true">∅</span>
+                        <strong>No objects yet</strong>
+                    </div>
+                ) : (
+                  <ol className="selected-objects__list">
                     {items.map((item) => (
-                        <div
+                        <li
                             key={item.id}
-                            className="flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200"
+                            className="selected-object"
                         >
                             {renderItemWithIcon(item, item.type)}
-                            <X
-                                size={18}
-                                className="text-gray-400 hover:text-gray-600 cursor-pointer"
-                                onClick={() => onRemoveItem(item.id)}
-                            />
-                        </div>
+                            <button type="button" onClick={() => onRemoveItem(item.id)} aria-label={`Remove ${item.label || "object"}`}>
+                                <X size={16} aria-hidden="true"/>
+                            </button>
+                        </li>
                     ))}
-                </div>
+                  </ol>
+                )}
             </div>
-        </div>
+        </section>
     );
 };

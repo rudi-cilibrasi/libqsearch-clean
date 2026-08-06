@@ -1,38 +1,22 @@
 import React, { useState } from "react";
-import { ChevronRight, Info } from "lucide-react";
-import { LANGUAGE_NAMES } from "../functions/udhr";
+import {ChevronRight} from "lucide-react";
+import {UDHR_LANGUAGES} from "../functions/udhr";
 import { SearchInput } from "./SearchInput";
-
-interface LanguageItem {
-    id: string;
-    type: "language";
-    label: string;
-    content: string;
-}
+import {LANGUAGE} from "../constants/modalConstants";
+import type {SelectedItem} from "./workbenchTypes";
 
 interface LanguageProps {
-    MIN_ITEMS: number;
-    addItem: (item: LanguageItem) => void;
-    selectedItems: LanguageItem[];
+    addItem: (item: SelectedItem) => void;
+    selectedItems: SelectedItem[];
 }
 
 export const Language: React.FC<LanguageProps> = ({
-                                                      MIN_ITEMS,
                                                       addItem,
                                                       selectedItems,
                                                   }) => {
     const [searchTerm, setSearchTerm] = useState<string>("");
 
     const safeSelectedItems = Array.isArray(selectedItems) ? selectedItems : [];
-
-    const availableLanguages: LanguageItem[] = Object.keys(LANGUAGE_NAMES).map(
-        (code) => ({
-            id: code,
-            type: "language" as const,
-            label: LANGUAGE_NAMES[code],
-            content: "",
-        })
-    );
 
     const handleSearchTerm = (searchTerm: string): void => {
         setSearchTerm(searchTerm);
@@ -43,61 +27,58 @@ export const Language: React.FC<LanguageProps> = ({
     };
 
     return (
-        <div className="min-h-0 flex flex-col p-4 gap-4">
-            {/* Fixed top section */}
-            <div>
+        <div className="source-browser language-browser">
+            <div className="source-browser__search">
                 <SearchInput
-                    label="Available Languages"
+                    label="Filter languages"
                     type="language"
                     handleSearchTerm={handleSearchTerm}
                     searchTerm={searchTerm}
                 />
             </div>
 
-            {/* Information Box - Styled similarly to FileUpload */}
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                    <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <div className="space-y-2">
-                        <div>
-                            <h3 className="text-blue-800 font-medium text-sm">
-                                Explore Language Relationships! ✨
-                            </h3>
-                            <p className="text-blue-700 text-xs mt-1 leading-relaxed">
-                                Using the Universal Declaration of Human Rights (UDHR), discover how
-                                languages relate to each other. Select at least {MIN_ITEMS} languages
-                                to generate a meaningful visualization.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Available Languages List */}
-            <div className="flex-1 min-h-0">
-                <div className="h-full overflow-y-auto">
-                    <div className="flex flex-col gap-2">
-                        {availableLanguages
-                            .filter((lang) =>
-                                lang.label.toLowerCase().includes(searchTerm.toLowerCase())
-                            )
-                            .map((lang) => (
-                                <div
-                                    key={lang.id}
-                                    onClick={() => addItem(lang)}
-                                    className={`flex justify-between items-center p-4 rounded-lg cursor-pointer transition-all
-                                        ${
-                                        isItemSelected(lang.id)
-                                            ? "bg-blue-50 border border-blue-200"
-                                            : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
-                                    }`}
-                                >
-                                    <span className="text-gray-700">{lang.label}</span>
-                                    <ChevronRight size={20} className="text-gray-400" />
-                                </div>
-                            ))}
-                    </div>
-                </div>
+            <div
+                className="source-browser__results source-browser__results--list source-browser__results--scrollable"
+                role="region"
+                aria-label="Available languages"
+                tabIndex={0}
+            >
+                <ul className="source-option-list">
+                    {UDHR_LANGUAGES
+                        .filter((language) => {
+                            const query = searchTerm.trim().toLowerCase();
+                            return !query || [
+                                language.name,
+                                language.id,
+                                language.languageTag,
+                                language.iso6393,
+                            ].some((value) => value?.toLowerCase().includes(query));
+                        })
+                        .map((language) => {
+                            const selected = isItemSelected(language.id);
+                            const item: SelectedItem = {
+                                id: language.id,
+                                type: LANGUAGE,
+                                label: language.name,
+                                content: "",
+                            };
+                            return (
+                                <li key={language.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => addItem(item)}
+                                        disabled={selected}
+                                        aria-pressed={selected}
+                                        className="source-option"
+                                    >
+                                        <span>{language.name}</span>
+                                        <small>{language.languageTag}</small>
+                                        {selected ? <em>Added</em> : <ChevronRight size={17} aria-hidden="true"/>}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                </ul>
             </div>
         </div>
     );

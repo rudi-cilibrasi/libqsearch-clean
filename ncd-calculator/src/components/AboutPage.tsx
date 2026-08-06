@@ -1,106 +1,155 @@
-import { FC } from 'react';
-import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ExternalLink, Users } from 'lucide-react';
+import {ExternalLink} from "lucide-react";
+import {Link} from "react-router-dom";
+import Footer from "./Footer";
+import Header from "./Header";
+import "./AboutPage.css";
 
-const About: FC = (): JSX.Element => {
-    const navigate = useNavigate();
+interface AboutPageProps {
+    openLogin: boolean;
+    setOpenLogin: (open: boolean) => void;
+    setAuthenticated: (authenticated: boolean) => void;
+}
 
-    const handleGoBack = (): void => {
-        navigate('/');
-    };
+interface TeamMember {
+    name: string;
+    link: string;
+}
 
-    const TeamMember = ({ name, link }: { name: string; link: string }) => (
-        <div className="bg-gray-900 rounded-lg p-6 border border-gray-800 hover:border-blue-500 transition-all duration-300">
-            <a
-                href={link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between text-gray-200 hover:text-blue-400 transition-colors"
-            >
-                <span className="text-lg font-medium">{name}</span>
-                <ExternalLink className="h-5 w-5" />
-            </a>
-        </div>
-    );
+const TEAM_MEMBERS: TeamMember[] = [
+    {name: "Rudi Cilibrasi", link: "https://cilibrar.com/"},
+    {name: "Paul Vitányi", link: "https://homepages.cwi.nl/~paulv/"},
+    {name: "Ming Li", link: "https://cs.uwaterloo.ca/computer-science/contacts/ming-li"},
+    {name: "Steven de Rooij", link: "https://www.uva.nl/en/profile/r/o/s.derooij/s.de-rooij.html"},
+    {name: "Maarten Keijzer", link: "https://www.h2i.sg/h2i-cto-maarten-keijzer-broadening-the-use-of-ai-ml-in-water-management-to-make-an-impact/"},
+    {name: "Joy Hughes", link: "https://dev.to/joyhughes"},
+    {name: "Nam V. Do", link: "https://github.com/namvdo"},
+    {name: "Shawn Nguyen", link: "https://github.com/Sonnpm197"},
+];
 
+const AboutPage = ({
+    openLogin,
+    setOpenLogin,
+    setAuthenticated,
+}: AboutPageProps): JSX.Element => {
     return (
-        <div className="    text-gray-200">
-            {/* Header Section */}
-            <header className="w-full px-6 py-16 text-center">
-                <div className="max-w-4xl mx-auto">
-                    <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
-                        About NCD Calculator
-                    </h1>
-                    <p className="text-xl text-gray-400">
-                        Built by researchers and developers dedicated to advancing the field of
-                        information theory and compression-based similarity analysis.
-                    </p>
-                    <br/>
-                    <a href="https://github.com/rudi-cilibrasi/libqsearch-clean" target="_blank"
-                       className="text-blue-500 hover:underline text-xl my-4">
-                        Contribute to our project on GitHub
-                    </a>
-                </div>
-            </header>
+        <div className="about-shell">
+            <Header
+                openLogin={openLogin}
+                setOpenLogin={setOpenLogin}
+                setAuthenticated={setAuthenticated}
+            />
 
-            {/* Main Content */}
-            <main className="px-6 py-8">
-                {/* Team Section */}
-                <section className="max-w-7xl mx-auto mb-16">
-                    <div className="flex items-center gap-3 mb-8">
-                        <Users className="h-6 w-6 text-blue-400" />
-                        <h2 className="text-2xl font-semibold">Our Team</h2>
-                    </div>
+            <main>
+                <section className="about-hero" aria-labelledby="about-title">
+                    <div className="landing-container about-hero__grid">
+                        <div>
+                            <p className="about-kicker">About CompLearn</p>
+                            <h1 id="about-title">Compression as a scientific instrument.</h1>
+                            <p className="about-hero__lead">
+                                CompLearn provides practical tools for comparing sequences, texts,
+                                and files through normalized compression distance. The method uses
+                                compressed length instead of hand-designed domain features.
+                            </p>
+                            <div className="about-actions">
+                                <Link className="landing-button landing-button--primary" to="/calculator?searchMode=file_upload">
+                                    Open workbench
+                                </Link>
+                                <a
+                                    className="landing-text-link"
+                                    href="https://github.com/rudi-cilibrasi/libqsearch-clean"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    View source <span aria-hidden="true">↗</span>
+                                </a>
+                            </div>
+                        </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        <TeamMember
-                            name="Rudi Cilibrasi"
-                            link="https://cilibrar.com/"
-                        />
-                        <TeamMember
-                            name="Paul Vitanyi"
-                            link="https://homepages.cwi.nl/~paulv/"
-                        />
-                        <TeamMember
-                            name="Ming Li"
-                            link="https://cs.uwaterloo.ca/computer-science/contacts/ming-li"
-                        />
-                        <TeamMember
-                            name="Steven de Rooij"
-                            link="https://www.uva.nl/en/profile/r/o/s.derooij/s.de-rooij.html"
-                        />
-                        <TeamMember
-                            name="Maarten Keijzer"
-                            link="https://www.h2i.sg/h2i-cto-maarten-keijzer-broadening-the-use-of-ai-ml-in-water-management-to-make-an-impact/"
-                        />
-                        <TeamMember
-                            name="Joy Hughes"
-                            link="https://dev.to/joyhughes"
-                        />
-                        <TeamMember
-                            name="Nam V. Do"
-                            link="https://github.com/namvdo"
-                        />
-                        <TeamMember
-                            name="Shawn Nguyen"
-                            link="https://github.com/Sonnpm197"
-                        />
+                        <figure className="about-equation">
+                            <figcaption>NCD definition</figcaption>
+                            <div className="about-equation__formula" aria-label="Normalized compression distance equation">
+                                <span>NCD(x, y)</span>
+                                <span>=</span>
+                                <span className="about-equation__fraction">
+                                    <span>C(xy) − min(C(x), C(y))</span>
+                                    <span>max(C(x), C(y))</span>
+                                </span>
+                            </div>
+                            <dl>
+                                <div>
+                                    <dt>C(x)</dt>
+                                    <dd>compressed length of one object</dd>
+                                </div>
+                                <div>
+                                    <dt>C(xy)</dt>
+                                    <dd>compressed length of the paired objects</dd>
+                                </div>
+                            </dl>
+                        </figure>
                     </div>
                 </section>
 
-                {/* Research Foundation Section */}
-                <section className="max-w-4xl mx-auto">
-                    {/* Back Button */}
-                    <button
-                        onClick={handleGoBack}
-                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                        <ChevronLeft className="h-5 w-5" />
-                        Back to Home
-                    </button>
+                <section className="about-section" aria-labelledby="contributors-title">
+                    <div className="landing-container">
+                        <header className="about-section__heading">
+                            <p className="about-section__index">01 / Contributors</p>
+                            <h2 id="contributors-title">Research and engineering contributors.</h2>
+                        </header>
+
+                        <ol className="about-team">
+                            {TEAM_MEMBERS.map((member, index) => (
+                                <li key={member.name}>
+                                    <span>{String(index + 1).padStart(2, "0")}</span>
+                                    <a href={member.link} target="_blank" rel="noopener noreferrer">
+                                        <strong>{member.name}</strong>
+                                        <ExternalLink size={16} aria-hidden="true"/>
+                                        <span className="sr-only"> opens in a new tab</span>
+                                    </a>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                </section>
+
+                <section className="about-section about-foundation" aria-labelledby="foundation-title">
+                    <div className="landing-container about-foundation__grid">
+                        <div>
+                            <p className="about-section__index">02 / Research basis</p>
+                            <h2 id="foundation-title">From information distance to an executable method.</h2>
+                        </div>
+                        <div className="about-foundation__text">
+                            <p>
+                                Normalized compression distance is a computable approximation of
+                                normalized information distance. A real compressor acts as the model:
+                                objects are considered similar when their joint description is shorter
+                                than the descriptions of unrelated objects.
+                            </p>
+                            <p>
+                                Results depend on the compressor, object size, and input preparation.
+                                These choices are experimental parameters and should be reported when
+                                NCD is used in research.
+                            </p>
+                            <div className="about-citation">
+                                <span>Cilibrasi, R. &amp; Vitányi, P. M. B.</span>
+                                <cite>Clustering by Compression</cite>
+                                <span>IEEE Transactions on Information Theory, 2005</span>
+                            </div>
+                            <a
+                                className="landing-text-link"
+                                href="https://homepages.cwi.nl/~paulv/papers/cluster.pdf"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Read the paper <span aria-hidden="true">↗</span>
+                            </a>
+                        </div>
+                    </div>
                 </section>
             </main>
+
+            <Footer/>
         </div>
     );
 };
-export default About;
+
+export default AboutPage;

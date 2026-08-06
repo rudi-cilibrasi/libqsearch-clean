@@ -5,13 +5,14 @@ import ErrorPage from "./components/ErrorPage"
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
 import AboutPage from "@/components/AboutPage"
 import {LandingPage} from "@/components/LandingPage.tsx";
+import {ROUTER_BASENAME} from "@/configs/site";
 
 function App() {
     const [openLogin, setOpenLogin] = useState(false)
     const [authenticated, setAuthenticated] = useState(false)
 
     return (
-        <Router>
+        <Router basename={ROUTER_BASENAME}>
             <div>
                 <Routes>
                     <Route
@@ -36,7 +37,16 @@ function App() {
                         }
                     />
                     <Route path="/error" element={<ErrorPage />} />
-                    <Route path="/about" element={<AboutPage />} />
+                    <Route
+                        path="/about"
+                        element={
+                            <AboutPage
+                                openLogin={openLogin}
+                                setOpenLogin={setOpenLogin}
+                                setAuthenticated={setAuthenticated}
+                            />
+                        }
+                    />
                 </Routes>
             </div>
         </Router>

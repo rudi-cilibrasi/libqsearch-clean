@@ -3,23 +3,20 @@ import {
   ChevronRight,
   Database,
   FileText,
-  Info,
   PawPrint,
-  Search,
-  Tag,
   AlertTriangle,
 } from "lucide-react";
 import { parseAccessionAndRemoveVersion } from "../cache/cache.ts";
 import { PaginatedResults, Suggestion } from "@/services/genbank.ts";
-import { SelectedItem } from "./InputHolder.tsx";
+import type {SelectedItem} from "./workbenchTypes";
 import { GenBankSearchService } from "@/services/GenBankSearchService.ts";
 
 type DisplayMode = "common" | "scientific" | "accession";
 
 interface FastaSearchSuggestionProps {
   searchTerm: string;
-  addItem: (item: any) => void;
-  type?: string;
+  addItem: (item: SelectedItem) => void;
+  type?: SelectedItem["type"];
   className?: string;
   setError: (error: any) => void;
   genbankSearchService: GenBankSearchService;
@@ -47,8 +44,7 @@ export const FastaSearchSuggestion = ({
                                       }: FastaSearchSuggestionProps) => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [localPageCount, setLocalPageCount] = useState({});
+  const [localPageCount, setLocalPageCount] = useState<Record<string, {count: number; timestamp: number}>>({});
   const [hasSearched, setHasSearched] = useState(false);
   const [currentLabels, setCurrentLabels] = useState<Record<string, string>>({});
   const [componentError, setComponentError] = useState<string | null>(null);
@@ -196,16 +192,12 @@ export const FastaSearchSuggestion = ({
           return; // Request was superseded by a newer one
         }
         
-        // Add a signal to abort the fetch if needed
-        // Note: This implementation assumes you can modify the GenBankSearchService to accept an AbortSignal
-        // If you can't modify the service, you'll need to implement a different cancellation strategy
         const paginatedSuggestions: PaginatedResults =
           await genbankSearchService.getSuggestions(
             normalizedSearchTerm,
             count + 1,
             startIndex,
-            displayMode,
-            abortController.signal // Add this parameter if your service supports it
+            displayMode
           );
         
         // Check again if this request is still relevant
@@ -233,7 +225,7 @@ export const FastaSearchSuggestion = ({
         // Only set error state if this request is still the current one
         if (searchRequests.current.get(normalizedSearchTerm)?.timestamp === requestTimestamp) {
           // Ignore aborted request errors
-          if (err.name !== 'AbortError') {
+          if (!(err instanceof Error && err.name === 'AbortError')) {
             console.error("Error fetching suggestions:", err);
             setSuggestions([]);
             setComponentError("Failed to fetch suggestions. Please try again.");
@@ -324,7 +316,7 @@ export const FastaSearchSuggestion = ({
         type: type,
         content: "",
         label: label,
-        id: parseAccessionAndRemoveVersion(suggestionId),
+        id: parseAccessionAndRemoveVersion(suggestionId) || suggestionId,
         searchTerm: getSuggestionProperty(
           suggestion,
           getPrimaryField(displayMode),
@@ -333,7 +325,6 @@ export const FastaSearchSuggestion = ({
       };
       
       addItem(input);
-      setSelectedIds((prev) => new Set([...prev, suggestionId]));
       setSuggestions((current) => current.filter((s) => s && s.id !== suggestionId));
     } catch (error) {
       console.error("Error selecting suggestion:", error);
@@ -381,15 +372,15 @@ export const FastaSearchSuggestion = ({
   // Render error state if there's a component error
   if (componentError) {
     return (
-      <div className={`w-full ${className}`}>
-        <div className="rounded-lg border shadow-md bg-white p-4">
-          <div className="flex items-center gap-2 text-amber-600">
-            <AlertTriangle className="h-5 w-5" />
+      <div className={`genbank-suggestions ${className}`}>
+        <div className="workbench-inline-error" role="alert">
+          <div className="genbank-suggestions__error">
+            <AlertTriangle size={17} aria-hidden="true"/>
             <span>{componentError}</span>
           </div>
           <button
+            type="button"
             onClick={resetComponent}
-            className="mt-2 text-sm text-blue-600 hover:underline"
           >
             Try again
           </button>
@@ -399,29 +390,9 @@ export const FastaSearchSuggestion = ({
   }
   
   return (
-    <div className={`w-full ${className}`}>
-      <div className="rounded-lg border shadow-md bg-white">
-        <div>
-          <div className="p-2 border-b">
-            <div className="flex items-center gap-2 text-sm text-gray-700 px-2">
-              <Search className="h-4 w-4" />
-              <span>Suggestions</span>
-              <span className="text-xs text-gray-500">
-                (
-                {displayMode === "common"
-                  ? "Common Names"
-                  : displayMode === "scientific"
-                    ? "Scientific Names"
-                    : "Accession Numbers"}
-                )
-              </span>
-            </div>
-          </div>
-          <div>
+    <div className={`genbank-suggestions ${className}`}>
             {loading ? (
-              <div className="p-4 text-center text-gray-600">
-                Loading suggestions...
-              </div>
+              <div className="genbank-suggestions__status">Loading…</div>
             ) : suggestions.length > 0 ? (
               suggestions.map((suggestion, index) => {
                 // Safety check for valid suggestion
@@ -432,71 +403,39 @@ export const FastaSearchSuggestion = ({
                 const suggestionId = getSuggestionProperty(suggestion, 'id', '');
                 const scientificName = getSuggestionProperty(suggestion, 'scientificName', 'Unknown Scientific Name');
                 const primaryCommonName = getSuggestionProperty(suggestion, 'primaryCommonName', 'Unknown Common Name');
-                const additionalCommonNames = getSuggestionProperty(suggestion, 'additionalCommonNames', []);
-                const suggestionType = getSuggestionProperty(suggestion, 'type', 'Unknown');
                 
                 const currentLabel = currentLabels[suggestionId] ||
                   generateLabel(suggestion, displayMode, autoLabelingEnabled, selectedItems);
                 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={`suggestion-${suggestionId || index}`}
                     onClick={() => handleSuggestionSelect(suggestion)}
-                    className="p-3 hover:bg-gray-100 cursor-pointer transition-colors"
+                    className="genbank-suggestion"
                   >
-                    <div className="flex justify-between items-center group">
-                      <div className="flex items-center gap-2">
+                      <span className="genbank-suggestion__name">
                         {getIcon(displayMode)}
-                        <span className="font-medium text-gray-900">
+                        <strong>
                           {currentLabel}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-700">
-                        <Tag className="h-4 w-4" />
-                        <span className="text-xs">{suggestionType}</span>
-                        <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-sm text-gray-600 italic ml-6 mt-1">
-                      <Info className="h-3 w-3" />
-                      <span>
+                        </strong>
+                      </span>
+                      <small>
                         {displayMode === "common"
                           ? scientificName
                           : displayMode === "scientific"
                             ? primaryCommonName
                             : `${primaryCommonName} (${scientificName})`}
-                      </span>
-                    </div>
-                    
-                    {Array.isArray(additionalCommonNames) &&
-                      additionalCommonNames.length > 0 &&
-                      displayMode !== "accession" && (
-                        <div className="flex gap-2 text-xs text-gray-600 mt-1 ml-6">
-                          <Tag className="h-3 w-3" />
-                          <span>
-                          Also known as:{" "}
-                            {additionalCommonNames.join(", ")}
-                        </span>
-                        </div>
-                      )}
-                  </div>
+                      </small>
+                      <ChevronRight size={17} aria-hidden="true"/>
+                  </button>
                 );
               })
             ) : hasSearched && searchTerm.trim().length > 2 ? (
-              <div className="p-4 text-center text-gray-600" onClick={resetComponent}>
-                <span className="cursor-pointer hover:text-blue-600">
-                  No suggestions found. Click to try again.
-                </span>
-              </div>
+              <button type="button" className="genbank-suggestions__status" onClick={resetComponent}>No results. Try again.</button>
             ) : searchTerm.trim().length <= 2 ? (
-              <div className="p-4 text-center text-gray-600">
-                Please enter at least 3 characters
-              </div>
+              <div className="genbank-suggestions__status">Enter 3 or more characters.</div>
             ) : null}
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

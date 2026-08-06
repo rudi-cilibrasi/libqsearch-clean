@@ -46,6 +46,13 @@ ncd-calculator/
 │   │   ├── FileUpload.tsx          # File drag-and-drop upload
 │   │   ├── Language.tsx            # UDHR language selection
 │   │   ├── LandingPage.tsx         # Home/marketing page
+│   │   ├── LandingPage.css         # Scientific/editorial visual system shared by landing and header
+│   │   ├── AboutPage.tsx           # Project, contributor, and research context
+│   │   ├── AboutPage.css           # About-page extension of the shared visual system
+│   │   ├── HeroSection.tsx         # NCD equation and example distance matrix
+│   │   ├── FeaturesSection.tsx     # Domain-specific analysis entry points
+│   │   ├── HowItWorksSection.tsx   # Compression-to-structure method pipeline
+│   │   ├── ResearchSection.tsx     # Research basis and primary citation
 │   │   ├── tree/                   # 3D tree visualization (Three.js/R3F)
 │   │   │   ├── QSearchTree.tsx     # Main 3D tree component
 │   │   │   ├── NodeObject.tsx      # 3D node rendering
@@ -53,7 +60,6 @@ ncd-calculator/
 │   │   │   ├── physics.ts          # Force-directed layout
 │   │   │   ├── treeLayout.ts       # Tree layout algorithms
 │   │   │   └── ...
-│   │   ├── demo/                   # Demo/showcase components
 │   │   └── ui/                     # Reusable UI primitives
 │   ├── workers/
 │   │   ├── shared/
@@ -103,7 +109,8 @@ ncd-calculator/
 │   └── libs/
 │       └── lzma.ts                # LZMA library wrapper
 └── public/
-    └── qsearch.wasm               # Compiled QSearch WASM binary
+    ├── qsearch.wasm               # Compiled QSearch WASM binary
+    └── udhr/v1/*.txt              # Versioned, integrity-checked UDHR article corpus
 ```
 
 ## Data Flow
@@ -157,6 +164,32 @@ User Input (FASTA sequences / files / UDHR translations)
 - **`src/main.tsx`** — React app bootstrap, renders `<App />`
 - **`src/App.tsx`** — React Router setup, routes to `LandingPage` and `QSearch`
 - **`src/components/QSearch.tsx`** — Main calculator page, orchestrates the full pipeline
+
+## Landing Page Visual System
+
+Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+
+The landing and About pages use a restrained scientific/editorial system rather than a generic software-marketing layout. They are built from warm paper, dark green ink, an oxide annotation color, serif display typography, monospace labels, square controls, and thin rules. The pages avoid gradients, particles, glow effects, decorative badges, and repeated rounded cards. Their primary visuals use the actual NCD equation, so the method remains central throughout the public site.
+
+The landing-page sections are intentionally small and domain-specific: applications, the compression pipeline, output interpretation, and the research basis. Navigation into the calculator uses React Router and preserves the selected analysis mode. `src/__test__/landingPage.test.tsx` verifies the scientific content, route handoff, and sign-in entry point. The shared header uses the same visual system on both the landing page and calculator route.
+
+## NCD Workbench Interface
+
+Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+
+The calculator route begins directly at the source controls and comparison set. `ListEditor.tsx` owns input selection and computation readiness; the source components handle GenBank, UDHR, and local-file acquisition; `InputHolder.tsx` provides a compact accessible object inventory. **Try example data** remains available beside the source selector, while the primary **Show Similarity** action closes the workflow at the bottom right. Long source corpora, including the UDHR language list, scroll within a keyboard-focusable work area instead of extending the page.
+
+`Workbench.css` extends the landing-page visual system across input preparation, progress, and result interpretation. The output viewer retains its algorithm-specific components, but its surrounding controls, status surface, and matrix colors use the shared scientific palette. `src/__test__/workbench.test.tsx` verifies the example-set invariants, minimum-set readiness message, empty state, and accessible item removal.
+
+## UDHR Corpus Pipeline
+
+Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+
+Language comparison no longer parses PDFs in the browser. `scripts/build-udhr-corpus.mjs` reads a pinned Unicode UDHR Project commit, verifies that every configured record is complete and OHCHR-linked, validates the XML structure, and emits one canonical UTF-8 asset per language plus `src/generated/udhr-manifest.json`. The canonical representation contains the body of Articles 1–30, one article per line. This gives every input the same section coverage and removes PDF layout, page-break, font-map, and heading-number artifacts from the compression input.
+
+`src/functions/udhr.ts` lazy-loads selected assets and fails closed unless their UTF-8 length, Unicode code-point count, 30-article structure, NFC form, and SHA-256 digest match the manifest. Concurrent requests for one language share the same promise; successful content is held in memory while immutable assets use normal browser HTTP caching. The retired `udhr_cache` local-storage entry is deleted during storage initialization so old lossy PDF extraction results cannot be reused.
+
+`scripts/verify-udhr-corpus.mjs` performs an offline verification and runs before production builds. Corpus generation, limitations, and update review are detailed in `ncd-calculator/docs/UDHR_CORPUS.md`.
 
 ## How to Run
 
