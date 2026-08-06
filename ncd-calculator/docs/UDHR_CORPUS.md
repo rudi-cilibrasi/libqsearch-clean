@@ -1,6 +1,6 @@
 # UDHR comparison corpus
 
-Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+Updated 2026-08-07 (Asia/Ho_Chi_Minh).
 
 ## Purpose
 
@@ -12,7 +12,7 @@ The replacement is a generated, versioned corpus. It is reproducible, lazy-loade
 
 The source is the [Unicode UDHR Project repository](https://github.com/eric-muller/udhr), pinned to commit `588b3f4b2d0467aff54842a4b926551b69d5a66a`. The source index marks all 61 selected records as stage 4, available, and linked to an OHCHR translation. Stage 4 means that OHCHR is identified as the source and complete XML is available. The generated manifest retains the exact source key, OHCHR translation identifier, ISO 639-3 code, BCP 47 tag, ISO 15924 script, and writing direction for every record. When a current user-facing English name differs from the pinned index, the manifest also retains the original index label as `sourceName`.
 
-Stable application identifiers are mapped explicitly in `scripts/udhr-corpus-config.mjs`. This matters for variants: examples include Portuguese (Portugal), German in 1901 orthography, monotonic Greek, Norwegian Bokmål, Northern Uzbek in Latin script, Western Farsi, Central Kurdish, and Tagalog. The interface displays the source language name and BCP 47 tag rather than presenting those records as unspecified varieties.
+Stable application identifiers are mapped explicitly in `scripts/udhr-corpus-config.mjs`. This matters for variants: examples include Portuguese (Portugal), German in 1901 orthography, monotonic Greek, Norwegian Bokmål, Northern Uzbek in Latin script, Western Farsi, Central Kurdish, and Tagalog. The interface uses concise names such as `Portuguese`, `German`, and `Norwegian`; it does not expose variant qualifiers or language tags in the primary list, matrix, or tree. Exact upstream names remain in `sourceName`, and the source key, BCP 47 tag, script, and other metadata remain in the manifest for reproducibility and search.
 
 ## Canonical representation
 

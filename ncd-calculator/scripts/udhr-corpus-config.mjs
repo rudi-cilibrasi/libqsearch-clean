@@ -3,11 +3,27 @@ export const UDHR_SCHEMA_VERSION = 1;
 export const UDHR_CORPUS_VERSION = "unicode-udhr-588b3f4b-articles-nfc-v1";
 
 /**
- * Current user-facing English names for records whose pinned upstream label is
- * historical. The manifest retains the original label as sourceName.
+ * Concise user-facing English names for records whose pinned upstream label
+ * includes a historical name, region, script, orthography, or inverted form.
+ * The manifest retains each exact upstream label as sourceName.
  */
 export const UDHR_DISPLAY_NAME_OVERRIDES = Object.freeze({
   bel: "Belarusian",
+  cmn: "Chinese",
+  deu: "German",
+  ell: "Greek",
+  fas: "Farsi",
+  gle: "Irish",
+  jav: "Javanese",
+  khm: "Khmer",
+  kur: "Kurdish",
+  mon: "Mongolian",
+  msa: "Malay",
+  nor: "Norwegian",
+  por: "Portuguese",
+  ron: "Romanian",
+  tuk: "Turkmen",
+  uzb: "Uzbek",
 });
 
 /**

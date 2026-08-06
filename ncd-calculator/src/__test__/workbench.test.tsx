@@ -67,6 +67,9 @@ describe("NCD workbench", () => {
         expect(screen.getByLabelText("Filter languages")).toBeInTheDocument();
         expect(screen.getByRole("region", {name: "Available languages"})).toHaveAttribute("tabindex", "0");
         expect(screen.getByRole("list")).toBeInTheDocument();
+        expect(screen.getByRole("button", {name: "German"})).toBeInTheDocument();
+        expect(screen.queryByText("German, Standard (1901)")).not.toBeInTheDocument();
+        expect(screen.queryByText("de-1901")).not.toBeInTheDocument();
         expect(screen.queryByText("Compare written languages")).not.toBeInTheDocument();
     });
 

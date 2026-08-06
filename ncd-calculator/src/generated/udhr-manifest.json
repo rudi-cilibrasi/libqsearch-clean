@@ -119,7 +119,8 @@
     {
       "id": "cmn",
       "sourceKey": "cmn_hans",
-      "name": "Chinese, Mandarin (Simplified)",
+      "name": "Chinese",
+      "sourceName": "Chinese, Mandarin (Simplified)",
       "languageTag": "zh",
       "iso6393": "cmn",
       "script": "Hans",
@@ -170,7 +171,8 @@
     {
       "id": "por",
       "sourceKey": "por_PT",
-      "name": "Portuguese (Portugal)",
+      "name": "Portuguese",
+      "sourceName": "Portuguese (Portugal)",
       "languageTag": "pt-PT",
       "iso6393": "por",
       "script": "Latn",
@@ -204,7 +206,8 @@
     {
       "id": "deu",
       "sourceKey": "deu_1901",
-      "name": "German, Standard (1901)",
+      "name": "German",
+      "sourceName": "German, Standard (1901)",
       "languageTag": "de-1901",
       "iso6393": "deu",
       "script": "Latn",
@@ -221,7 +224,8 @@
     {
       "id": "jav",
       "sourceKey": "jav",
-      "name": "Javanese (Latin)",
+      "name": "Javanese",
+      "sourceName": "Javanese (Latin)",
       "languageTag": "jv",
       "iso6393": "jav",
       "script": "Latn",
@@ -442,7 +446,8 @@
     {
       "id": "ell",
       "sourceKey": "ell_monotonic",
-      "name": "Greek (monotonic)",
+      "name": "Greek",
+      "sourceName": "Greek (monotonic)",
       "languageTag": "el-monoton",
       "iso6393": "ell",
       "script": "Grek",
@@ -493,7 +498,8 @@
     {
       "id": "gle",
       "sourceKey": "gle",
-      "name": "Gaelic, Irish",
+      "name": "Irish",
+      "sourceName": "Gaelic, Irish",
       "languageTag": "ga",
       "iso6393": "gle",
       "script": "Latn",
@@ -544,7 +550,8 @@
     {
       "id": "nor",
       "sourceKey": "nob",
-      "name": "Norwegian, Bokmål",
+      "name": "Norwegian",
+      "sourceName": "Norwegian, Bokmål",
       "languageTag": "nb",
       "iso6393": "nob",
       "script": "Latn",
@@ -578,7 +585,8 @@
     {
       "id": "ron",
       "sourceKey": "ron_1953",
-      "name": "Romanian (1953)",
+      "name": "Romanian",
+      "sourceName": "Romanian (1953)",
       "languageTag": "ro",
       "iso6393": "ron",
       "script": "Latn",
@@ -714,7 +722,8 @@
     {
       "id": "mon",
       "sourceKey": "khk",
-      "name": "Mongolian, Halh (Cyrillic)",
+      "name": "Mongolian",
+      "sourceName": "Mongolian, Halh (Cyrillic)",
       "languageTag": "mn-Cyrl",
       "iso6393": "khk",
       "script": "Cyrl",
@@ -748,7 +757,8 @@
     {
       "id": "tuk",
       "sourceKey": "tuk_cyrl",
-      "name": "Turkmen (Cyrillic)",
+      "name": "Turkmen",
+      "sourceName": "Turkmen (Cyrillic)",
       "languageTag": "tk-Cyrl",
       "iso6393": "tuk",
       "script": "Cyrl",
@@ -765,7 +775,8 @@
     {
       "id": "uzb",
       "sourceKey": "uzn_latn",
-      "name": "Uzbek, Northern (Latin)",
+      "name": "Uzbek",
+      "sourceName": "Uzbek, Northern (Latin)",
       "languageTag": "uz-Latn",
       "iso6393": "uzn",
       "script": "Latn",
@@ -884,7 +895,8 @@
     {
       "id": "fas",
       "sourceKey": "pes_1",
-      "name": "Farsi, Western",
+      "name": "Farsi",
+      "sourceName": "Farsi, Western",
       "languageTag": "fa",
       "iso6393": "pes",
       "script": "Arab",
@@ -918,7 +930,8 @@
     {
       "id": "kur",
       "sourceKey": "ckb",
-      "name": "Kurdish, Central",
+      "name": "Kurdish",
+      "sourceName": "Kurdish, Central",
       "languageTag": "ckb-Latn",
       "iso6393": "ckb",
       "script": "Latn",
@@ -952,7 +965,8 @@
     {
       "id": "khm",
       "sourceKey": "khm",
-      "name": "Khmer, Central",
+      "name": "Khmer",
+      "sourceName": "Khmer, Central",
       "languageTag": "km",
       "iso6393": "khm",
       "script": "Khmr",
@@ -1020,7 +1034,8 @@
     {
       "id": "msa",
       "sourceKey": "mly_latn",
-      "name": "Malay (Latin)",
+      "name": "Malay",
+      "sourceName": "Malay (Latin)",
       "languageTag": "zlm-Latn",
       "iso6393": "zlm",
       "script": "Latn",

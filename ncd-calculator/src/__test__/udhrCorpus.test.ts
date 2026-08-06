@@ -40,11 +40,30 @@ describe("versioned UDHR corpus", () => {
         expect(UDHR_CORPUS.source.commit).toMatch(/^[a-f0-9]{40}$/u);
 
         expect(UDHR_LANGUAGES.find(({id}) => id === "fil")?.name).toBe("Tagalog");
-        expect(UDHR_LANGUAGES.find(({id}) => id === "nor")?.name).toBe("Norwegian, Bokmål");
         expect(UDHR_LANGUAGES.find(({id}) => id === "fas")?.direction).toBe("rtl");
         expect(UDHR_LANGUAGES.find(({id}) => id === "bel")).toMatchObject({
             name: "Belarusian",
             sourceName: "Belarusan",
+        });
+        expect(Object.fromEntries(UDHR_LANGUAGES.filter(({sourceName}) => sourceName).map((language) => (
+            [language.id, {name: language.name, sourceName: language.sourceName}]
+        )))).toEqual({
+            bel: {name: "Belarusian", sourceName: "Belarusan"},
+            cmn: {name: "Chinese", sourceName: "Chinese, Mandarin (Simplified)"},
+            deu: {name: "German", sourceName: "German, Standard (1901)"},
+            ell: {name: "Greek", sourceName: "Greek (monotonic)"},
+            fas: {name: "Farsi", sourceName: "Farsi, Western"},
+            gle: {name: "Irish", sourceName: "Gaelic, Irish"},
+            jav: {name: "Javanese", sourceName: "Javanese (Latin)"},
+            khm: {name: "Khmer", sourceName: "Khmer, Central"},
+            kur: {name: "Kurdish", sourceName: "Kurdish, Central"},
+            mon: {name: "Mongolian", sourceName: "Mongolian, Halh (Cyrillic)"},
+            msa: {name: "Malay", sourceName: "Malay (Latin)"},
+            nor: {name: "Norwegian", sourceName: "Norwegian, Bokmål"},
+            por: {name: "Portuguese", sourceName: "Portuguese (Portugal)"},
+            ron: {name: "Romanian", sourceName: "Romanian (1953)"},
+            tuk: {name: "Turkmen", sourceName: "Turkmen (Cyrillic)"},
+            uzb: {name: "Uzbek", sourceName: "Uzbek, Northern (Latin)"},
         });
 
         expect(UDHR_LANGUAGES.filter(({id}) => ["rus", "ukr", "bel"].includes(id)).map((language) => ({

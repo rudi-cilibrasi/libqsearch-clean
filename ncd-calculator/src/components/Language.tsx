@@ -72,7 +72,6 @@ export const Language: React.FC<LanguageProps> = ({
                                         className="source-option"
                                     >
                                         <span>{language.name}</span>
-                                        <small>{language.languageTag}</small>
                                         {selected ? <em>Added</em> : <ChevronRight size={17} aria-hidden="true"/>}
                                     </button>
                                 </li>
