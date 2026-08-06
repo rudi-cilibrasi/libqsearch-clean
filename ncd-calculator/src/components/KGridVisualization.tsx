@@ -1,10 +1,10 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {KGridDualOptimization} from './KGridDualOptimization';
 import {QSearchTree3D, QTreeResponse} from './QSearchTree3D';
-import {Download, Upload} from 'lucide-react';
 import {MatrixTable} from "@/components/MatrixTable.tsx";
 import {GridObject} from "@/datastructures/kgrid.ts";
 import {LabelManager} from "@/functions/labelUtils.ts";
+import type {NCDMatrixResponse} from "@/types/ncd";
 
 // Visualization types enum for better type safety
 export const VisualizationType = {
@@ -12,6 +12,8 @@ export const VisualizationType = {
     KGRID: "kgrid",
     MATRIX: "matrix"
 } as const;
+
+type VisualizationTypeValue = typeof VisualizationType[keyof typeof VisualizationType];
 
 interface KGridVisualizationProps {
     ncdMatrixResponse: NCDMatrixResponse;
@@ -51,7 +53,7 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                                                                    errorMsg
                                                                }) => {
     // Default to QUARTET view, fallback to others if available
-    const getDefaultView = () => {
+    const getDefaultView = (): VisualizationTypeValue => {
         if (qSearchTreeResult && Object.keys(qSearchTreeResult).length > 0) {
             return VisualizationType.QUARTET;
         }
@@ -59,7 +61,7 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
     };
 
     // State management
-    const [activeViz, setActiveViz] = useState(getDefaultView());
+    const [activeViz, setActiveViz] = useState<VisualizationTypeValue>(getDefaultView());
     const [selectedTheme, setSelectedTheme] = useState("scientific");
     const [isRunning, setIsRunning] = useState(false);
     const [iterations, setIterations] = useState(0);
@@ -261,13 +263,13 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
         return (
             <div>
                 {hasTreeData() ? (
-                    <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <div className="ncd-visualization__canvas">
                         {qSearchTreeResult &&
                             <QSearchTree3D data={qSearchTreeResult} darkThemeOnly={true}/>
                         }
                     </div>
                 ) : (
-                    <div className="flex items-center justify-center h-96 bg-gray-800 rounded-lg shadow">
+                    <div className="ncd-visualization__pending">
                         <div className="text-center">
                             <div className="text-blue-400 mb-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none"
@@ -301,59 +303,47 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
     };
 
     return (
-        <div className="bg-gray-900 rounded-lg shadow-lg overflow-hidden" style={{minHeight: '600px'}}>
+            <section className="ncd-visualization" aria-label="NCD result visualization">
             {/* Error message display */}
             {errorMsg && (
-                <div className="bg-red-900 border-l-4 border-red-400 text-white p-4 mb-4">
+                <div className="ncd-visualization__error" role="alert">
                     <p className="text-lg font-medium">{errorMsg}</p>
                 </div>
             )}
 
             {/* Visualization Type Selector */}
-            <div className="bg-gray-900 border-b border-gray-700">
-                <div className="flex p-2">
+            <nav className="ncd-visualization__tabs" aria-label="Result view">
                     <button
+                        type="button"
                         onClick={() => setActiveViz(VisualizationType.QUARTET)}
-                        className={`px-4 py-3 text-base font-bold rounded-t mr-1 ${
-                            activeViz === VisualizationType.QUARTET
-                                ? 'bg-blue-700 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
+                        aria-pressed={activeViz === VisualizationType.QUARTET}
                     >
-                        Tree Visualization
+                        Quartet tree
                     </button>
                     <button
+                        type="button"
                         onClick={() => setActiveViz(VisualizationType.KGRID)}
-                        className={`px-4 py-3 text-base font-bold rounded-t mr-1 ${
-                            activeViz === VisualizationType.KGRID
-                                ? 'bg-blue-700 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
+                        aria-pressed={activeViz === VisualizationType.KGRID}
                     >
-                        Grid Visualization
+                        K-grid
                     </button>
                     <button
+                        type="button"
                         onClick={() => setActiveViz(VisualizationType.MATRIX)}
-                        className={`px-4 py-3 text-base font-bold rounded-t ${
-                            activeViz === VisualizationType.MATRIX
-                                ? 'bg-blue-700 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
+                        aria-pressed={activeViz === VisualizationType.MATRIX}
                     >
-                        Matrix View
+                        Distance matrix
                     </button>
-                </div>
-            </div>
+            </nav>
 
 
             {/* Main Content Area */}
-            <div className="p-4 flex">
+            <div className="ncd-visualization__body">
                 {/* Left Controls Panel - Only show for K-Grid visualization */}
                 {activeViz === VisualizationType.KGRID && (
-                    <div
-                        className="w-64 bg-gray-800 rounded-lg shadow-lg mr-4 text-white h-fit flex-shrink-0 overflow-hidden">
+                    <aside className="ncd-visualization__controls">
                         <div className="bg-blue-800 text-white p-3 rounded-t-lg">
-                            <h3 className="font-bold text-lg">Controls</h3>
+                            <h3 className="font-bold text-lg">K-grid controls</h3>
                         </div>
 
                         {/* Display Options */}
@@ -434,25 +424,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                             </div>
                         </div>
 
-                        {/* Data Options */}
-                        <div className="p-4 border-b border-gray-700">
-                            <h4 className="font-bold mb-3 text-blue-300 text-base">Data</h4>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    className="py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-sm font-bold flex justify-center items-center">
-                                    <Upload size={14} className="mr-1"/>
-                                    Import
-                                </button>
-
-                                <button
-                                    className="py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-sm font-bold flex justify-center items-center">
-                                    <Download size={14} className="mr-1"/>
-                                    Export
-                                </button>
-                            </div>
-                        </div>
-
                         {/* Help Button */}
                         <div className="p-4">
                             <button
@@ -462,17 +433,16 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                                 Help
                             </button>
                         </div>
-                    </div>
+                    </aside>
                 )}
 
                 {/* Main Visualization Area */}
-                <div className="flex-1 overflow-auto">
+                <div className="ncd-visualization__output">
                     {showHelp && (
                         <div className="bg-gray-800 p-4 border-l-4 border-yellow-500 mb-4 text-white text-left">
-                            <h3 className="font-bold text-lg mb-2 text-yellow-300 text-center">About Genome Similarity
-                                Visualization</h3>
+                            <h3 className="font-bold text-lg mb-2 text-yellow-300 text-center">Reading NCD outputs</h3>
                             <p className="mb-2 text-base">
-                                This tool visualizes genome similarity using different methods:
+                                This tool presents relationships among the selected objects in three forms:
                             </p>
                             <ul className="text-left">
                                 <li className="mb-1"><strong className="text-yellow-300">Quartet Tree:</strong> Displays
@@ -499,18 +469,19 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
             </div>
 
             {/* Status Bar */}
-            <div className="bg-gray-900 text-gray-300 p-2 text-xs mg-2">
+            <footer className="ncd-visualization__status">
                 <div className="flex justify-between items-center">
                     <div>
                         Status: {isRunning ? "Optimization running" : "Ready"} •
                         Items: {ncdMatrixResponse?.labels.length || objects.length}
+                        {activeViz === VisualizationType.KGRID && ` • Match: ${matchPercentage.toFixed(1)}% • Time: ${formatTime(runningTime)}`}
                     </div>
                     <div>
                         Visualization: {activeViz.charAt(0).toUpperCase() + activeViz.slice(1)}
                     </div>
                 </div>
-            </div>
-        </div>
+            </footer>
+        </section>
     );
 };
 

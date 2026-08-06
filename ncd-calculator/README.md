@@ -1,8 +1,39 @@
-# React + Vite
+# CompLearn NCD Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Browser-based normalized compression distance analysis for GenBank sequences, Universal Declaration of Human Rights translations, and local files. Compression, matrix construction, and layout optimization run in web workers so the interface remains responsive.
 
-Currently, two official plugins are available:
+## Start the interface
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+cd ncd-calculator
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. The built-in example set and local-file workflow do not require the Node backend. GenBank search and authentication use the backend API configured in `src/configs/api.tsx`.
+
+## Workbench workflow
+
+The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source, or select **Try example data** beside the source tabs for an immediate self-contained run.
+
+1. Add at least four objects, or use the example data.
+2. Select **Show Similarity**. The page reports compression progress and exposes quartet-tree, K-grid, and distance-matrix result views.
+
+The example data contains two intentionally related sequence pairs. It exercises the same compression pipeline as uploaded content and is suitable for interface and worker verification; it is not a scientific benchmark dataset.
+
+## Verification
+
+```bash
+npm run build
+npm run lint
+npm run test
+npm run typecheck
+```
+
+Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__test__/workbench.test.tsx`.
+
+## Visual system
+
+The landing page and workbench share a restrained scientific/editorial system: warm paper, dark green structural surfaces, oxide annotations, serif headings, monospace metadata, square controls, and thin rules. Decorative gradients, glow effects, generic cards, and promotional copy are intentionally avoided. The design keeps the NCD equation, comparison set, computation state, and result matrix visually primary.
+
+Updated 2026-08-06 (Asia/Ho_Chi_Minh).

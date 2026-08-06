@@ -1,5 +1,5 @@
 import {Loader} from 'lucide-react';
-import {CompressionStats} from "@/types/ncd.d.ts";
+import type {CompressionStats} from "@/types/ncd";
 
 export const NCDProgress = ({stats}: { stats: CompressionStats }) => {
     const getPercentComplete = () => {
@@ -22,21 +22,13 @@ export const NCDProgress = ({stats}: { stats: CompressionStats }) => {
     };
 
     return (
-        <div className="flex items-center gap-3 text-sm">
-            <Loader className="animate-spin text-blue-500" size={20}/>
-            <span className="font-medium text-gray-700">
-        {getPercentComplete()}% Complete
-      </span>
-            <span className="text-gray-500">
-        ({stats.processedPairs}/{stats.totalPairs} pairs)
-      </span>
-            <span className="font-mono text-blue-600">
-        {formatProcessingRate()}
-      </span>
+        <div className="ncd-progress">
+            <Loader className="ncd-progress__spinner" size={19} aria-hidden="true"/>
+            <strong>{getPercentComplete()}% complete</strong>
+            <span>{stats.processedPairs}/{stats.totalPairs} pairs</span>
+            <code>{formatProcessingRate()}</code>
             {stats.currentPair && stats.lastNcdScore !== null && (
-                <span className="font-mono text-gray-500">
-          Current: ({stats.currentPair[0]},{stats.currentPair[1]}) = {stats.lastNcdScore.toFixed(4)}
-        </span>
+                <code>Current: ({stats.currentPair[0]},{stats.currentPair[1]}) = {stats.lastNcdScore.toFixed(4)}</code>
             )}
         </div>
     );

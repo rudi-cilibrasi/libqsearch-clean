@@ -3,6 +3,12 @@ import react from "@vitejs/plugin-react";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
+const baseUrl = process.env.VITE_BASE_URL ?? "/";
+
+if (!baseUrl.startsWith("/") || !baseUrl.endsWith("/")) {
+  throw new Error("VITE_BASE_URL must be an absolute path ending in '/', for example /ncd/");
+}
+
 const treatJsFilesAsJsx: Plugin = {
   name: "treat-js-files-as-jsx",
   async transform(code: string, id: string) {
@@ -40,7 +46,7 @@ const configureWasmHeaders: Plugin = {
 };
 
 export default defineConfig({
-  base: "./",
+  base: baseUrl,
   plugins: [
     handleBuiltins,
     treatJsFilesAsJsx,

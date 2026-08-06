@@ -39,23 +39,19 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   };
 
   return (
-    <div className="p-6">
-      <h3 className="text-lg font-bold text-gray-900 mb-4">{label}</h3>
-      <div className="relative">
-        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-          <Search size={20} className="text-gray-400" />
-        </div>
+    <div className="source-search">
+      <label htmlFor={`source-search-${type}`}>{label}</label>
+      <div className="source-search__control">
+        <Search size={18} aria-hidden="true" />
         <input
+          id={`source-search-${type}`}
           type="text"
           value={searchTerm}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
             handleSearchTerm(e.target.value)
           }
           onKeyDown={handlePress}
-          placeholder="Search..."
-          className="w-full py-3 px-4 pl-12 border-2 border-gray-200 rounded-lg text-base outline-none
-                        bg-black text-white placeholder-gray-400
-                        focus:border-blue-500 transition-colors"
+          placeholder={type === "fasta" ? "Species, scientific name, or accession" : "Filter the reference corpus"}
         />
       </div>
     </div>

@@ -46,6 +46,13 @@ ncd-calculator/
 │   │   ├── FileUpload.tsx          # File drag-and-drop upload
 │   │   ├── Language.tsx            # UDHR language selection
 │   │   ├── LandingPage.tsx         # Home/marketing page
+│   │   ├── LandingPage.css         # Scientific/editorial visual system shared by landing and header
+│   │   ├── AboutPage.tsx           # Project, contributor, and research context
+│   │   ├── AboutPage.css           # About-page extension of the shared visual system
+│   │   ├── HeroSection.tsx         # NCD equation and example distance matrix
+│   │   ├── FeaturesSection.tsx     # Domain-specific analysis entry points
+│   │   ├── HowItWorksSection.tsx   # Compression-to-structure method pipeline
+│   │   ├── ResearchSection.tsx     # Research basis and primary citation
 │   │   ├── tree/                   # 3D tree visualization (Three.js/R3F)
 │   │   │   ├── QSearchTree.tsx     # Main 3D tree component
 │   │   │   ├── NodeObject.tsx      # 3D node rendering
@@ -53,7 +60,6 @@ ncd-calculator/
 │   │   │   ├── physics.ts          # Force-directed layout
 │   │   │   ├── treeLayout.ts       # Tree layout algorithms
 │   │   │   └── ...
-│   │   ├── demo/                   # Demo/showcase components
 │   │   └── ui/                     # Reusable UI primitives
 │   ├── workers/
 │   │   ├── shared/
@@ -157,6 +163,22 @@ User Input (FASTA sequences / files / UDHR translations)
 - **`src/main.tsx`** — React app bootstrap, renders `<App />`
 - **`src/App.tsx`** — React Router setup, routes to `LandingPage` and `QSearch`
 - **`src/components/QSearch.tsx`** — Main calculator page, orchestrates the full pipeline
+
+## Landing Page Visual System
+
+Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+
+The landing and About pages use a restrained scientific/editorial system rather than a generic software-marketing layout. They are built from warm paper, dark green ink, an oxide annotation color, serif display typography, monospace labels, square controls, and thin rules. The pages avoid gradients, particles, glow effects, decorative badges, and repeated rounded cards. Their primary visuals use the actual NCD equation, so the method remains central throughout the public site.
+
+The landing-page sections are intentionally small and domain-specific: applications, the compression pipeline, output interpretation, and the research basis. Navigation into the calculator uses React Router and preserves the selected analysis mode. `src/__test__/landingPage.test.tsx` verifies the scientific content, route handoff, and sign-in entry point. The shared header uses the same visual system on both the landing page and calculator route.
+
+## NCD Workbench Interface
+
+Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+
+The calculator route begins directly at the source controls and comparison set. `ListEditor.tsx` owns input selection and computation readiness; the source components handle GenBank, UDHR, and local-file acquisition; `InputHolder.tsx` provides a compact accessible object inventory. Prominent **Try example data** and **Show Similarity** actions sit together above the inputs, making the complete compression path testable without an API, user files, or scrolling.
+
+`Workbench.css` extends the landing-page visual system across input preparation, progress, and result interpretation. The output viewer retains its algorithm-specific components, but its surrounding controls, status surface, and matrix colors use the shared scientific palette. `src/__test__/workbench.test.tsx` verifies the example-set invariants, minimum-set readiness message, empty state, and accessible item removal.
 
 ## How to Run
 

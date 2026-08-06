@@ -5,57 +5,46 @@ interface MatrixTableProps {
     labels: string[]
 }
 export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) => {
-    // Generate color for cells with high contrast, but with more pleasant colors
-    const getCellStyle = (value: number) => {
-        // Use a softer color gradient based on value
-        // Lower values (more similar) = softer blue
-        // Higher values (more different) = lighter blue-gray
+    const formatLabel = (label: string): string => (
+        label.length > 16 ? `${label.substring(0, 14)}…` : label
+    );
 
-        // Calculate a better color using a more pleasant gradient
-        const intensity = value; // 0.0 to 1.0
-
-        // Create a softer blue palette
-        const r = Math.round(220 - (intensity * 100)); // 220 to 120
-        const g = Math.round(230 - (intensity * 70));  // 230 to 160
-        const b = 255; // Keep blue high for theme consistency
-
-        // Calculate text color using YIQ formula for best contrast
-        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-        const textColor = brightness > 145 ? "#1a1a3a" : "#ffffff"; // Darker text for contrast
+    const getCellStyle = (value: number): React.CSSProperties => {
+        const intensity = Math.max(0, Math.min(value, 1));
+        const lightness = Math.round(95 - intensity * 48);
+        const textColor = intensity > 0.62 ? "#fffdf7" : "#16211b";
 
         return {
-            backgroundColor: `rgb(${r}, ${g}, ${b})`,
+            backgroundColor: `hsl(151 25% ${lightness}%)`,
             color: textColor,
             padding: "6px",
             textAlign: "center",
-            border: "1px solid #2a2a4a",
-            fontFamily: "monospace",
-            fontWeight: textColor === "#ffffff" ? "bold" : "normal",
+            border: "1px solid #7e877f",
+            fontFamily: "var(--font-mono)",
+            fontWeight: 500,
             fontSize: "0.85rem"
         };
     };
 
-    // Get diagonal cell style - softer dark color
-    const getDiagonalCellStyle = () => {
+    const getDiagonalCellStyle = (): React.CSSProperties => {
         return {
-            backgroundColor: "#3a3a5c", // Softer dark color
-            color: "#ffffff",
+            backgroundColor: "#a6462b",
+            color: "#fffdf7",
             padding: "6px",
             textAlign: "center",
-            border: "1px solid #2a2a4a",
-            fontFamily: "monospace",
+            border: "1px solid #7c321f",
+            fontFamily: "var(--font-mono)",
             fontWeight: "bold",
             fontSize: "0.85rem"
         };
     };
 
-    // Get header cell style - more pleasant blue
-    const getHeaderStyle = () => {
+    const getHeaderStyle = (): React.CSSProperties => {
         return {
             padding: "6px",
-            backgroundColor: "#4a4a9f", // Softer blue
-            color: "white",
-            border: "1px solid #3a3a7c",
+            backgroundColor: "#142c23",
+            color: "#eef0e8",
+            border: "1px solid #53635a",
             position: "sticky",
             top: 0,
             left: 0,
@@ -67,13 +56,12 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) =>
         };
     };
 
-    // Get row header style - matches header
-    const getRowHeaderStyle = () => {
+    const getRowHeaderStyle = (): React.CSSProperties => {
         return {
             padding: "6px",
-            backgroundColor: "#4a4a9f", // Softer blue
-            color: "white",
-            border: "1px solid #3a3a7c",
+            backgroundColor: "#142c23",
+            color: "#eef0e8",
+            border: "1px solid #53635a",
             position: "sticky",
             left: 0,
             fontWeight: "bold",
@@ -85,16 +73,16 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) =>
     };
 
     return (
-        <div className="bg-gray-900 rounded-lg shadow-lg overflow-hidden h-full">
-            <div className="p-4">
-                <div className="overflow-auto max-h-[calc(100vh-300px)] border border-gray-700 rounded">
-                    <table className="border-collapse w-full bg-gray-900 table-fixed">
+        <div className="distance-matrix">
+            <div className="distance-matrix__table-wrap">
+                    <table>
+                        <caption>Pairwise normalized compression distance matrix</caption>
                         <thead>
                         <tr>
-                            <th style={{...getHeaderStyle(), width: '80px'}}>ID</th>
+                            <th style={{...getHeaderStyle(), width: '112px'}}>ID</th>
                             {labels.map((label, index) => (
-                                <th key={index} style={{...getHeaderStyle(), width: '80px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                                    {label.length > 8 ? `${label.substring(0, 6)}...` : label}
+                                <th key={index} title={label} style={{...getHeaderStyle(), width: '112px', maxWidth: '112px', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                                    {formatLabel(label)}
                                 </th>
                             ))}
                         </tr>
@@ -102,8 +90,8 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) =>
                         <tbody>
                         {ncdMatrix.map((row, rowIndex) => (
                             <tr key={rowIndex}>
-                                <th style={{...getRowHeaderStyle(), width: '80px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                                    {labels[rowIndex].length > 8 ? `${labels[rowIndex].substring(0, 6)}...` : labels[rowIndex]}
+                                <th title={labels[rowIndex]} style={{...getRowHeaderStyle(), width: '112px', maxWidth: '112px', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                                    {formatLabel(labels[rowIndex])}
                                 </th>
                                 {row.map((value, colIndex) => (
                                     <td
@@ -118,26 +106,25 @@ export const MatrixTable: React.FC<MatrixTableProps> = ({ ncdMatrix, labels}) =>
                         ))}
                         </tbody>
                     </table>
-                </div>
+            </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-4 text-white bg-gray-800 p-3 rounded">
+                <div className="distance-matrix__legend">
                     <div>
                         <div className="flex items-center mb-1">
-                            <span className="inline-block w-5 h-5 mr-2" style={{ backgroundColor: "rgb(120, 160, 255)" }}></span>
+                            <span className="distance-matrix__swatch distance-matrix__swatch--near"></span>
                             <span className="font-bold">0.0000</span> (identical)
                         </div>
                         <div className="flex items-center">
-                            <span className="inline-block w-5 h-5 mr-2" style={{ backgroundColor: "rgb(220, 230, 255)" }}></span>
+                            <span className="distance-matrix__swatch distance-matrix__swatch--far"></span>
                             <span className="font-bold">1.0000</span> (different)
                         </div>
                     </div>
                     <div>
-                        <p className="font-bold text-yellow-300 mb-1">Reading the Matrix</p>
+                        <p className="font-bold text-yellow-300 mb-1">Reading the matrix</p>
                         <p className="text-sm">Lower values indicate higher similarity</p>
                         <p className="text-sm">Diagonal cells show self-comparison (always 0)</p>
                     </div>
                 </div>
-            </div>
         </div>
     );
 };

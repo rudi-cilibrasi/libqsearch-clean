@@ -1,35 +1,10 @@
 #root {
-    max-width: 1280px;
-    margin: 0 auto;
-    text-align: center;
+    width: 100%;
+    min-height: 100vh;
 }
 
 .text-xxs {
     font-size: 0.65rem;
     line-height: 0.6rem;
 }
-
-
-@keyframes float {
-    0% {
-        transform: translate(0, 0);
-    }
-    25% {
-        transform: translate(10px, 10px);
-    }
-    50% {
-        transform: translate(5px, 20px);
-    }
-    75% {
-        transform: translate(-5px, 10px);
-    }
-    100% {
-        transform: translate(0, 0);
-    }
-}
-
-.particles-container .particle {
-    animation: float linear infinite;
-}
-
 

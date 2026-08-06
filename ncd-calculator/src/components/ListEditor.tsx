@@ -12,7 +12,7 @@
  */
 
 import React, {useEffect, useRef, useState} from "react";
-import {AlertCircle, Dna, Download, FileType2, Globe2, Upload} from "lucide-react";
+import {AlertCircle, Dna, Download, FileType2, FlaskConical, Globe2, Upload} from "lucide-react";
 import {getTranslationResponse} from "../functions/udhr";
 import {InputHolder} from "./InputHolder.tsx";
 import {Language} from "./Language";
@@ -29,15 +29,11 @@ import {LabelManager} from "@/functions/labelUtils.ts";
 import createGraph from "@/functions/graphExport.ts";
 import {saveAs} from "file-saver";
 import {QTreeResponse} from "@/components/tree";
+import {getWorkbenchExampleItems} from "./workbenchExamples";
+import type {SelectedItem} from "./workbenchTypes";
+export type {SelectedItem} from "./workbenchTypes";
 export interface SearchMode {
 	searchMode: string;
-}
-
-export interface SelectedItem {
-	type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD;
-	label: string;
-	content?: string;
-	id: string;
 }
 
 export interface FastaSequenceResponse {
@@ -208,9 +204,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		[]
 	);
 	
-	const [apiKey, setApiKey] = React.useState<string>(
-		import.meta.env.VITE_NCBI_API_KEY
-	);
+	const apiKey = import.meta.env.VITE_NCBI_API_KEY ?? "";
 	
 	const [fastaSuggestionStartIndex, setFastaSuggestionStartIndex] =
 		React.useState<Record<string, number>>({});
@@ -219,7 +213,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	const MIN_ITEMS = 4;
 	const localStorageManager = LocalStorageKeyManager.getInstance();
 	const compressionServiceRef = useRef(CompressionService.getInstance());
-	const [searchParams, setSearchParams] = useSearchParams();
+	const [, setSearchParams] = useSearchParams();
 	
 	// Computed values
 	const isSearchDisabled =
@@ -357,7 +351,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		
 		for (let i = 0; i < withoutContent.length; i++) {
 			const item = withoutContent[i];
-			const sequence = localStorageManager.get(LocalStorageKeys.ACCESSION_SEQUENCE, item.id) || "";
+			const sequence = localStorageManager.get<string>(LocalStorageKeys.ACCESSION_SEQUENCE, item.id) || "";
 			if (sequence && sequence.trim() !== "") {
 				item.content = sequence;
 				res.push(item);
@@ -441,11 +435,11 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	const computeFastaNcdInput = async (
 		fastaItems: SelectedItem[],
-		apiKey: string
+		_apiKey: string
 	): Promise<SelectedItem[]> => {
 		if (!isValidInput(fastaItems)) return [];
 		try {
-			const searchResults = await fetchFastaSequenceAndProcess(fastaItems, apiKey);
+			const searchResults = await fetchFastaSequenceAndProcess(fastaItems);
 			if (searchResults.length === 0) return [];
 			cacheAccessionSequence(searchResults);
 			return searchResults;
@@ -476,8 +470,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	};
 	
 	const fetchFastaSequenceAndProcess = async (
-		fastaItems: SelectedItem[],
-		apiKey: string
+		fastaItems: SelectedItem[]
 	): Promise<SelectedItem[]> => {
 		const idsToFetch = fastaItems.map((item) => item.id);
 		const map = new Map<string, SelectedItem>();
@@ -485,7 +478,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			map.set(item.id, {...item});
 		});
 		
-		const response = await getFastaSequences(idsToFetch, apiKey);
+		const response = await getFastaSequences(idsToFetch);
 		const arr = toArr(response);
 		arr.forEach((item) => {
 			const fastItem = map.get(item.accession);
@@ -520,13 +513,27 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		setSelectedItems([]);
 		resetDisplay();
 		setHasImportedMatrix(false);
-		setImportError(false);
+		setImportError(null);
 		if (currentMode) {
 			setSearchParams({searchMode: currentMode});
 			setSearchMode({
 				searchMode: currentMode
 			});
 		}
+	};
+
+	const loadExampleSet = (): void => {
+		const examples = getWorkbenchExampleItems();
+
+		examples.forEach((item) => {
+			labelManager.registerLabel(item.id, item.label);
+		});
+
+		resetDisplay();
+		setMode(FILE_UPLOAD);
+		setSelectedItems(examples);
+		setHasImportedMatrix(false);
+		setImportError(null);
 	};
 	
 	const getAllFastaSuggestionWithLastIndex = (): Record<string, number> => {
@@ -539,10 +546,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				return (
 					<FastaSearch
 						addItem={addItem}
-						MIN_ITEMS={MIN_ITEMS}
 						selectedItems={selectedItems}
-						onSetApiKey={setApiKey}
-						setSelectedItems={setSelectedItems}
 						getAllFastaSuggestionWithLastIndex={getAllFastaSuggestionWithLastIndex}
 						getFastaSuggestionStartIndex={getFastaSuggestionStartIndex}
 						setFastaSuggestionStartIndex={setFastaSuggestionStartIndex}
@@ -550,11 +554,10 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				);
 			case LANGUAGE:
 				return (
-					<Language
-						selectedItems={selectedItems}
-						addItem={addItem}
-						MIN_ITEMS={MIN_ITEMS}
-					/>
+						<Language
+							selectedItems={selectedItems}
+							addItem={addItem}
+						/>
 				);
 			default:
 				return (
@@ -568,143 +571,74 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	
 	return (
-		<div className="p-6 w-[1200px] mx-auto">
-			<div className="flex gap-4 mb-6">
-				<button
-					onClick={() => setMode(FASTA)}
-					className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                    ${
-						searchMode.searchMode === FASTA
-							? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-							: "bg-gray-100 text-gray-600 border-2 border-transparent"
-					}`}
-				>
-					<Dna size={20}/>
-					<span>Animal Grouping</span>
-				</button>
-				<button
-					onClick={() => setMode(LANGUAGE)}
-					className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                    ${
-						searchMode.searchMode === LANGUAGE
-							? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-							: "bg-gray-100 text-gray-600 border-2 border-transparent"
-					}`}
-				>
-					<Globe2 size={20}/>
-					<span>Language Analysis</span>
-				</button>
-				<button
-					onClick={() => setMode(FILE_UPLOAD)}
-					className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                    ${
-						searchMode.searchMode === FILE_UPLOAD
-							? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-							: "bg-gray-100 text-gray-600 border-2 border-transparent"
-					}`}
-				>
-					<FileType2 size={20}/>
-					<span>File Upload</span>
-				</button>
-			</div>
-			
-			<div className="flex gap-6">
-				<div className="w-1/2 h-[600px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
-					<div className="flex-1 overflow-y-auto p-3">
-						{renderModal(searchMode)}
-					</div>
-				</div>
-				<InputHolder
-					selectedItems={selectedItems}
-					onRemoveItem={removeItem}
-					MIN_ITEMS={MIN_ITEMS}
-				/>
-			</div>
-			
-			{/* Bottom section with all the buttons */}
-			<div className="mt-6 flex flex-col">
-				{/* Import/Export buttons row */}
-				<div className="flex mb-4">
-					<div className="mr-auto flex gap-3">
-						<button
-							onClick={triggerFileInput}
-							className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-700 transition-all border border-indigo-300"
-						>
-							<Upload size={18}/>
-							<span>Import Matrix</span>
-						</button>
-						
-						<button
-							onClick={handleExportMatrix}
-							className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-        ${
-								selectedItems.length === 0
-									? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-300"
-									: "bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-300"
-							}`}
-							disabled={selectedItems.length === 0}
-						>
-							<Download size={18}/>
-							<span>Export Matrix</span>
-						</button>
-					</div>
-					
-					<button
-						onClick={clearAllSelectedItems}
-						disabled={isClearDisabled}
-						className={`px-6 py-3 rounded-lg transition-all
-                      ${
-							isClearDisabled
-								? "bg-gray-100 text-gray-400 cursor-not-allowed"
-								: "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
-						}`}
-					>
-						Clear All
+		<section className="workbench-editor" aria-label="NCD workbench">
+			<div className="workbench-sourcebar">
+				<div className="source-tabs" role="tablist" aria-label="Input source">
+					<button type="button" role="tab" aria-selected={searchMode.searchMode === FASTA} onClick={() => setMode(FASTA)}>
+						<Dna size={17} aria-hidden="true"/>
+						<span>GenBank sequences</span>
 					</button>
-					<button
-						onClick={sendNcdInput}
-						disabled={isSearchDisabled}
-						className={`px-6 py-3 rounded-lg transition-all ml-5
-                      ${
-							isSearchDisabled
-								? "bg-gray-100 text-gray-400 cursor-not-allowed"
-								: "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
-						}`}
-					>
-						Calculate
+					<button type="button" role="tab" aria-selected={searchMode.searchMode === LANGUAGE} onClick={() => setMode(LANGUAGE)}>
+						<Globe2 size={17} aria-hidden="true"/>
+						<span>UDHR languages</span>
+					</button>
+					<button type="button" role="tab" aria-selected={searchMode.searchMode === FILE_UPLOAD} onClick={() => setMode(FILE_UPLOAD)}>
+						<FileType2 size={17} aria-hidden="true"/>
+						<span>Local files</span>
 					</button>
 				</div>
-				
-				{/* Error message */}
-				{importError && (
-					<div className="mt-2 p-3 bg-red-50 border border-red-300 text-red-700 rounded-md text-sm flex items-start">
-						<AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0"/>
-						<span>{importError}</span>
-					</div>
-				)}
+				<div className="workbench-sourcebar__actions">
+					<button type="button" onClick={loadExampleSet} className="workbench-button workbench-button--example">
+						<FlaskConical size={17} aria-hidden="true"/>
+						Try example data
+					</button>
+					<button type="button" onClick={sendNcdInput} disabled={isSearchDisabled} className="workbench-button workbench-button--primary">
+						Show Similarity
+					</button>
+				</div>
 			</div>
-			
-			{/* Hidden file input */}
-			<input
-				type="file"
-				ref={fileInputRef}
-				onChange={handleMatrixImport}
-				accept=".json"
-				className="hidden"
-			/>
-			
-			{isAutoProcessing && (
-				<div className="mt-2 p-3 bg-blue-50 border border-blue-300 text-blue-700 rounded-md text-sm flex items-start">
-					<svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none"
-					     viewBox="0 0 24 24">
-						<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-						<path className="opacity-75" fill="currentColor"
-						      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-					</svg>
-					<span>Automatically processing imported matrix data...</span>
+
+			<div className="workbench-input-grid">
+				<section className="workbench-panel workbench-panel--source" aria-label="Object source">
+					{renderModal(searchMode)}
+				</section>
+				<InputHolder selectedItems={selectedItems} onRemoveItem={removeItem} MIN_ITEMS={MIN_ITEMS}/>
+			</div>
+
+			<footer className="workbench-actions">
+				<div className="workbench-actions__secondary">
+					<button type="button" onClick={triggerFileInput} className="workbench-button">
+						<Upload size={17} aria-hidden="true"/>
+						Import matrix
+					</button>
+					<button type="button" onClick={handleExportMatrix} className="workbench-button" disabled={selectedItems.length === 0}>
+						<Download size={17} aria-hidden="true"/>
+						Export tree
+					</button>
+				</div>
+				<div className="workbench-actions__primary">
+					<button type="button" onClick={clearAllSelectedItems} disabled={isClearDisabled} className="workbench-button">
+						Clear set
+					</button>
+				</div>
+			</footer>
+
+			{importError && (
+				<div className="workbench-message workbench-message--error" role="alert">
+					<AlertCircle size={16} aria-hidden="true"/>
+					<span>{importError}</span>
 				</div>
 			)}
-		</div>
+
+			<input type="file" ref={fileInputRef} onChange={handleMatrixImport} accept=".json" className="sr-only" aria-label="Import NCD matrix"/>
+
+			{isAutoProcessing && (
+				<div className="workbench-message" role="status">
+					<span className="workbench-spinner" aria-hidden="true"/>
+					<span>Processing imported matrix data.</span>
+				</div>
+			)}
+		</section>
 	);
 };
 

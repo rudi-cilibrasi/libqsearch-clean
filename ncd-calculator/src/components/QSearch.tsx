@@ -25,6 +25,7 @@ import KGridVisualization from "@/components/KGridVisualization.tsx";
 import {GridObject} from "@/datastructures/kgrid.ts";
 import {QTreeNode, QTreeResponse} from "@/components/QSearchTree3D.tsx";
 import {LabelManager} from "@/functions/labelUtils.ts";
+import "./Workbench.css";
 
 export interface QSearchProps {
 	openLogin: boolean;
@@ -138,8 +139,8 @@ export const QSearch: React.FC<QSearchProps> = ({
 		try {
 			setIsLoading(true);
 			setErrorMsg("");
-			labels.forEach((label) => {
-				labelManager.registerLabel(label);
+				labels.forEach((label) => {
+					labelManager.registerLabel(label, label);
 			})
 			
 			// Detect if this is imported matrix data by checking content format
@@ -422,13 +423,13 @@ export const QSearch: React.FC<QSearchProps> = ({
 	}
 	
 	return (
-		<>
+		<div className="ncd-workbench">
 			<Header
 				openLogin={openLogin}
 				setOpenLogin={setOpenLogin}
 				setAuthenticated={setAuthenticated}
 			/>
-			<div className="max-w-7xl mx-auto px-4 py-8">
+			<main className="workbench-page">
 				<ListEditor
 					qTreeResponse={qSearchTreeResult}
 					onComputedNcdInput={onNcdInput}
@@ -440,58 +441,41 @@ export const QSearch: React.FC<QSearchProps> = ({
 					authenticated={authenticated}
 				/>
 				
-				{/* Loading state */}
 				{isLoading && (
-					<div className="flex items-center gap-2 text-slate-600 my-4">
+					<section className="workbench-computation" aria-live="polite" aria-label="NCD computation progress">
 						{compressionInfo && (
-							<span>
-                Computing result using {compressionInfo.algorithm.toUpperCase()}
-								...
-              </span>
+							<p>Computing pairwise distances with {compressionInfo.algorithm.toUpperCase()}.</p>
 						)}
 						<NCDProgress stats={compressionStats}/>
-					</div>
+					</section>
 				)}
 				
-				{/* Error state */}
-				{errorMsg && <div className="text-red-600 my-4">{errorMsg}</div>}
+				{errorMsg && <div className="workbench-message workbench-message--error" role="alert">{errorMsg}</div>}
 				
-				{/* Results */}
 				{!isLoading && hasMatrix && labels.length > 0 && ncdMatrix.length > 0 && (
-					<KGridVisualization
-						labelManager={labelManager}
-						objects={gridObjects}
-						maxIterations={100000}
-						onOptimizationStart={handleOptimizationStart}
-						onOptimizationEnd={handleOptimizationEnd}
-						onIterationUpdate={handleIterationUpdate}
-						qSearchTreeResult={qSearchTreeResult}
-						autoStart={true}
-						totalExecutionTime={totalExecutionTime || undefined}
-						iterationsPerSecond={iterationsPerSecond || undefined}
-						ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
-					/>
+					<section className="workbench-results" aria-labelledby="results-title">
+						<header className="workbench-results__header">
+							<h2 id="results-title">Similarity</h2>
+							<span>{labels.length} objects · {labels.length * (labels.length - 1) / 2} pairs</span>
+						</header>
+						<KGridVisualization
+							labelManager={labelManager}
+							objects={gridObjects}
+							maxIterations={100000}
+							onOptimizationStart={handleOptimizationStart}
+							onOptimizationEnd={handleOptimizationEnd}
+							onIterationUpdate={handleIterationUpdate}
+							qSearchTreeResult={qSearchTreeResult}
+							autoStart={true}
+							totalExecutionTime={totalExecutionTime || undefined}
+							iterationsPerSecond={iterationsPerSecond || undefined}
+							ncdMatrixResponse={getNcdMatrixResponse(labels, ncdMatrix)}
+						/>
+					</section>
 				)}
 				
-				{/* Compression info */}
-				{compressionInfo && !isLoading && (
-					<div className="mt-2 mb-4 flex items-center justify-center gap-2 text-sm">
-						<div
-							className={`px-3 py-1 rounded-full ${
-								compressionInfo.algorithm === "zstd"
-									? "bg-blue-100 text-blue-700"
-									: compressionInfo.algorithm === "lzma"
-										? "bg-purple-100 text-purple-700"
-										: "bg-green-100 text-green-700"
-							}`}
-						>
-							{compressionInfo.algorithm.toUpperCase()}
-						</div>
-						<span className="text-gray-600">{compressionInfo.reason}</span>
-					</div>
-				)}
-			</div>
-		</>
+			</main>
+		</div>
 	);
 };
 

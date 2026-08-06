@@ -1,0 +1,60 @@
+import {cleanup, fireEvent, render, screen} from "@testing-library/react";
+import {describe, expect, test, vi} from "vitest";
+import {FastaSearch} from "../components/FastaSearch";
+import {InputHolder} from "../components/InputHolder";
+import {Language} from "../components/Language";
+import {getWorkbenchExampleItems} from "../components/workbenchExamples";
+
+describe("NCD workbench", () => {
+    test("provides a valid four-object example set with independent copies", () => {
+        const firstSet = getWorkbenchExampleItems();
+        const secondSet = getWorkbenchExampleItems();
+
+        expect(firstSet).toHaveLength(4);
+        expect(new Set(firstSet.map((item) => item.id)).size).toBe(4);
+        expect(firstSet.every((item) => (item.content?.length ?? 0) > 500)).toBe(true);
+        expect(firstSet[0]).not.toBe(secondSet[0]);
+    });
+
+    test("shows a concise object count and exposes an accessible remove action", () => {
+        const onRemoveItem = vi.fn();
+        const items = getWorkbenchExampleItems();
+
+        render(<InputHolder selectedItems={items} onRemoveItem={onRemoveItem} MIN_ITEMS={4}/>);
+
+        expect(screen.getByText("4 objects")).toBeInTheDocument();
+        expect(screen.queryByText("Selected objects")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", {name: "Remove Sequence alpha"}));
+        expect(onRemoveItem).toHaveBeenCalledWith("example-alpha");
+    });
+
+    test("keeps the empty state concise", () => {
+        render(<InputHolder selectedItems={[]} onRemoveItem={vi.fn()} MIN_ITEMS={4}/>);
+
+        expect(screen.getByText("No objects yet")).toBeInTheDocument();
+        expect(screen.getByText("4 more needed")).toBeInTheDocument();
+        expect(screen.getByLabelText("0 of 4 required objects selected")).toBeInTheDocument();
+    });
+
+    test("opens source modes directly at their useful controls", () => {
+        render(
+            <FastaSearch
+                addItem={vi.fn()}
+                selectedItems={[]}
+                getAllFastaSuggestionWithLastIndex={() => ({})}
+                getFastaSuggestionStartIndex={() => 0}
+                setFastaSuggestionStartIndex={vi.fn()}
+            />
+        );
+
+        expect(screen.getByLabelText("GenBank query")).toBeInTheDocument();
+        expect(screen.queryByText("Find a sequence record")).not.toBeInTheDocument();
+        expect(screen.queryByText("01 / GenBank source")).not.toBeInTheDocument();
+
+        cleanup();
+        render(<Language addItem={vi.fn()} selectedItems={[]}/>);
+
+        expect(screen.getByLabelText("Filter languages")).toBeInTheDocument();
+        expect(screen.queryByText("Compare written languages")).not.toBeInTheDocument();
+    });
+});

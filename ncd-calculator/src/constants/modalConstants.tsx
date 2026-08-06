@@ -1,5 +1,4 @@
-import React from 'react'
 // modals
-export const FASTA: string = "fasta";
-export const LANGUAGE: string = "language"
-export const FILE_UPLOAD: string = "file_upload";
+export const FASTA = "fasta" as const;
+export const LANGUAGE = "language" as const;
+export const FILE_UPLOAD = "file_upload" as const;

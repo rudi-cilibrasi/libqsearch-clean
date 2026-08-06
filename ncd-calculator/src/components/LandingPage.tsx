@@ -1,47 +1,48 @@
-import React, { useState, useEffect } from "react";
+import {useNavigate} from "react-router-dom";
 import Header from "./Header";
 import HeroSection from "./HeroSection";
-import DemoSection from "./DemoSection";
 import FeaturesSection from "./FeaturesSection";
 import HowItWorksSection from "./HowItWorksSection";
 import VisualizationTypesSection from "./VisualizationTypesSection";
-import InfoBanner from "./InfoBanner";
 import ResearchSection from "./ResearchSection";
 import Footer from "./Footer";
+import "./LandingPage.css";
 
-export const LandingPage = ({ openLogin, setOpenLogin, setAuthenticated }) => {
-	// Preserve the original navigation function
-	const navigateToCalculator = (analysisType) => {
-		window.location.href = `/calculator?searchMode=${analysisType}`;
-	};
-	
-	// Handle scroll effect for navbar
-	const [isScrolled, setIsScrolled] = useState(false);
-	
-	useEffect(() => {
-		const handleScroll = () => {
-			setIsScrolled(window.scrollY > 50);
-		};
-		window.addEventListener('scroll', handleScroll);
-		return () => window.removeEventListener('scroll', handleScroll);
-	}, []);
-	
-	return (
-		<div className="min-h-screen bg-gray-950 text-gray-200">
-			<Header
-				isScrolled={isScrolled}
-				openLogin={openLogin}
-				setOpenLogin={setOpenLogin}
-			/>
-			<HeroSection navigateToCalculator={navigateToCalculator} />
-			<DemoSection />
-			<FeaturesSection navigateToCalculator={navigateToCalculator} />
-			<HowItWorksSection />
-			<VisualizationTypesSection />
-			<InfoBanner />
-			<ResearchSection />
-			<Footer />
-		</div>
-	);
+export type AnalysisType = "fasta" | "language" | "file_upload";
+
+export interface LandingPageProps {
+    openLogin: boolean;
+    setOpenLogin: (open: boolean) => void;
+    setAuthenticated: (authenticated: boolean) => void;
+}
+
+export const LandingPage = ({
+    openLogin,
+    setOpenLogin,
+    setAuthenticated,
+}: LandingPageProps) => {
+    const navigate = useNavigate();
+
+    const navigateToCalculator = (analysisType: AnalysisType): void => {
+        navigate(`/calculator?searchMode=${analysisType}`);
+    };
+
+    return (
+        <div className="landing-shell">
+            <Header
+                openLogin={openLogin}
+                setOpenLogin={setOpenLogin}
+                setAuthenticated={setAuthenticated}
+                variant="landing"
+            />
+            <main>
+                <HeroSection navigateToCalculator={navigateToCalculator}/>
+                <FeaturesSection navigateToCalculator={navigateToCalculator}/>
+                <HowItWorksSection/>
+                <VisualizationTypesSection/>
+                <ResearchSection/>
+            </main>
+            <Footer/>
+        </div>
+    );
 };
-
