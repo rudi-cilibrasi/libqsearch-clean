@@ -233,10 +233,12 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	useEffect(() => {
 		let changed = false;
 		const hydratedItems = selectedItems.map((item) => {
-			const displayLabel = getItemDisplayLabel(item);
-			if (displayLabel === item.label) return item;
+			const record = item.type === LANGUAGE ? getUdhrLanguage(item.id) : undefined;
+			const canonicalId = record?.id ?? item.id;
+			const displayLabel = record?.name ?? getItemDisplayLabel(item);
+			if (displayLabel === item.label && canonicalId === item.id) return item;
 			changed = true;
-			return {...item, label: displayLabel};
+			return {...item, id: canonicalId, label: displayLabel};
 		});
 		if (changed) setSelectedItems(hydratedItems);
 	}, [selectedItems, setSelectedItems]);

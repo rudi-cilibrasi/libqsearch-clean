@@ -51,7 +51,7 @@ export const Language: React.FC<LanguageProps> = ({
                                 language.name,
                                 language.id,
                                 language.languageTag,
-                                language.iso6393,
+                                language.languageId,
                             ].some((value) => value?.toLowerCase().includes(query));
                         })
                         .map((language) => {

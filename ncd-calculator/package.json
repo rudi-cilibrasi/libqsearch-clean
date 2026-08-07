@@ -15,6 +15,7 @@
     "test": "vitest --run",
     "typecheck": "tsc --noEmit",
     "graphviz:verify-dev": "node scripts/verify-dev-graphviz.mjs",
+    "udhr:audit": "node scripts/build-udhr-corpus.mjs --audit-only",
     "udhr:refresh": "node scripts/build-udhr-corpus.mjs",
     "udhr:verify": "node scripts/verify-udhr-corpus.mjs"
   },

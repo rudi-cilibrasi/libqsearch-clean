@@ -26,7 +26,9 @@ export const normalizeSegment = (value) => String(value)
   .replace(/\r\n?/gu, "\n")
   .replace(/[\t\f\v]+/gu, " ")
   .replace(/\p{Zs}+/gu, " ")
-  .replace(/ *\n */gu, "\n")
+  // Source formatting may wrap one XML paragraph across physical lines. A
+  // canonical line is reserved for an article boundary, never source layout.
+  .replace(/ *\n+ */gu, " ")
   .replace(/ {2,}/gu, " ")
   .trim();
 
@@ -98,7 +100,11 @@ const readParagraphs = (container, context) => {
   }).filter(Boolean);
 };
 
-export const extractCanonicalUdhr = (xml, sourceKey) => {
+export const extractCanonicalUdhr = (
+  xml,
+  sourceKey,
+  {requireCompleteArticles = true, minimumCodePoints = 2_000} = {},
+) => {
   const parsed = parseTrustedXml(xml, `udhr_${sourceKey}.xml`);
   const document = parsed.udhr;
   if (!document || typeof document !== "object") {
@@ -109,18 +115,35 @@ export const extractCanonicalUdhr = (xml, sourceKey) => {
   }
 
   const articles = asArray(document.article);
-  if (articles.length !== 30) {
-    throw new Error(`${sourceKey}: expected 30 articles, found ${articles.length}`);
+  if (articles.length === 0) {
+    throw new Error(`${sourceKey}: contains no articles`);
+  }
+
+  const articleNumbers = articles.map((article, articleIndex) => {
+    const articleNumber = Number(article["@_number"]);
+    if (
+      !Number.isInteger(articleNumber)
+      || articleNumber < 1
+      || articleNumber > 30
+      || (articleIndex > 0 && articleNumber <= Number(articles[articleIndex - 1]["@_number"]))
+    ) {
+      throw new Error(`${sourceKey}: invalid or non-increasing article number`);
+    }
+    return articleNumber;
+  });
+  const hasCompleteArticles = (
+    articleNumbers.length === 30
+    && articleNumbers.every((articleNumber, index) => articleNumber === index + 1)
+  );
+  if (requireCompleteArticles && !hasCompleteArticles) {
+    throw new Error(`${sourceKey}: expected Articles 1-30, found ${articleNumbers.join(",")}`);
   }
 
   const articleSegments = articles.map((article, articleIndex) => {
-    const expectedNumber = String(articleIndex + 1);
-    if (String(article["@_number"]) !== expectedNumber) {
-      throw new Error(`${sourceKey}: expected Article ${expectedNumber}`);
-    }
-    const segments = readParagraphs(article, `${sourceKey}.article[${expectedNumber}]`);
+    const articleNumber = articleNumbers[articleIndex];
+    const segments = readParagraphs(article, `${sourceKey}.article[${articleNumber}]`);
     if (segments.length === 0) {
-      throw new Error(`${sourceKey}: Article ${expectedNumber} has no body paragraphs`);
+      throw new Error(`${sourceKey}: Article ${articleNumber} has no body paragraphs`);
     }
     // Paragraph and list-item boundaries differ slightly between translations.
     // Collapse them within each article so the serialized structure contributes
@@ -139,12 +162,13 @@ export const extractCanonicalUdhr = (xml, sourceKey) => {
   if (CONTROL_CHARACTERS.test(text)) {
     throw new Error(`${sourceKey}: canonical text contains control characters`);
   }
-  if (countCodePoints(text) < 2_000) {
+  if (countCodePoints(text) < minimumCodePoints) {
     throw new Error(`${sourceKey}: canonical body is unexpectedly short`);
   }
 
   return {
     articleCount: articles.length,
+    articleNumbers,
     characterCount: countCodePoints(text),
     direction: document["@_dir"],
     iso6393: document["@_iso639-3"],
@@ -152,6 +176,7 @@ export const extractCanonicalUdhr = (xml, sourceKey) => {
     name: document["@_n"],
     script: document["@_iso15924"],
     segmentCount: segments.length,
+    hasCompleteArticles,
     text,
     utf8Bytes: Buffer.byteLength(text, "utf8"),
   };
