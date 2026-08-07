@@ -23,22 +23,34 @@ The example data contains two intentionally related sequence pairs. It exercises
 
 The quartet-tree result opens in a planar 2D presentation so topology and labels can be read without manipulating a camera. The view automatically fits after layout and when the viewport changes, and provides explicit zoom, fit, and reset controls. **Interactive 3D** remains available for spatial exploration; its camera also fits the complete tree on entry and resize, while node selection reports whether the selected point is a leaf or an internal node.
 
+Pair compression is explicitly order-dependent. The worker first constructs the complete directed matrix with separate `C(x || y)` and `C(y || x)` cells, then derives the symmetric QSearch/K-grid input by taking the minimum of each pair of reflected matrix cells. Both matrices are retained in the typed result. Directed compression results are stored in a SHA-256 content-addressed, versioned cache; incompatible legacy caches are removed automatically. QSearch uses a deterministic multi-start seed schedule and records selected-topology frequency and per-edge split stability for reproducibility. These diagnostics are kept out of the primary interface and retained in the typed result, explicit DOT exports, and technical documentation. The complete numerical contract is in [`docs/NCD_QSEARCH_REPRODUCIBILITY.md`](docs/NCD_QSEARCH_REPRODUCIBILITY.md).
+
 ## Verification
 
 ```bash
 npm run build
+npm run graphviz:verify-dev
 npm run lint
 npm run test
 npm run typecheck
+cd .. && make wasm-calculator
 ```
 
-Production builds also verify that the Graphviz renderer was bundled into relative assets. The build fails if an unresolved `@hpcc-js/wasm` module specifier would reach the browser.
+The planar renderer remains a lazy Graphviz/WASM chunk so it does not delay the landing page. In development, Graphviz is served directly rather than through Vite's disposable hashed dependency cache; `graphviz:verify-dev` checks that resolution and runs automatically during a build. Production builds separately verify that Graphviz was bundled into relative assets and fail if an unresolved `@hpcc-js/wasm` module specifier would reach the browser.
+
+After changing dependencies or switching branches while the development server is running, restart Vite so its module graph matches the installed packages:
+
+```bash
+npm run dev -- --force
+```
+
+The planar-tree interface reports initialization failures and offers **Retry renderer**. The shared loader deduplicates concurrent initialization and clears failed attempts before retrying.
 
 Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__test__/workbench.test.tsx`.
 
 ### Reproducible UDHR inputs
 
-UDHR comparisons use a versioned UTF-8 snapshot generated from the Unicode UDHR Project at a pinned commit. Each of the 59 records is marked complete in the source index and linked there to an OHCHR translation. The comparison corpus contains the body of Articles 1–30 only: preambles, source notes, and localized headings are excluded so every language has identical section coverage. Paragraphs within an article are joined with one space, and the 30 article boundaries are represented by line feeds.
+UDHR comparisons use a versioned UTF-8 snapshot generated from the Unicode UDHR Project at a pinned commit. Each of the 61 records is marked complete in the source index and linked there to an OHCHR translation. The comparison corpus contains the body of Articles 1–30 only: preambles, source notes, and localized headings are excluded so every language has identical section coverage. Paragraphs within an article are joined with one space, and the 30 article boundaries are represented by line feeds.
 
 The browser loads only the selected same-origin text assets. It decodes UTF-8 in fatal mode and verifies the byte count, Unicode code-point count, article count, NFC normalization, and SHA-256 digest before compression. A failed check stops the calculation. Assets use the browser HTTP cache plus request deduplication instead of application-managed local storage.
 
@@ -54,5 +66,7 @@ Compressor-based NCD converges toward its theoretical properties as compressed i
 ## Visual system
 
 The landing page and workbench share a restrained scientific/editorial system: warm paper, dark green structural surfaces, oxide annotations, serif headings, monospace metadata, square controls, and thin rules. Decorative gradients, glow effects, generic cards, and promotional copy are intentionally avoided. The design keeps the NCD equation, comparison set, computation state, and result matrix visually primary.
+
+The production interface is for end users. Internal identifiers, seeds, protocol versions, worker throughput, iteration counts, objective values, cache state, and raw optimizer diagnostics belong in exports, logs, tests, or technical documents rather than the GUI. See [`docs/END_USER_UI_POLICY.md`](docs/END_USER_UI_POLICY.md).
 
 Updated 2026-08-06 (Asia/Ho_Chi_Minh).

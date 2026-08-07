@@ -3,6 +3,14 @@ export const UDHR_SCHEMA_VERSION = 1;
 export const UDHR_CORPUS_VERSION = "unicode-udhr-588b3f4b-articles-nfc-v1";
 
 /**
+ * Current user-facing English names for records whose pinned upstream label is
+ * historical. The manifest retains the original label as sourceName.
+ */
+export const UDHR_DISPLAY_NAME_OVERRIDES = Object.freeze({
+  bel: "Belarusian",
+});
+
+/**
  * Stable application identifiers mapped to the exact Unicode UDHR source keys.
  *
  * Application identifiers are kept stable so existing saved selections continue
@@ -13,6 +21,8 @@ export const UDHR_LANGUAGE_SOURCES = Object.freeze([
   ["eng", "eng"],
   ["fra", "fra"],
   ["rus", "rus"],
+  ["ukr", "ukr"],
+  ["bel", "bel"],
   ["spa", "spa"],
   ["cmn", "cmn_hans"],
   ["hin", "hin"],

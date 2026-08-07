@@ -1,9 +1,10 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {KGridDualOptimization} from './KGridDualOptimization';
-import {QSearchTree3D, QTreeResponse} from './QSearchTree3D';
+import {QSearchTree3D} from './QSearchTree3D';
+import type {QTreeResponse} from "@/types/qsearch";
 import {MatrixTable} from "@/components/MatrixTable.tsx";
 import {GridObject} from "@/datastructures/kgrid.ts";
-import {LabelManager} from "@/functions/labelUtils.ts";
+import {getDisplayLabel} from "@/services/DisplayLabelProtocol.ts";
 import type {NCDMatrixResponse} from "@/types/ncd";
 
 // Visualization types enum for better type safety
@@ -25,12 +26,8 @@ interface KGridVisualizationProps {
     onOptimizationEnd?: () => void;
     onIterationUpdate?: (iteration: number) => void;
     autoStart?: boolean;
-    optimizationStartTime?: number;
-    optimizationEndTime?: number;
-    totalExecutionTime?: number;
-    iterationsPerSecond?: number;
     qSearchTreeResult?: QTreeResponse;
-    labelManager: LabelManager;
+    labelMap: ReadonlyMap<string, string>;
     errorMsg?: string;
 }
 
@@ -44,12 +41,8 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                                                                    onOptimizationEnd,
                                                                    onIterationUpdate,
                                                                    autoStart = false,
-                                                                   optimizationStartTime,
-                                                                   optimizationEndTime,
-                                                                   totalExecutionTime,
-                                                                   iterationsPerSecond,
                                                                    qSearchTreeResult,
-                                                                   labelManager,
+                                                                   labelMap,
                                                                    errorMsg
                                                                }) => {
     // Default to QUARTET view, fallback to others if available
@@ -64,13 +57,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
     const [activeViz, setActiveViz] = useState<VisualizationTypeValue>(getDefaultView());
     const [selectedTheme, setSelectedTheme] = useState("scientific");
     const [isRunning, setIsRunning] = useState(false);
-    const [iterations, setIterations] = useState(0);
-    const [matchPercentage, setMatchPercentage] = useState(0);
-    const [runningTime, setRunningTime] = useState(0);
-    // @ts-ignore
-    const [localIterationsPerSecond, setLocalIterationsPerSecond] = useState(0);
-    // @ts-ignore
-    const [selectedCluster, setSelectedCluster] = useState(null);
     const [showHelp, setShowHelp] = useState(false);
 
     // Track if optimization has been started manually
@@ -83,11 +69,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
         }
     }, [qSearchTreeResult]);
 
-    // Refs for timers and animation frames
-    const timerRef = useRef<any>(null);
-    const startTimeRef = useRef<number | null>(null);
-    const speedCalcRef = useRef<any>({lastTime: 0, lastIteration: 0});
-
     // Use a ref to track running state to avoid closure issues
     const isRunningRef = useRef<boolean>(false);
 
@@ -98,20 +79,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
         isRunningRef.current = true;
         manuallyStartedRef.current = true;
 
-        // Reset iteration counter
-        setIterations(0);
-        setMatchPercentage(0);
-
-        // Start timing
-        startTimeRef.current = Date.now();
-
-        // Set up timer to update running time
-        timerRef.current = setInterval(() => {
-            if (startTimeRef.current && isRunningRef.current) {
-                setRunningTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
-            }
-        }, 1000);
-
         // Notify parent
         if (onOptimizationStart) {
             onOptimizationStart();
@@ -119,69 +86,34 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
     };
 
     // Handle optimization end - ensure all animations are stopped
-    const handleOptimizationEnd = () => {
+    const handleOptimizationEnd = useCallback(() => {
         // Update running state first
         setIsRunning(false);
         isRunningRef.current = false;
-
-        // Clear the interval timer
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-        }
 
         // Notify parent about optimization end
         if (onOptimizationEnd) {
             onOptimizationEnd();
         }
-    };
+    }, [onOptimizationEnd]);
+
+    // K-grid is an optional visualization. Stop its worker-side search and
+    // timers as soon as the user switches to a different result view.
+    useEffect(() => {
+        if (activeViz !== VisualizationType.KGRID && isRunningRef.current) {
+            handleOptimizationEnd();
+        }
+    }, [activeViz, handleOptimizationEnd]);
 
     // Handle iteration update - also updates match percentage
     const handleIterationUpdate = (iteration: number) => {
         // Only update if still running
         if (!isRunningRef.current) return;
 
-        setIterations(iteration);
-
-        // Calculate iterations per second
-        const now = Date.now();
-        if (now - speedCalcRef.current.lastTime >= 1000) {
-            const elapsed = (now - speedCalcRef.current.lastTime) / 1000;
-            const iterationsInPeriod = iteration - speedCalcRef.current.lastIteration;
-            setLocalIterationsPerSecond(Math.round(iterationsInPeriod / elapsed));
-
-            speedCalcRef.current = {
-                lastTime: now,
-                lastIteration: iteration
-            };
-        }
-
         if (onIterationUpdate) {
             onIterationUpdate(iteration);
         }
     };
-
-    // Update matchPercentage from KGridDualOptimization
-    const handleMatchPercentageUpdate = (percentage: number) => {
-        setMatchPercentage(percentage);
-    };
-
-    // Format time display (mm:ss)
-    const formatTime = (seconds: number) => {
-        if (seconds === undefined || seconds === null) return "0:00";
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    // Clean up on unmount
-    useEffect(() => {
-        return () => {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-            }
-        };
-    }, []);
 
     // Calculate optimal grid dimensions
     const getOptimalDimensions = () => {
@@ -197,19 +129,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
 
     const {width: gridWidth, height: gridHeight} = getOptimalDimensions();
 
-    // Update running metrics from props
-    useEffect(() => {
-        if (optimizationStartTime && optimizationEndTime && totalExecutionTime) {
-            setRunningTime(Math.floor(totalExecutionTime / 1000));
-        } else if (optimizationStartTime) {
-            setRunningTime(Math.floor((Date.now() - optimizationStartTime) / 1000));
-        }
-
-        if (iterationsPerSecond !== undefined && iterationsPerSecond !== null) {
-            setLocalIterationsPerSecond(Math.round(iterationsPerSecond));
-        }
-    }, [optimizationStartTime, optimizationEndTime, totalExecutionTime, iterationsPerSecond]);
-
     // Check if tree data is available and has nodes
     const hasTreeData = () => {
         return (
@@ -220,7 +139,7 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
     };
 
     const getDisplayLabels = (ids: string[]) => {
-        return ids.map(id => labelManager.getDisplayLabel(id) || 'Unknown');
+        return ids.map(id => getDisplayLabel(labelMap, id));
     }
 
     // Render K-Grid visualization content
@@ -233,7 +152,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                     height={gridHeight}
                     objects={objects}
                     maxIterations={maxIterations}
-                    currentIterations={iterations}
                     onOptimizationStart={handleOptimizationStart}
                     onOptimizationEnd={handleOptimizationEnd}
                     onIterationUpdate={handleIterationUpdate}
@@ -242,7 +160,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                     showSingleGrid={true}
                     isRunning={isRunning}
                     ncdMatrixResponse={ncdMatrixResponse}
-                    onMatchPercentageUpdate={handleMatchPercentageUpdate}
                 />
             </div>
         );
@@ -346,28 +263,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                             <h3 className="font-bold text-lg">K-grid controls</h3>
                         </div>
 
-                        {/* Display Options */}
-                        <div className="p-4 border-b border-gray-700">
-                            <h4 className="font-bold mb-3 text-blue-300 text-base">Display Info</h4>
-
-                            <div className="mb-3">
-                                <p className="text-sm text-white mb-2 font-medium">Grid Size:</p>
-                                <div className="flex items-center">
-                                    <span
-                                        className="text-base text-blue-300 mr-3 font-bold">{gridWidth}×{gridHeight}</span>
-                                    <div className="flex-1 bg-gray-600 h-2 rounded-full overflow-hidden">
-                                        <div className="bg-blue-500 h-full" style={{width: '50%'}}></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mb-3">
-                                <p className="text-sm text-white mb-2 font-medium">Items:</p>
-                                <span
-                                    className="text-base font-medium">{objects.length || ncdMatrixResponse?.labels.length}</span>
-                            </div>
-                        </div>
-
                         {/* Color Theme */}
                         <div className="p-4 border-b border-gray-700">
                             <h4 className="font-bold mb-3 text-blue-300 text-base">Color Theme</h4>
@@ -468,19 +363,6 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                 </div>
             </div>
 
-            {/* Status Bar */}
-            <footer className="ncd-visualization__status">
-                <div className="flex justify-between items-center">
-                    <div>
-                        Status: {isRunning ? "Optimization running" : "Ready"} •
-                        Items: {ncdMatrixResponse?.labels.length || objects.length}
-                        {activeViz === VisualizationType.KGRID && ` • Match: ${matchPercentage.toFixed(1)}% • Time: ${formatTime(runningTime)}`}
-                    </div>
-                    <div>
-                        Visualization: {activeViz.charAt(0).toUpperCase() + activeViz.slice(1)}
-                    </div>
-                </div>
-            </footer>
         </section>
     );
 };

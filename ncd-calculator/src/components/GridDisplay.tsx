@@ -5,7 +5,6 @@ interface GridDisplayProps {
     grid: GridState;
     objectsById: Record<string, { label: string; content: number[] }>;
     iterations: number;
-    iterationsPerSecond?: number;
     colorTheme?: string;
     onCellSelect?: (objectId: string, i: number, j: number) => void;
     cellDimensions?: { width: string; height: string };
@@ -452,7 +451,6 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
     };
 
     // Render only non-empty cells if showEmptyCells is false
-// Render only non-empty cells if showEmptyCells is false
     const renderGridCells = () => {
         const cells = [];
         const nonEmptyCells = [];
@@ -503,11 +501,7 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                             margin: 0,
                             padding: 0
                         }}
-                    >
-                        <div className="flex items-center justify-center text-xxs text-gray-400 opacity-40">
-                            ({i},{j})
-                        </div>
-                    </div>
+                    />
                 );
                 continue;
             }
@@ -534,10 +528,6 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                 );
                 continue;
             }
-
-            const shortContent = object.label?.length > 20
-                ? object.label.substring(0, 20) + "..."
-                : object.label || "";
 
             const isSelected = selectedCell?.i === i && selectedCell?.j === j;
 
@@ -581,24 +571,6 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                     }}
                     onClick={() => handleCellClick(indexId, i, j)}
                 >
-                    {/* Position indicator with improved visibility */}
-                    <div
-                        className="absolute top-0.5 right-0.5 text-xxs font-medium bg-black bg-opacity-20 px-0.5 rounded text-white z-10">
-                        ({i},{j})
-                    </div>
-
-                    {/* Cluster indicator with improved visibility */}
-                    {clusterData && (
-                        <div
-                            className="absolute bottom-0.5 left-0.5 text-xxs font-bold opacity-90 px-1 py-0.5 rounded z-10"
-                            style={{
-                                color: getContrastColor(cellColor),
-                                backgroundColor: `${cellColor}EE`
-                            }}>
-                            C{clusterData.clusterId}
-                        </div>
-                    )}
-
                     {/* Update the connection indicators for similar neighbors */}
                     {hasRightSimilar && (
                         <div
@@ -633,21 +605,12 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                             }}></div>
                     )}
 
-                    {/* Content container with minimal padding */}
-                    <div className="flex flex-col items-center justify-center w-full h-full p-1">
-                        {/* Main content */}
-                        <div className="font-semibold text-xs mb-0.5 truncate w-full">
-                            {object.label}
-                        </div>
-
+                    <div className="flex items-center justify-center w-full h-full p-2">
                         <div
-                            className="text-xxs text-gray-600 opacity-75 line-clamp-2 w-full overflow-hidden text-ellipsis">
-                            {shortContent}
-                        </div>
-
-                        {/* ID indicator - simplified */}
-                        <div className="text-xxs text-gray-500 mt-0.5 truncate w-full">
-                            ID: {objectId.substring(0, 6)}...
+                            className="font-semibold text-xs leading-tight break-words w-full"
+                            title={object.label}
+                        >
+                            {object.label}
                         </div>
                     </div>
                 </div>
@@ -707,7 +670,7 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                 <div
                     className="absolute bottom-2 right-2 bg-gray-800 bg-opacity-90 p-2 rounded-lg shadow-lg text-white z-40 max-w-xs">
                     <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-xs font-bold">Cluster {zoomedCluster}</h3>
+                        <h3 className="text-xs font-bold">Related objects</h3>
                         <button
                             className="text-xxs bg-gray-700 hover:bg-gray-600 text-white px-2 py-0.5 rounded"
                             onClick={() => {
@@ -721,18 +684,16 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
                     </div>
 
                     <div className="text-xxs mb-1">
-                        <span className="text-gray-300">Items in cluster: </span>
+                        <span className="text-gray-300">Objects: </span>
                         <span className="font-bold">{clusterItems.length}</span>
                     </div>
 
                     {clusterItems.length > 0 && (
                         <div className="max-h-24 overflow-y-auto">
-                            <div className="text-xxs font-medium mb-0.5 text-gray-300">Items:</div>
                             <ul className="text-xxs space-y-0.5">
                                 {clusterItems.map((item, index) => (
-                                    <li key={index} className="flex items-center justify-between">
-                                        <span className="truncate mr-1">{item.label}</span>
-                                        <span className="text-gray-400 whitespace-nowrap">({item.i},{item.j})</span>
+                                    <li key={index}>
+                                        <span className="truncate">{item.label}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -743,56 +704,3 @@ export const GridDisplay: React.FC<GridDisplayProps> = ({
         </div>
     );
 };
-
-// Helper function to determine if text should be black or white based on background color
-function getContrastColor(hexOrHsl: string): string {
-    let r, g, b;
-
-    if (hexOrHsl.startsWith('#')) {
-        // Handle hex color
-        const hex = hexOrHsl.replace('#', '');
-        r = parseInt(hex.substr(0, 2), 16);
-        g = parseInt(hex.substr(2, 2), 16);
-        b = parseInt(hex.substr(4, 2), 16);
-    } else if (hexOrHsl.startsWith('hsl')) {
-        // Approximate HSL to RGB (not perfect but good enough for contrast)
-        const hslMatch = hexOrHsl.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-        if (hslMatch) {
-            const h = parseInt(hslMatch[1]) / 360;
-            const s = parseInt(hslMatch[2]) / 100;
-            const l = parseInt(hslMatch[3]) / 100;
-
-            // HSL to RGB conversion (simplified)
-            if (s === 0) {
-                r = g = b = l * 255;
-            } else {
-                const hue2rgb = (p: number, q: number, t: number) => {
-                    if (t < 0) t += 1;
-                    if (t > 1) t -= 1;
-                    if (t < 1 / 6) return p + (q - p) * 6 * t;
-                    if (t < 1 / 2) return q;
-                    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-                    return p;
-                };
-
-                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                const p = 2 * l - q;
-                r = hue2rgb(p, q, h + 1 / 3) * 255;
-                g = hue2rgb(p, q, h) * 255;
-                b = hue2rgb(p, q, h - 1 / 3) * 255;
-            }
-        } else {
-            // Default to black if parsing fails
-            return '#000000';
-        }
-    } else {
-        // Default to black for unknown formats
-        return '#000000';
-    }
-
-    // Calculate relative luminance
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-    // Return black for light colors, white for dark colors
-    return luminance > 0.5 ? '#000000' : '#ffffff';
-}

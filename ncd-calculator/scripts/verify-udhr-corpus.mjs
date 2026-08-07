@@ -4,6 +4,7 @@ import {fileURLToPath} from "node:url";
 
 import {
   UDHR_CORPUS_VERSION,
+  UDHR_DISPLAY_NAME_OVERRIDES,
   UDHR_LANGUAGE_SOURCES,
   UDHR_SCHEMA_VERSION,
   UDHR_SOURCE_COMMIT,
@@ -47,6 +48,17 @@ for (const language of manifest.languages) {
   }
   if (language.asset !== `${language.id}.txt`) {
     throw new Error(`${language.id}: asset name is not canonical`);
+  }
+  const displayNameOverride = UDHR_DISPLAY_NAME_OVERRIDES[language.id];
+  if (displayNameOverride !== undefined && (
+    language.name !== displayNameOverride
+    || typeof language.sourceName !== "string"
+    || !language.sourceName
+  )) {
+    throw new Error(`${language.id}: display-name override provenance is invalid`);
+  }
+  if (displayNameOverride === undefined && language.sourceName !== undefined) {
+    throw new Error(`${language.id}: unexpected source-name override metadata`);
   }
 
   const text = await readFile(path.join(assetDirectory, language.asset), "utf8");

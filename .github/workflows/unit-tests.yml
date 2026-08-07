@@ -59,27 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Install Emscripten SDK
+      - name: Verify reproducible QSearch WASM build
         run: |
-          sudo mkdir -p /opt/emsdk
-          sudo chown $USER:$USER /opt/emsdk
-          git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk
-          /opt/emsdk/emsdk install latest
-          /opt/emsdk/emsdk activate latest
-
-      - name: Build WASM with Emscripten
-        run: |
-          source /opt/emsdk/emsdk_env.sh
-          cd $GITHUB_WORKSPACE
-          em++ -std=c++20 -Wall -Wextra -O2 \
-            -s NO_EXIT_RUNTIME=1 \
-            -s ALLOW_MEMORY_GROWTH=1 \
-            -s MODULARIZE \
-            -s SINGLE_FILE=1 \
-            -s NO_DISABLE_EXCEPTION_CATCHING \
-            -s EXPORT_ES6=1 \
-            -s EXPORTED_FUNCTIONS='["_run_qsearch"]' \
-            -lembind \
-            -s ENVIRONMENT=worker \
-            src/*.cpp \
-            -o ./ncd-calculator/src/wasm/qsearch.js
+          make wasm-calculator
+          git diff --exit-code -- ncd-calculator/src/wasm/qsearch.js

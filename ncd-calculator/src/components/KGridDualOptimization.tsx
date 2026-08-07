@@ -36,7 +36,6 @@ interface KGridDualOptimizationProps {
     width?: number;
     height?: number;
     objects?: GridObject[];
-    currentIterations?: number;
     maxIterations?: number;
     onOptimizationStart?: () => void;
     onOptimizationEnd?: () => void;
@@ -46,7 +45,6 @@ interface KGridDualOptimizationProps {
     showSingleGrid?: boolean;
     isRunning?: boolean;
     ncdMatrixResponse?: NCDMatrixResponse;
-    onMatchPercentageUpdate?: (number: number) => void;
     showEmptyCells?: boolean; // Control empty cell visibility
     fitToContainer?: boolean; // Control fitting behavior
     onError?: (error: string) => void; // New error callback
@@ -65,12 +63,9 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                                                                                 showSingleGrid = false,
                                                                                 isRunning = false,
                                                                                 ncdMatrixResponse,
-                                                                                onMatchPercentageUpdate,
                                                                                 showEmptyCells = true,
                                                                                 fitToContainer = true,
-                                                                                onError,
-                                                                                currentIterations,
-                                                                                currentObjectiveValue
+                                                                                onError
                                                                             }) => {
     // Add global styles for custom text size
     React.useEffect(() => {
@@ -96,25 +91,16 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
     const [gridState1, setGridState1] = useState<GridState | null>(null);
     const [gridState2, setGridState2] = useState<GridState | null>(null);
 
-    // Display objective values - separate from internal grid state objectives
-    const [displayObjective1, setDisplayObjective1] = useState<number | null>(null);
-    const [displayObjective2, setDisplayObjective2] = useState<number | null>(null);
-
     // Tracking and control states
     const [iterations, setIterations] = useState<number>(0);
     const [converged, setConverged] = useState<boolean>(false);
-    const [convergenceType, setConvergenceType] = useState<string>("");
-    const [matchPercentage, setMatchPercentage] = useState<number>(0);
     const bestMatchPercentageRef = useRef<number>(0);
 
-    // Performance metrics
-    const [iterationsPerSecond, setIterationsPerSecond] = useState<number>(0);
-    const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
     const [hasError, setHasError] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string>("");
 
     // Best state tracking
-    const [bestObjective1, setBestObjective1] = useState<number>(Number.MAX_VALUE);
+    const [, setBestObjective1] = useState<number>(Number.MAX_VALUE);
     const [bestGrid1, setBestGrid1] = useState<GridState | null>(null);
 
     // Reference to the web worker
@@ -265,25 +251,19 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
             setGridState1(newGrid1);
             setBestObjective1(newGrid1.objectiveValue);
             setBestGrid1(structuredClone(newGrid1));
-            setDisplayObjective1(newGrid1.objectiveValue);
             console.log(`New best for Grid 1: ${newGrid1.objectiveValue.toFixed(4)}`);
         }
 
         if (improvement.similarityImproved) {
-            setMatchPercentage(similarity);
-            if (onMatchPercentageUpdate) {
-                onMatchPercentageUpdate(similarity);
-            }
             bestMatchPercentageRef.current = similarity;
         }
 
         if (similarity >= 100) {
             console.log("Grids have converged to identical arrangements");
             setConverged(true);
-            setConvergenceType("exact match");
             stopOptimization();
         }
-    }, [onMatchPercentageUpdate, onError]);
+    }, [onError]);
 
     // Check for termination conditions
     const checkTerminationConditions = useCallback((status: IterationStatus) => {
@@ -313,7 +293,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         if (currentIteration >= maxIterations) {
             console.log("Maximum iterations reached");
             setConverged(true);
-            setConvergenceType("max iterations reached");
             stopOptimization();
             return true;
         }
@@ -321,7 +300,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         if (noImprovementCount > 10000) {
             console.log("Optimization stalled - no improvement in 10,000 iterations");
             setConverged(true);
-            setConvergenceType("optimization stalled");
             stopOptimization();
             return true;
         }
@@ -366,27 +344,12 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                     break;
 
                 case 'status_update':
-                    if (status) {
-                        if (status.iterationsPerSecond !== undefined) {
-                            // Use a moving average to smooth the display and prevent jumps
-                            setIterationsPerSecond(prevSpeed => {
-                                const newSpeed = status.iterationsPerSecond || 0;
-                                return prevSpeed === 0
-                                    ? newSpeed
-                                    : prevSpeed * 0.7 + newSpeed * 0.3; // 70% old value, 30% new value for smoothing
-                            });
-                        }
-
-                        if (status.estimatedTimeRemaining !== undefined) {
-                            setEstimatedTimeRemaining(status.estimatedTimeRemaining);
-                        }
-                    }
+                    if (status) checkTerminationConditions(status);
                     break;
 
                 case 'optimization_complete':
                     console.log("Optimization complete - reached maximum iterations");
                     setConverged(true);
-                    setConvergenceType("max iterations reached");
                     stopOptimization();
                     break;
 
@@ -455,12 +418,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         optimizationActive.current = true;
 
         setConverged(false);
-        setConvergenceType("");
         setIterations(0);
-
-        // Reset performance metrics
-        setIterationsPerSecond(0);
-        setEstimatedTimeRemaining(null);
 
         setTimeout(() => {
             if (!workerRef.current || !gridState1 || !gridState2) return;
@@ -517,11 +475,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                 setGridState1(initialGrid1);
                 setGridState2(initialGrid2);
 
-                if (!isRunning) {
-                    setDisplayObjective1(initialGrid1.objectiveValue);
-                    setDisplayObjective2(initialGrid2.objectiveValue);
-                }
-
                 setBestObjective1(initialGrid1.objectiveValue);
 
                 console.log("Initial grids created");
@@ -538,29 +491,16 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
         }
     }, [width, height, initializeGrid, objects, ncdMatrixResponse, isRunning, onError]);
 
-    // Update display objectives and show best grids when the animation is stopped
+    // Show the best arrangement when the animation is stopped.
     useEffect(() => {
         if (!isRunning) {
             if (bestGrid1) {
                 console.log(`Showing best objective grids with values: ${bestGrid1.objectiveValue.toFixed(4)}`);
 
                 setGridState1(bestGrid1);
-
-                setDisplayObjective1(bestGrid1.objectiveValue);
-            } else if (gridState1 && gridState2) {
-                setDisplayObjective1(gridState1.objectiveValue);
-                setDisplayObjective2(gridState2.objectiveValue);
             }
         }
     }, [isRunning, gridState1, gridState2, bestGrid1]);
-
-    // Format time for display
-    const formatTime = (seconds: number | null) => {
-        if (seconds === null) return "--:--";
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
 
     return (
         <div className="w-full h-full">
@@ -585,26 +525,12 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                 </div>
             )}
 
-            {/* Performance stats bar */}
+            {/* Keep progress user-facing; detailed worker metrics stay internal. */}
             {isRunning && (
-                <div className="mb-4 bg-gray-800 text-white p-2 rounded-lg shadow flex justify-between items-center">
+                <div className="mb-4 bg-gray-800 text-white p-2 rounded-lg shadow flex items-center">
                     <div className="flex items-center">
                         <div className="animate-pulse mr-2 h-2 w-2 bg-green-400 rounded-full"></div>
-                        <span className="text-xs">Running optimization</span>
-                    </div>
-                    <div className="flex space-x-4 text-xs">
-                        <div>
-                            <span className="text-gray-400 mr-1">Speed:</span>
-                            <span className="text-green-300 font-mono">{iterationsPerSecond.toFixed(1)} it/s</span>
-                        </div>
-                        <div>
-                            <span className="text-gray-400 mr-1">Iterations:</span>
-                            <span className="text-green-300 font-mono">{currentIterations}</span>
-                        </div>
-                        <div>
-                            <span className="text-gray-400 mr-1">Objective value:</span>
-                            <span className="text-green-300 font-mono">{gridState1?.objectiveValue.toFixed(2)}</span>
-                        </div>
+                        <span className="text-xs">Arranging similar objects…</span>
                     </div>
                 </div>
             )}
@@ -615,12 +541,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                     ref={grid1ContainerRef}
                     className={`${showSingleGrid ? 'w-full' : 'w-1/2'} bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col`}>
                     <h3 className="text-center font-bold p-2 bg-gray-700 border-b border-gray-600 text-white text-lg">
-                        Grid 1
-                        {!isRunning && displayObjective1 !== null && (
-                            <span className="ml-2 text-sm text-green-300">
-                            ({displayObjective1?.toFixed(4) || "N/A"})
-                        </span>
-                        )}
+                        Arrangement
                     </h3>
                     <div className="h-96 border-b border-gray-600 overflow-hidden flex-grow relative p-0">
                         {gridState1 ? (
@@ -630,7 +551,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                                 objectsById={objectsById}
                                 iterations={iterations}
                                 colorTheme={colorTheme}
-                                iterationsPerSecond={iterationsPerSecond}
                                 showEmptyCells={showEmptyCells}
                                 fitToContainer={fitToContainer}
                                 clusterThreshold={0.25} // Lower threshold for better clustering
@@ -655,11 +575,6 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                         )}
                     </div>
 
-                    {/* Grid details */}
-                    <div className="p-2 bg-gray-700 text-xs text-gray-300 flex justify-between">
-                        <span>Dimensions: {gridState1?.width}×{gridState1?.height}</span>
-                        <span>Empty cells: {gridState1 ? countEmptyCells(gridState1) : 0}</span>
-                    </div>
                 </div>
 
                 {!showSingleGrid && (
@@ -667,12 +582,7 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                         ref={grid2ContainerRef}
                         className="w-1/2 bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col">
                         <h3 className="text-center font-bold p-2 bg-gray-700 border-b border-gray-600 text-white text-lg">
-                            Grid 2
-                            {!isRunning && displayObjective2 !== null && (
-                                <span className="ml-2 text-sm text-green-300">
-                                ({displayObjective2?.toFixed(4) || "N/A"})
-                            </span>
-                            )}
+                            Alternative arrangement
                         </h3>
                         <div className="h-96 border-b border-gray-600 overflow-hidden flex-grow relative">
                             {gridState2 ? (
@@ -706,60 +616,15 @@ export const KGridDualOptimization: React.FC<KGridDualOptimizationProps> = ({
                             )}
                         </div>
 
-                        {/* Grid details */}
-                        <div className="p-2 bg-gray-700 text-xs text-gray-300 flex justify-between">
-                            <span>Dimensions: {gridState2?.width}×{gridState2?.height}</span>
-                            <span>Empty cells: {gridState2 ? countEmptyCells(gridState2) : 0}</span>
-                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Status and controls */}
-            <div className="bg-gray-800 rounded-lg p-2 text-center">
-                {isRunning ? (
-                    <div className="text-xs text-gray-400 p-2">
-                        Optimization in progress. Updates occur when better arrangements are found.
-                    </div>
-                ) : (
-                    <div className="text-xs text-gray-400 p-2">
-                        Match percentage: {matchPercentage.toFixed(2)}% |
-                        Empty cells are {showEmptyCells ? 'visible' : 'hidden'} |
-                        Grid type: {gridState1?.width}×{gridState1?.height} with slack space
-                    </div>
-                )}
-            </div>
-
-            {/* Optimization Statistics */}
             {converged && !isRunning && (
                 <div className="mt-2 bg-green-800 rounded-lg p-3 text-white">
-                    <h4 className="text-white text-sm font-semibold mb-1">Optimization Complete</h4>
-                    <p className="text-xs">
-                        {convergenceType === "exact match"
-                            ? "The grids have reached a perfect match!"
-                            : convergenceType === "max iterations reached"
-                                ? `Maximum iterations (${maxIterations.toLocaleString()}) reached with ${matchPercentage.toFixed(2)}% similarity.`
-                                : `Optimization stalled after ${iterations.toLocaleString()} iterations with ${matchPercentage.toFixed(2)}% similarity.`
-                        }
-                    </p>
+                    <p className="text-xs">Arrangement complete.</p>
                 </div>
             )}
         </div>
     );
-};
-
-// Helper function to count empty cells in a grid
-const countEmptyCells = (grid: GridState): number => {
-    const EMPTY_CELL_INDEX = grid.emptyIndex || -1;
-    let count = 0;
-
-    for (let i = 0; i < grid.height; i++) {
-        for (let j = 0; j < grid.width; j++) {
-            if (grid.grid[i][j] === EMPTY_CELL_INDEX) {
-                count++;
-            }
-        }
-    }
-
-    return count;
 };

@@ -1,15 +1,16 @@
 /// <reference lib="webworker" />
 declare const self: DedicatedWorkerGlobalScope;
-import {calculateCRC32, calculateNCD, encodeText, processChunk} from "./shared/utils";
+import {encodeText, getPairFileConcatenated, processChunk} from "./shared/utils";
 import type {
   NCDInput,
   WorkerErrorMessage,
   WorkerResultMessage,
   WorkerStartMessage,
   WorkerReadyMessage,
-  WorkerProgressMessage
 } from "@/types/ncd";
 import { LZMA } from '../libs/lzma';
+import {createSingleCacheKey, getCompressionProvenance, reduceDirectedMatrix} from "@/services/CompressionProtocol";
+import type {PairCompressionRecord, SingleCompressionRecord} from "@/types/compression";
 
 // Configuration settings for LZMA compression
 // These settings are optimized for NCD computation with files ≤1MB
@@ -61,7 +62,7 @@ async function initializeLzmaWorker() {
         LZMA.compress(
           testData,
           1, // Use fastest mode for initialization test
-          (result) => {
+          (result: false | number[]) => {
             clearTimeout(timeoutId);
             if (result === false) {
               reject(new Error('LZMA test compression failed'));
@@ -130,7 +131,7 @@ function compressData(data: Uint8Array): Promise<Uint8Array> {
       LZMA.compress(
         data,
         COMPRESSION_SETTINGS.COMPRESSION_MODE,
-        (result) => {
+        (result: false | number[]) => {
           clearTimeout(timeoutId);
           if (result === false) {
             reject(new Error('LZMA compression failed'));
@@ -138,16 +139,7 @@ function compressData(data: Uint8Array): Promise<Uint8Array> {
           }
           resolve(new Uint8Array(result));
         },
-        (percent: number) => {
-          console.log(`LZMA compression progress: ${(percent * 100).toFixed(2)}%`);
-          
-          // Report progress to main thread
-          self.postMessage({
-            type: 'progress',
-            message: `Compressing data: ${(percent * 100).toFixed(0)}%`,
-            progress: percent
-          } as WorkerProgressMessage);
-        }
+        () => undefined
       );
     } catch (error) {
       clearTimeout(timeoutId);
@@ -183,10 +175,10 @@ async function compressedSizePair(str1: string, str2: string): Promise<number> {
   try {
     const encoded1 = encodeText(str1);
     const encoded2 = encodeText(str2);
-    const delimiter = encodeText("\n###\n");
-    
+    const combinedArray = getPairFileConcatenated(str1, str2);
+
     // Check if combined size exceeds LZMA limit
-    const totalSize = encoded1.length + delimiter.length + encoded2.length;
+    const totalSize = combinedArray.length;
     if (totalSize > COMPRESSION_SETTINGS.MAX_FILE_SIZE) {
       throw new Error(`Combined file size (${totalSize} bytes) exceeds LZMA limit of ${COMPRESSION_SETTINGS.MAX_FILE_SIZE} bytes`);
     }
@@ -197,12 +189,6 @@ async function compressedSizePair(str1: string, str2: string): Promise<number> {
       totalSize,
       dictSize: getOptimalDictionarySize(totalSize)
     });
-    
-    // Combine files with delimiter for compression
-    const combinedArray = new Uint8Array(totalSize);
-    combinedArray.set(encoded1, 0);
-    combinedArray.set(delimiter, encoded1.length);
-    combinedArray.set(encoded2, encoded1.length + delimiter.length);
     
     const compressed = await compressData(combinedArray);
     return compressed.length;
@@ -219,15 +205,15 @@ async function processInput(input: NCDInput): Promise<void> {
       await initializeLzmaWorker();
     }
     
-    const { labels, contents, cachedSizes } = input;
+    const { labels, contents, contentKeys, cachedSizes } = input;
     
     // Validate input
-    if (!labels?.length || !contents?.length) {
+    if (!labels?.length || !contents?.length || contentKeys?.length !== contents.length) {
       throw new Error("Invalid input data");
     }
     
     const n = contents.length;
-    const totalPairs = (n * (n - 1)) / 2;
+    const totalPairs = n * (n - 1);
     
     // Send start message with total counts
     self.postMessage({
@@ -237,15 +223,13 @@ async function processInput(input: NCDInput): Promise<void> {
     } as WorkerStartMessage);
     
     // Initialize data structures
-    const contentBuffers = contents.map((content) => encodeText(content));
-    const crcs = contentBuffers.map(buffer => calculateCRC32(buffer));
-    const singleCompressedSizes = new Array(n);
-    const ncdMatrix = Array.from({ length: n }, () => Array(n).fill(0));
-    const newCompressionData = [];
+    const singleCompressedSizes: number[] = new Array(n);
+    const directedNcdMatrix = Array.from({ length: n }, () => Array(n).fill(0));
+    const singleCompressionData: SingleCompressionRecord[] = [];
     
     // Process individual files, using cache when available
     for (let i = 0; i < n; i++) {
-      const key = `lzma:${crcs[i]}`;
+      const key = createSingleCacheKey("lzma", contentKeys[i]);
       const cached = cachedSizes?.get(key);
       
       if (cached !== undefined) {
@@ -254,44 +238,48 @@ async function processInput(input: NCDInput): Promise<void> {
       } else {
         console.log(`LZMA Worker: Computing size for file ${i}`);
         singleCompressedSizes[i] = await compressedSizeSingle(contents[i]);
+        singleCompressionData.push({
+          contentKey: contentKeys[i],
+          compressedSize: singleCompressedSizes[i],
+        });
       }
     }
     
     // Process all pairs of files using chunking for better performance
     const CHUNK_SIZE = 3; // Process 3 pairs at a time
-    const allResults = [];
+    const pairCompressionData: PairCompressionRecord[] = [];
     
     for (let i = 0; i < n; i += CHUNK_SIZE) {
       const endI = Math.min(i + CHUNK_SIZE, n);
       const chunkResults = await processChunk(
-        i, endI, n, contents,
+        i, endI, n, contents, contentKeys,
         singleCompressedSizes,
         'lzma',
         cachedSizes,
         compressedSizePair,
         self
       );
-      
-      allResults.push(...chunkResults);
+
+      pairCompressionData.push(
+        ...chunkResults.flatMap((result) => result.pairRecord ? [result.pairRecord] : []),
+      );
       
       for (const {i, j, ncd} of chunkResults) {
-        ncdMatrix[i][j] = ncd;
-        ncdMatrix[j][i] = ncd;
+        directedNcdMatrix[i][j] = ncd;
       }
     }
+
+    const ncdMatrix = reduceDirectedMatrix(directedNcdMatrix);
     
     // Send final results
     self.postMessage({
       type: "result",
       labels,
+      directedNcdMatrix,
       ncdMatrix,
-      newCompressionData: allResults.map(result => ({
-        key1: result.key1,
-        key2: result.key2,
-        size1: result.size1,
-        size2: result.size2,
-        combinedSize: result.combinedSize
-      }))
+      provenance: getCompressionProvenance("lzma"),
+      singleCompressionData,
+      pairCompressionData,
     } as WorkerResultMessage);
     
   } catch (error) {

@@ -1,8 +1,10 @@
-import type {NCDInput, WorkerMessage} from "../types/ncd";
-import {calculateCRC32} from "@/workers/shared/utils.ts";
-import {CRCCache, CRCCacheEntry} from "@/cache/CRCCache.ts";
+import type {NCDInput, WorkerMessage, WorkerResultMessage} from "../types/ncd";
+import {CompressionCache} from "@/cache/CompressionCache.ts";
+import {fingerprintContent, getCompressionProvenance} from "@/services/CompressionProtocol.ts";
+import {PAIR_SEPARATOR} from "@/services/CompressionProtocol.ts";
+import type {CompressionAlgorithm, PreparedCompressionInput} from "@/types/compression";
 
-export type CompressionAlgorithm = "lzma" | "zstd";
+export type {CompressionAlgorithm} from "@/types/compression";
 
 export interface CompressionResponse {
 	algorithm: CompressionAlgorithm;
@@ -38,6 +40,8 @@ export class CompressionService {
 	// Worker instance and current algorithm state
 	private worker: Worker | null = null;
 	private currentAlgorithm: CompressionAlgorithm | null = null;
+	private initializationPromise: Promise<void> | null = null;
+	private readonly preferredAlgorithm: CompressionAlgorithm;
 	
 	// Worker factory function for creating worker instances
 	private workerFactory: WorkerFactory;
@@ -59,7 +63,7 @@ export class CompressionService {
 	) {
 		this.workerFactory = workerFactory || this.defaultWorkerFactory.bind(this);
 		this.initializationTimeout = timeout;
-		this.initializeWorker(defaultAlgorithm).catch(console.error);
+		this.preferredAlgorithm = defaultAlgorithm;
 	}
 	
 	/**
@@ -103,7 +107,10 @@ export class CompressionService {
 	 * @returns CompressionResponse with selected algorithm and reason
 	 */
 	static needsAdvancedCompression(size1: number, size2: number): CompressionResponse {
-		const maxSize = size1 + size2;
+		if (![size1, size2].every((size) => Number.isFinite(size) && size >= 0)) {
+			throw new Error("Compression input sizes must be finite, non-negative byte counts");
+		}
+		const maxSize = size1 + size2 + new TextEncoder().encode(PAIR_SEPARATOR).length;
 		
 		if (maxSize > this.ABSOLUTE_MAX_SIZE) {
 			throw new Error(
@@ -152,10 +159,17 @@ export class CompressionService {
 	 * Determines the best compression algorithm and prepares cached sizes
 	 *
 	 * @param input The NCD input data containing labels and contents
-	 * @param crcCache Cache for storing compression results
-	 * @returns Tuple of compression decision and cached sizes map
+	 * @param cache Versioned cache for storing compression results
+	 * @returns Prepared, content-addressed input for the selected worker
 	 */
-	static preprocessNcdInput = <T extends CRCCache>(input: NCDInput, crcCache: T): [CompressionResponse, Map<string, number>] => {
+	static preprocessNcdInput = async (
+		input: NCDInput,
+		cache: CompressionCache,
+	): Promise<PreparedCompressionInput> => {
+		if (input.contents.length < 2) {
+			throw new Error("At least two objects are required for an NCD comparison");
+		}
+
 		// Determine the best compression algorithm based on content sizes
 		const contentSizes = input.contents.map(
 			(content) => new TextEncoder().encode(content).length
@@ -166,34 +180,16 @@ export class CompressionService {
 			sortedSizes[1]
 		);
 		
-		const compressionAlgo = compressionDecision.algorithm;
-		
-		// Prepare cached sizes
-		const contentBuffers = input.contents.map((content) =>
-			new TextEncoder().encode(content)
-		);
-		
-		const fileCRCs = contentBuffers.map((buffer) => calculateCRC32(buffer));
-		const cachedSizes: Map<string, number> = new Map();
-		
-		for (const crc of fileCRCs) {
-			const size = crcCache.getCompressedSize(compressionAlgo, [crc]);
-			if (size) {
-				cachedSizes.set(`${compressionAlgo}:${crc}`, size);
-			}
-		}
-		
-		for (let i = 0; i < fileCRCs.length; i++) {
-			for (let j = i + 1; j < fileCRCs.length; j++) {
-				if (i == j) continue;
-				const entry: CRCCacheEntry | null = crcCache.getCachedEntry(compressionAlgo, [fileCRCs[i], fileCRCs[j]]);
-				if (entry) {
-					cachedSizes.set(entry.key, entry.value);
-				}
-			}
-		}
-		
-		return [compressionDecision, cachedSizes];
+		const contentKeys = await Promise.all(input.contents.map(fingerprintContent));
+		const algorithm = compressionDecision.algorithm;
+
+		return {
+			algorithm,
+			reason: compressionDecision.reason,
+			contentKeys,
+			cachedSizes: cache.prepareWorkerCache(algorithm, contentKeys),
+			provenance: getCompressionProvenance(algorithm),
+		};
 	}
 	
 	/**
@@ -202,11 +198,21 @@ export class CompressionService {
 	 * @param algorithm The compression algorithm to initialize
 	 * @returns Promise that resolves when the worker is ready
 	 */
-	async initialize(algorithm: CompressionAlgorithm = "zstd"): Promise<void> {
+	async initialize(algorithm: CompressionAlgorithm = this.preferredAlgorithm): Promise<void> {
+		if (this.initializationPromise) {
+			await this.initializationPromise;
+		}
 		if (this.currentAlgorithm === algorithm && this.worker) {
 			return;
 		}
-		await this.initializeWorker(algorithm);
+
+		const pending = this.initializeWorker(algorithm);
+		this.initializationPromise = pending;
+		try {
+			await pending;
+		} finally {
+			if (this.initializationPromise === pending) this.initializationPromise = null;
+		}
 	}
 	
 	/**
@@ -220,11 +226,12 @@ export class CompressionService {
 		input: {
 			labels: string[];
 			contents: string[];
+			contentKeys: string[];
 			cachedSizes: Map<string, number> | undefined;
 			algorithm: CompressionAlgorithm;
 		},
 		onProgress?: (message: WorkerMessage) => void
-	): Promise<WorkerMessage> {
+	): Promise<WorkerResultMessage> {
 		const totalSize = input.contents.reduce((sum, content) => {
 			return sum + new TextEncoder().encode(content).length;
 		}, 0);
@@ -373,9 +380,9 @@ export class CompressionService {
 	 * @returns Promise that resolves with the worker result
 	 */
 	private async processWorkerMessages(
-		input: any,
+		input: NCDInput & {algorithm: CompressionAlgorithm},
 		onProgress?: (message: WorkerMessage) => void
-	): Promise<WorkerMessage> {
+	): Promise<WorkerResultMessage> {
 		return new Promise((resolve, reject) => {
 			const handleMessage = (e: MessageEvent<WorkerMessage>) => {
 				const message = e.data;

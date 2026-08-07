@@ -13,7 +13,7 @@
 
 import React, {useEffect, useRef, useState} from "react";
 import {AlertCircle, Dna, Download, FileType2, FlaskConical, Globe2, Upload} from "lucide-react";
-import {getTranslationResponse} from "../functions/udhr";
+import {getTranslationResponse, getUdhrLanguage} from "../functions/udhr";
 import {InputHolder} from "./InputHolder.tsx";
 import {Language} from "./Language";
 import {useStorageState} from "../cache/cache";
@@ -25,10 +25,9 @@ import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 import {useSearchParams} from "react-router-dom";
 import {CompressionService} from "@/services/CompressionService";
 import {NCDImportFormat} from "@/types/ncd";
-import {LabelManager} from "@/functions/labelUtils.ts";
 import createGraph from "@/functions/graphExport.ts";
 import {saveAs} from "file-saver";
-import {QTreeResponse} from "@/components/tree";
+import type {QTreeResponse} from "@/types/qsearch";
 import {getWorkbenchExampleItems} from "./workbenchExamples";
 import type {SelectedItem} from "./workbenchTypes";
 export type {SelectedItem} from "./workbenchTypes";
@@ -48,14 +47,20 @@ export interface ProcessedFastaItem {
 
 export interface NcdInput {
 	labels: string[];
+	displayLabels?: string[];
 	contents: string[];
 	kind?: "objects" | "distance-matrix";
 }
 
+const getItemDisplayLabel = (item: SelectedItem): string => {
+	if (item.type === LANGUAGE) {
+		return getUdhrLanguage(item.id)?.name ?? item.label ?? item.id;
+	}
+	return item.label?.trim() || item.id;
+};
+
 interface ListEditorProps {
 	onComputedNcdInput: (input: NcdInput) => void;
-	labelMapRef: React.MutableRefObject<Map<string, string>>;
-	setLabelMap: (map: Map<string, string>) => void;
 	setIsLoading: (loading: boolean) => void;
 	resetDisplay: () => void;
 	setOpenLogin: (open: boolean) => void;
@@ -115,17 +120,13 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			resetDisplay();
 			setSelectedItems([]);
 			
-			// Get LabelManager instance
-			const labelManager = LabelManager.getInstance();
-			
 			// Create items for each label in the matrix
 			const importedItems: SelectedItem[] = data.labels.map((label, index) => {
-				// Register for display and sanitization
-				labelManager.registerLabel(label, label);
+				const displayLabel = getUdhrLanguage(label)?.name ?? label;
 				
 				return {
 					id: label,
-					label: label,
+					label: displayLabel,
 					type: FILE_UPLOAD,
 					content: JSON.stringify(data.distances[index]),
 				};
@@ -172,7 +173,12 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				contents.push(item.content || "");
 			});
 			
-			await onComputedNcdInput({labels, contents, kind: "distance-matrix"});
+			await onComputedNcdInput({
+				labels,
+				displayLabels: importedItems.map(getItemDisplayLabel),
+				contents,
+				kind: "distance-matrix",
+			});
 			console.log("Automatic processing of imported matrix complete");
 		} catch (error) {
 			console.error("Error in automatic processing:", error);
@@ -222,7 +228,18 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		(searchMode.searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
 	const isClearDisabled = selectedItems.length === 0;
 	
-	const labelManager = LabelManager.getInstance();
+	// Rehydrate canonical names for selections restored from older localStorage
+	// entries that kept only the ISO identifier in the presentation field.
+	useEffect(() => {
+		let changed = false;
+		const hydratedItems = selectedItems.map((item) => {
+			const displayLabel = getItemDisplayLabel(item);
+			if (displayLabel === item.label) return item;
+			changed = true;
+			return {...item, label: displayLabel};
+		});
+		if (changed) setSelectedItems(hydratedItems);
+	}, [selectedItems, setSelectedItems]);
 	
 	// Initialize local storage and check version
 	useEffect(() => {
@@ -261,25 +278,20 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		setImportError(null);
 		setIsLoading(true);
 		try {
-			const labelManager = LabelManager.getInstance();
-			// pre-register all labels regardless processing part
-			selectedItems.forEach((item) => {
-				labelManager.registerLabel(item.id, item.label);
-			})
-			
 			if (hasImportedMatrix) {
 				const labels: string[] = [];
 				const contents: string[] = [];
 				selectedItems.forEach(item => {
 					labels.push(item.id);
 					contents.push(item.content || "");
-					
-					if (!labelManager.getDisplayLabel(item.id)) {
-						labelManager.registerLabel(item.id, item.id);
-					}
 				});
 				// process the input directly
-				await onComputedNcdInput({labels, contents, kind: "distance-matrix"});
+				await onComputedNcdInput({
+					labels,
+					displayLabels: selectedItems.map(getItemDisplayLabel),
+					contents,
+					kind: "distance-matrix",
+				});
 			} else {
 				const computedNcdInput = await computeNcdInput(selectedItems);
 				// update the items with their computed content
@@ -288,6 +300,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				// covert to the format expected by the NCD processor
 				const input = {
 					labels: ncdSelectedItems.map((item) => item.id),
+					displayLabels: ncdSelectedItems.map(getItemDisplayLabel),
 					contents: ncdSelectedItems.map((item) => item.content || ""),
 					kind: "objects",
 				} as NcdInput;
@@ -495,9 +508,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	const addItem = (item: SelectedItem): void => {
 		if (!selectedItems.find((selected) => selected.id === item.id)) {
-			const labelManager = LabelManager.getInstance();
-			labelManager.registerLabel(item.id, item.label);
-			setSelectedItems([...selectedItems, item]);
+			setSelectedItems([...selectedItems, {...item, label: getItemDisplayLabel(item)}]);
 		}
 	};
 	
@@ -521,10 +532,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 
 	const loadExampleSet = (): void => {
 		const examples = getWorkbenchExampleItems();
-
-		examples.forEach((item) => {
-			labelManager.registerLabel(item.id, item.label);
-		});
 
 		resetDisplay();
 		setMode(FILE_UPLOAD);

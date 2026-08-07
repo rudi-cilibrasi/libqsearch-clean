@@ -1,3 +1,9 @@
+import type {
+    CompressionProvenance,
+    PairCompressionRecord,
+    SingleCompressionRecord,
+} from "./compression";
+
 export interface CompressionStats {
     processedPairs: number;
     totalPairs: number;
@@ -10,9 +16,13 @@ export interface CompressionStats {
 
 export interface NCDInput {
     contents: string[];
+    /** Stable identifiers used by compression, caches, and QSearch. */
     labels: string[];
+    /** Human-readable labels in the same order as `labels`. */
+    displayLabels?: string[];
     kind?: 'objects' | 'distance-matrix';
     cachedSizes?: Map<string, number>;
+    contentKeys?: string[];
 }
 
 
@@ -32,7 +42,6 @@ export type WorkerStartMessage = {
     type: 'start';
     totalItems: number;
     totalPairs: number;
-    contents: string[];
 }
 
 
@@ -49,14 +58,13 @@ export type WorkerProgressMessage = {
 export type WorkerResultMessage = {
     type: 'result';
     labels: string[];
+    /** Full ordered matrix where [i][j] may differ from [j][i]. */
+    directedNcdMatrix: number[][];
+    /** Reflected-minimum reduction used by symmetric downstream algorithms. */
     ncdMatrix: number[][];
-    newCompressionData?: Array<{
-        key1: string;
-        key2: string;
-        size1: number;
-        size2: number;
-        combinedSize: number;
-    }>;
+    provenance: CompressionProvenance;
+    singleCompressionData: SingleCompressionRecord[];
+    pairCompressionData: PairCompressionRecord[];
 }
 
 
@@ -68,7 +76,9 @@ export type WorkerErrorMessage = {
 
 export type NCDMatrixResponse = {
     labels: string[];
+    directedNcdMatrix?: number[][];
     ncdMatrix: number[][];
+    provenance: CompressionProvenance;
 }
 
 

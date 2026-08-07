@@ -1,4 +1,4 @@
-import {cleanup, fireEvent, render, screen} from "@testing-library/react";
+import {cleanup, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {MemoryRouter} from "react-router-dom";
 import {describe, expect, test, vi} from "vitest";
 import {FastaSearch} from "../components/FastaSearch";
@@ -6,6 +6,8 @@ import {InputHolder} from "../components/InputHolder";
 import {Language} from "../components/Language";
 import ListEditor from "../components/ListEditor";
 import {getWorkbenchExampleItems} from "../components/workbenchExamples";
+import {FASTA, LANGUAGE} from "../constants/modalConstants";
+import {STORAGE_VERSION, STORAGE_VERSION_NAME} from "../cache/LocalStorageKeyManager";
 
 vi.mock("../services/CompressionService", () => ({
     CompressionService: {
@@ -73,8 +75,6 @@ describe("NCD workbench", () => {
             <MemoryRouter>
                 <ListEditor
                     onComputedNcdInput={vi.fn()}
-                    labelMapRef={{current: new Map()}}
-                    setLabelMap={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
                     setOpenLogin={vi.fn()}
@@ -86,5 +86,34 @@ describe("NCD workbench", () => {
         const showSimilarity = screen.getByRole("button", {name: "Show Similarity"});
         expect(showSimilarity.closest(".workbench-actions")).not.toBeNull();
         expect(showSimilarity.closest(".workbench-sourcebar")).toBeNull();
+    });
+
+    test("upgrades saved UDHR identifiers to canonical language names", async () => {
+        localStorage.setItem(STORAGE_VERSION_NAME, STORAGE_VERSION.toString());
+        localStorage.setItem("searchMode", JSON.stringify({searchMode: FASTA}));
+        localStorage.setItem("selectedItems", JSON.stringify([
+            {id: "eng", label: "eng", type: LANGUAGE, content: ""},
+            {id: "fra", label: "fra", type: LANGUAGE, content: ""},
+        ]));
+
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={vi.fn()}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("English")).toBeInTheDocument();
+            expect(screen.getByText("French")).toBeInTheDocument();
+        });
+        expect(screen.queryByText("eng")).not.toBeInTheDocument();
+        expect(screen.queryByText("fra")).not.toBeInTheDocument();
+        localStorage.clear();
     });
 });

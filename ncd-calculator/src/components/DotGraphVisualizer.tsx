@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from "react";
 import type {Graphviz as GraphvizRenderer} from "@hpcc-js/wasm/graphviz";
+import {loadGraphviz} from "../services/GraphvizService";
 import {createPlanarTreeDot, PlanarTreeData} from "./tree/planarTree";
 
 interface DotGraphVisualizerProps {
@@ -29,6 +30,7 @@ export const DotGraphVisualizer: React.FC<DotGraphVisualizerProps> = ({data, onC
     const [containerDimensions, setContainerDimensions] = useState({width: 0, height: 0});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
 
     const calculateFitScale = useCallback((): number => {
         const {width: svgWidth, height: svgHeight} = svgDimensionsRef.current;
@@ -51,8 +53,8 @@ export const DotGraphVisualizer: React.FC<DotGraphVisualizerProps> = ({data, onC
         const initializeGraphviz = async (): Promise<void> => {
             try {
                 setLoading(true);
-                const {Graphviz} = await import("@hpcc-js/wasm/graphviz");
-                const renderer = await Graphviz.load();
+                setError(null);
+                const renderer = await loadGraphviz();
                 if (!cancelled) setGraphviz(renderer);
             } catch (initializationError) {
                 if (cancelled) return;
@@ -66,7 +68,7 @@ export const DotGraphVisualizer: React.FC<DotGraphVisualizerProps> = ({data, onC
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [loadAttempt]);
 
     useEffect(() => {
         const surface = surfaceRef.current;
@@ -158,6 +160,12 @@ export const DotGraphVisualizer: React.FC<DotGraphVisualizerProps> = ({data, onC
         changeZoom(event.deltaY < 0 ? 1.1 : 1 / 1.1);
     };
 
+    const retryRenderer = (): void => {
+        setGraphviz(null);
+        setError(null);
+        setLoadAttempt(currentAttempt => currentAttempt + 1);
+    };
+
     return (
         <div className="quartet-planar">
             <div className="quartet-planar__controls" role="toolbar" aria-label="Planar tree view controls">
@@ -174,6 +182,7 @@ export const DotGraphVisualizer: React.FC<DotGraphVisualizerProps> = ({data, onC
                     <div className="quartet-planar__message quartet-planar__message--error" role="alert">
                         <strong>Planar tree unavailable</strong>
                         <span>{error}</span>
+                        <button type="button" onClick={retryRenderer}>Retry renderer</button>
                         {onClose && <button type="button" onClick={onClose}>Close</button>}
                     </div>
                 )}

@@ -4,19 +4,12 @@ import {Html, OrbitControls} from "@react-three/drei";
 import type {OrbitControls as OrbitControlsImpl} from "three-stdlib";
 import * as THREE from "three";
 import {saveAs} from "file-saver";
-import createGraph from "../functions/graphExport";
 import {DotGraphVisualizer} from "./DotGraphVisualizer";
 import {calculateCameraFitDistance} from "./tree/cameraFit";
+import {createPlanarTreeDot} from "./tree/planarTree";
+import type {QTreeNode, QTreeResponse} from "@/types/qsearch";
 
-export interface QTreeNode {
-    index: number;
-    label: string;
-    connections: number[];
-}
-
-export interface QTreeResponse {
-    nodes: QTreeNode[];
-}
+export type {QTreeNode, QTreeResponse} from "@/types/qsearch";
 
 export interface QSearchTree3DProps {
     data: QTreeResponse;
@@ -343,7 +336,6 @@ export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({data}) => {
     const edges = useMemo(() => collectEdges(data.nodes), [data.nodes]);
     const bounds = useMemo(() => getTreeBounds(positions, 10 * scaleFactor), [positions, scaleFactor]);
     const selected = data.nodes.find(node => node.index === selectedNode);
-
     useEffect(() => {
         setSelectedNode(null);
     }, [data]);
@@ -353,7 +345,7 @@ export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({data}) => {
     };
 
     const handleExport = (): void => {
-        const dotFormat = createGraph(data, false);
+        const dotFormat = createPlanarTreeDot(data, {includeDiagnostics: true});
         const blob = new Blob([dotFormat], {type: "text/plain;charset=utf-8"});
         saveAs(blob, "quartet-tree.dot");
     };
@@ -419,8 +411,8 @@ export const QSearchTree3D: React.FC<QSearchTree3DProps> = ({data}) => {
                     <div className="quartet-tree__selection" aria-live="polite">
                         {selected ? (
                             <>
-                                <strong>{selected.label?.trim() || `Internal node ${selected.index}`}</strong>
-                                <span>{selected.connections.length <= 1 ? "Leaf" : "Internal node"} · {selected.connections.length} connection{selected.connections.length === 1 ? "" : "s"}</span>
+                                <strong>{selected.label?.trim() || "Branch point"}</strong>
+                                <span>{selected.connections.length <= 1 ? "Leaf" : "Branch point"}</span>
                             </>
                         ) : (
                             <span>Select a node to inspect it.</span>

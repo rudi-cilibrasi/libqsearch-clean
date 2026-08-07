@@ -1,8 +1,8 @@
 import {useEffect, useState} from "react";
-import {CRCCache} from "@/cache/CRCCache.ts";
+import {CompressionCache} from "@/cache/CompressionCache";
 
 export const useNCDCache = () => {
-   const [cache] = useState(() => new CRCCache());
+   const [cache] = useState(() => new CompressionCache());
     useEffect(() => {
     }, []);
     return cache;
