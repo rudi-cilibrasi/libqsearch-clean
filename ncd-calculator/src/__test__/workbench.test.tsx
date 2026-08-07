@@ -64,10 +64,55 @@ describe("NCD workbench", () => {
         cleanup();
         render(<Language addItem={vi.fn()} selectedItems={[]}/>);
 
-        expect(screen.getByLabelText("Filter languages")).toBeInTheDocument();
-        expect(screen.getByRole("region", {name: "Available languages"})).toHaveAttribute("tabindex", "0");
+        expect(screen.getByLabelText("Filter languages")).toHaveAttribute(
+            "aria-describedby",
+            "language-search-count",
+        );
+        expect(screen.getByText("431 languages")).toBeInTheDocument();
+        expect(screen.getByRole("region", {name: "Available UDHR language groups"})).toHaveAttribute("tabindex", "0");
         expect(screen.getByRole("list")).toBeInTheDocument();
+        const german = screen.getByRole("button", {name: "German, 2 variants"});
+        expect(german).toHaveAttribute("aria-expanded", "false");
+        fireEvent.click(german);
+        expect(german).toHaveAttribute("aria-expanded", "true");
+        expect(screen.getByRole("button", {name: "German, Standard (1901)"})).toBeInTheDocument();
+        expect(screen.getByRole("button", {name: "German, Standard (1996)"})).toBeInTheDocument();
+        expect(screen.queryByText("de-1901")).not.toBeInTheDocument();
         expect(screen.queryByText("Compare written languages")).not.toBeInTheDocument();
+    });
+
+    test("searches language metadata and adds explicit variants with unique labels", () => {
+        const addItem = vi.fn();
+        render(<Language addItem={addItem} selectedItems={[]}/>);
+
+        const search = screen.getByLabelText("Filter languages");
+        fireEvent.change(search, {target: {value: "bosnian cyrillic"}});
+        expect(screen.getByText("1 language")).toBeInTheDocument();
+        const bosnian = screen.getByRole("button", {name: "Bosnian, 2 variants"});
+        fireEvent.click(bosnian);
+        fireEvent.click(screen.getByRole("button", {name: "Bosnian (Cyrillic)"}));
+        fireEvent.click(screen.getByRole("button", {name: "Bosnian (Latin)"}));
+
+        expect(addItem).toHaveBeenNthCalledWith(1, expect.objectContaining({
+            id: "udhr:bos_cyrl",
+            label: "Bosnian (Cyrillic)",
+        }));
+        expect(addItem).toHaveBeenNthCalledWith(2, expect.objectContaining({
+            id: "udhr:bos_latn",
+            label: "Bosnian (Latin)",
+        }));
+
+        fireEvent.change(search, {target: {value: "francoprovencal"}});
+        expect(screen.getByRole("button", {name: "Francoprovençal, 4 variants"})).toBeInTheDocument();
+    });
+
+    test("announces unavailable incomplete records and prevents selection", () => {
+        render(<Language addItem={vi.fn()} selectedItems={[]}/>);
+        fireEvent.change(screen.getByLabelText("Filter languages"), {target: {value: "csw"}});
+
+        const unavailable = screen.getByRole("button", {name: "Cree, Swampy, unavailable for comparison"});
+        expect(unavailable).toBeDisabled();
+        expect(screen.getByText("Unavailable")).toBeInTheDocument();
     });
 
     test("places the primary computation action in the bottom action row", () => {

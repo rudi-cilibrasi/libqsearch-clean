@@ -13,7 +13,11 @@
 
 import React, {useEffect, useRef, useState} from "react";
 import {AlertCircle, Dna, Download, FileType2, FlaskConical, Globe2, Upload} from "lucide-react";
-import {getTranslationResponse, getUdhrLanguage} from "../functions/udhr";
+import {
+	getTranslationResponse,
+	getUdhrLanguage,
+	getUdhrRecordDisplayLabel,
+} from "../functions/udhr";
 import {InputHolder} from "./InputHolder.tsx";
 import {Language} from "./Language";
 import {useStorageState} from "../cache/cache";
@@ -54,7 +58,7 @@ export interface NcdInput {
 
 const getItemDisplayLabel = (item: SelectedItem): string => {
 	if (item.type === LANGUAGE) {
-		return getUdhrLanguage(item.id)?.name ?? item.label ?? item.id;
+		return getUdhrRecordDisplayLabel(item.id) ?? item.label ?? item.id;
 	}
 	return item.label?.trim() || item.id;
 };
@@ -233,10 +237,14 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	useEffect(() => {
 		let changed = false;
 		const hydratedItems = selectedItems.map((item) => {
-			const displayLabel = getItemDisplayLabel(item);
-			if (displayLabel === item.label) return item;
+			const record = item.type === LANGUAGE ? getUdhrLanguage(item.id) : undefined;
+			const canonicalId = record?.id ?? item.id;
+			const displayLabel = record === undefined
+				? getItemDisplayLabel(item)
+				: (getUdhrRecordDisplayLabel(record.id) ?? record.name);
+			if (displayLabel === item.label && canonicalId === item.id) return item;
 			changed = true;
-			return {...item, label: displayLabel};
+			return {...item, id: canonicalId, label: displayLabel};
 		});
 		if (changed) setSelectedItems(hydratedItems);
 	}, [selectedItems, setSelectedItems]);

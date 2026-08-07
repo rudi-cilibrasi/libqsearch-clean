@@ -8,6 +8,7 @@ interface SearchInputProps {
   label: string;
   searchTerm: string;
   handleSearchTerm: (term: string) => void;
+  describedBy?: string;
   setSearchError?: (error: string) => void;
   genbankSearchService?: GenBankSearchService;
 }
@@ -17,6 +18,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   label,
   searchTerm,
   handleSearchTerm,
+  describedBy,
   setSearchError,
   genbankSearchService,
 }) => {
@@ -47,6 +49,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           id={`source-search-${type}`}
           type="text"
           value={searchTerm}
+          aria-describedby={describedBy}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
             handleSearchTerm(e.target.value)
           }

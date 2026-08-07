@@ -1,6 +1,6 @@
 # UDHR comparison corpus
 
-Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+Updated 2026-08-07 (Asia/Ho_Chi_Minh).
 
 ## Purpose
 
@@ -10,25 +10,29 @@ The replacement is a generated, versioned corpus. It is reproducible, lazy-loade
 
 ## Provenance
 
-The source is the [Unicode UDHR Project repository](https://github.com/eric-muller/udhr), pinned to commit `588b3f4b2d0467aff54842a4b926551b69d5a66a`. The source index marks all 61 selected records as stage 4, available, and linked to an OHCHR translation. Stage 4 means that OHCHR is identified as the source and complete XML is available. The generated manifest retains the exact source key, OHCHR translation identifier, ISO 639-3 code, BCP 47 tag, ISO 15924 script, and writing direction for every record. When a current user-facing English name differs from the pinned index, the manifest also retains the original index label as `sourceName`.
+The source is the [Unicode UDHR Project repository](https://github.com/eric-muller/udhr), pinned to commit `588b3f4b2d0467aff54842a4b926551b69d5a66a`. Corpus v2 includes every source-index record marked available at stage 4: 501 records representing 431 ISO 639-3 language codes. The manifest retains the exact source key, OHCHR translation identifier where present, ISO 639-3 code, BCP 47 tag, ISO 15924 script, writing direction, article numbers, and source name. Content identity is the variant-safe `udhr:<source-key>` record ID; ISO 639-3 remains a language-group identifier and is not assumed to identify one unique text.
 
-Stable application identifiers are mapped explicitly in `scripts/udhr-corpus-config.mjs`. This matters for variants: examples include Portuguese (Portugal), German in 1901 orthography, monotonic Greek, Norwegian Bokmål, Northern Uzbek in Latin script, Western Farsi, Central Kurdish, and Tagalog. The interface displays the source language name and BCP 47 tag rather than presenting those records as unspecified varieties.
+The 465 records with a non-empty OHCHR identifier use the `ohchr-linked` provenance tier. The other 36 stage-4 records use `unicode-complete`. Both tiers preserve the Unicode source and pass the same structural and byte-integrity checks, but the second tier must not be described as OHCHR-linked. The checked-in audit report records these counts and every exclusion decision.
+
+The language browser exposes all 501 records through 431 language groups. Groups with multiple records require explicit variant selection; the interface does not silently choose the first record. Historical three-letter application IDs resolve through `legacyAliases` to canonical record IDs, so saved selections such as `deu` migrate to `udhr:deu_1901`. A group uses a concise name such as `Portuguese`, `German`, or `Norwegian`, while selected variants use exact distinguishing source labels. Exact upstream names and variant metadata remain in the manifest. The grouping and presentation-label rules are specified in `docs/UDHR_LANGUAGE_BROWSER.md`.
 
 ## Canonical representation
 
-Every text contains the body of Articles 1–30 in source order. Preambles are excluded because the selected Amharic record has no preamble; including preambles only where present would make the compared documents cover different material. Source notes, document titles, localized article headings, list markers, and article numbers are also excluded because they are metadata or presentation rather than article body text.
+Canonical assets contain available article body text in source order. Preambles are excluded because coverage differs between translations; including them selectively would make compared documents cover different material. Source notes, document titles, localized article headings, list markers, and article numbers are also excluded because they are metadata or presentation rather than article body text.
 
-Paragraph and list-item boundaries vary slightly among translations. The generator joins all body paragraphs within an article using one ASCII space, then joins the 30 articles using line feed (`U+000A`). The result therefore has exactly 30 structural segments for every language without changing word order or characters. Empty XML paragraph elements are ignored. Text is normalized to Unicode NFC, CRLF is converted to LF, horizontal Unicode space characters are collapsed to an ASCII space, and C0/C1 control characters are rejected. NFC is used instead of NFKC because compatibility normalization can erase distinctions that belong to the source orthography.
+Paragraph and list-item boundaries vary slightly among translations. The generator joins all body paragraphs and source-layout line wraps within an article using one ASCII space, then joins articles using line feed (`U+000A`). A comparison-ready record therefore has exactly 30 structural segments. Empty XML paragraph elements are ignored. Text is normalized to Unicode NFC, CRLF is converted to LF, horizontal Unicode space characters are collapsed to an ASCII space, and C0/C1 control characters are rejected. NFC is used instead of NFKC because compatibility normalization can erase distinctions that belong to the source orthography.
 
-Generation fails unless the XML is well formed, contains no document-type or custom-entity declarations, has the expected source key, contains Articles 1–30 in order, gives every article non-empty body text, has at least 2,000 Unicode code points, and matches the source-index metadata. Numeric Unicode character references are decoded with scalar-value validation; arbitrary entity expansion remains disabled.
+Generation fails unless the XML is well formed, contains no document-type or custom-entity declarations, has the expected source key, gives every present article non-empty body text, uses unique increasing article numbers in the range 1–30, and matches the source-index metadata. Numeric Unicode character references are decoded with scalar-value validation; arbitrary entity expansion remains disabled. A separate comparison-readiness gate requires Articles 1–30 exactly and at least 2,000 Unicode code points.
+
+The audit found five stage-4 records that do not meet aligned article coverage: `csw`, `ike`, and `ojb` stop at Article 23; `kwi` lacks Article 1; and `ykg` stops at Article 29. Their canonical bytes and provenance are retained, but `comparisonReady` is false and the runtime refuses to send them to compression. This preserves all 501 upstream records without pretending that source stage alone guarantees equivalent experimental coverage. The result is 496 comparison-ready records representing 426 language codes.
 
 ## Runtime integrity and scaling
 
-The generated manifest at `src/generated/udhr-manifest.json` records each asset's SHA-256 digest, UTF-8 byte length, Unicode code-point count, segment count, and article count. `src/functions/udhr.ts` fetches the selected same-origin asset, decodes UTF-8 with `fatal: true`, repeats the structural checks, and verifies the digest with Web Crypto. Any mismatch stops the calculation and is shown in the workbench. The application does not silently substitute empty text.
+The generated manifest at `src/generated/udhr-manifest-v2.json` records each asset's SHA-256 digest, UTF-8 byte length, Unicode code-point count, segment count, article numbers, provenance tier, and comparison readiness. Filenames contain the first 16 hexadecimal digits of the full SHA-256 digest. `src/functions/udhr.ts` fetches the selected same-origin asset, decodes UTF-8 with `fatal: true`, repeats the structural checks, and verifies the full digest with Web Crypto. Any mismatch stops the calculation and is shown in the workbench. The application does not silently substitute empty text.
 
-Assets are loaded on demand, so adding supported languages does not grow the main JavaScript bundle or require 61 startup requests. Concurrent requests for one language are deduplicated. Successful content is cached only in memory; persistent transfer caching is delegated to the browser's HTTP cache. This avoids duplicate local-storage copies and prevents an old extraction error from surviving a corpus upgrade.
+All 501 assets are checked into `public/udhr/v2/records`, currently occupying about 6.3 MB. Vite copies them into the deployment without importing their text into the JavaScript bundle. The browser makes no corpus request when it opens or searches the language list. It loads only selected records after the user starts a calculation, caps the shared queue at six active requests, and deduplicates concurrent requests for one record. Successful content is cached only in memory; persistent transfer caching is delegated to the browser's HTTP cache. Digest-addressed filenames make long-lived cache entries immutable without application-managed local-storage copies.
 
-Production builds run `npm run udhr:verify` before Vite. This offline check reads every asset and validates its metadata and digest. Unit tests cover manifest invariants, successful UTF-8 loading, request deduplication, unknown identifiers, and failure on modified bytes.
+Production builds run `npm run udhr:verify` before Vite. This offline check reads all 501 assets, verifies the pinned source-index digest, manifest and audit counts, record and asset uniqueness, legacy aliases, provenance tiers, comparison readiness, and content digests. Unit tests cover the catalog counts, legacy resolution, immutable URLs, request deduplication, the six-request bound, comparison exclusions, unknown identifiers, and failure on modified bytes.
 
 ## Scientific interpretation
 
@@ -58,7 +62,9 @@ Do not edit generated text assets or the manifest by hand. To reproduce the curr
 git -C /path/to/udhr checkout 588b3f4b2d0467aff54842a4b926551b69d5a66a
 npm run udhr:refresh -- --source-dir /path/to/udhr
 npm run udhr:verify
-npm run test -- --run src/__test__/udhrCorpus.test.ts
+npm test -- src/__test__/udhrCorpus.test.ts
 ```
 
-Without `--source-dir`, `udhr:refresh` downloads the XML files from the immutable commit on GitHub. For a future source update, first change the pinned commit and corpus version in `scripts/udhr-corpus-config.mjs`. Review upstream history and status for every changed record, regenerate, inspect manifest and text diffs, run the complete verification suite, and record the scientific compatibility decision in this document.
+`npm run udhr:audit` validates all eligible source XML and prints the deterministic report without publishing files. Without `--source-dir`, audit and refresh download XML from the immutable commit on GitHub; normal builds and runtime never contact upstream. Refresh validates every record, writes a staged v2 directory, re-reads and verifies every staged byte, and only then replaces the published v2 assets and generated metadata.
+
+For a future source update, change the pinned commit, corpus version, expected source counts, and expected comparison-readiness counts in `scripts/udhr-corpus-config.mjs`. Review upstream history and every audit difference, regenerate twice to check determinism, inspect manifest and content diffs, run the complete verification suite, and record the scientific compatibility decision in this document. See `docs/UDHR_CORPUS_V2_PIPELINE.md` for the implementation contract.
