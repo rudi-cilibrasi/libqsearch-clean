@@ -4,7 +4,7 @@ Updated 2026-08-07 (Asia/Ho_Chi_Minh).
 
 ## Scope and release boundary
 
-Corpus v2 is the data-infrastructure release for the complete Unicode UDHR snapshot. It imports every record marked `status=y` and `stage=4` at the pinned source commit, assigns variant-safe identities, publishes local content-addressed assets, records provenance and audit decisions, and enforces bounded same-origin lazy loading. It does not yet replace the reviewed 61-record language browser with the planned grouped browser. The complete catalog is available to code as `UDHR_RECORDS`; `UDHR_LANGUAGES` remains the compatibility subset used by the current interface.
+Corpus v2 is the data-infrastructure release for the complete Unicode UDHR snapshot. It imports every record marked `status=y` and `stage=4` at the pinned source commit, assigns variant-safe identities, publishes local content-addressed assets, records provenance and audit decisions, and enforces bounded same-origin lazy loading. The second release now presents the complete catalog through `UDHR_LANGUAGE_GROUPS`; `UDHR_FEATURED_LANGUAGES` retains the original reviewed 61-record mapping only for compatibility and provenance tests.
 
 The pinned index contains 615 records. Of the 586 marked available, 501 are stage 4 and represent 431 ISO 639-3 language codes. Forty-six language codes have multiple complete records, producing 70 records beyond a one-record-per-code view. The pipeline preserves those variants instead of overwriting them by ISO code.
 
@@ -108,6 +108,6 @@ npm run build
 
 For an update, reviewers should compare the pinned commit, index digest, aggregate counts, provenance-tier counts, comparison exclusions, record identities, changed content digests, license notice, and documentation. Regeneration should be run twice; the second run should produce no tracked difference. An upstream count or comparison-readiness change requires an explicit configuration update and scientific review.
 
-## Next release
+## Grouped browser layer
 
-The grouped language-browser release will expose the complete comparison-ready catalog as language groups with explicit variant selection. It must not infer that one variant is scientifically canonical merely because it sorts first. When multiple variants of one language are selected together, presentation labels must disambiguate them while computations continue to use record IDs.
+The second release derives 431 deterministic language groups from the manifest language IDs and requires explicit selection whenever a group contains multiple records. It does not infer that one variant is scientifically canonical merely because it sorts first. When multiple variants of one language are selected together, globally unique presentation labels disambiguate them while compression, caching, and QSearch continue to use canonical record IDs. See `docs/UDHR_LANGUAGE_BROWSER.md` for the complete interaction, search, accessibility, and label contract.

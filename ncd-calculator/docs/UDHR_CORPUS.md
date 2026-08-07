@@ -14,7 +14,7 @@ The source is the [Unicode UDHR Project repository](https://github.com/eric-mull
 
 The 465 records with a non-empty OHCHR identifier use the `ohchr-linked` provenance tier. The other 36 stage-4 records use `unicode-complete`. Both tiers preserve the Unicode source and pass the same structural and byte-integrity checks, but the second tier must not be described as OHCHR-linked. The checked-in audit report records these counts and every exclusion decision.
 
-The current language browser continues to expose its reviewed 61-record subset while the grouped browser is developed separately. Its historical three-letter application IDs resolve through `legacyAliases` to canonical record IDs, so saved selections such as `deu` migrate to `udhr:deu_1901`. The interface uses concise names such as `Portuguese`, `German`, and `Norwegian`; exact upstream names remain in `sourceName`, and variant metadata remains in the manifest.
+The language browser exposes all 501 records through 431 language groups. Groups with multiple records require explicit variant selection; the interface does not silently choose the first record. Historical three-letter application IDs resolve through `legacyAliases` to canonical record IDs, so saved selections such as `deu` migrate to `udhr:deu_1901`. A group uses a concise name such as `Portuguese`, `German`, or `Norwegian`, while selected variants use exact distinguishing source labels. Exact upstream names and variant metadata remain in the manifest. The grouping and presentation-label rules are specified in `docs/UDHR_LANGUAGE_BROWSER.md`.
 
 ## Canonical representation
 

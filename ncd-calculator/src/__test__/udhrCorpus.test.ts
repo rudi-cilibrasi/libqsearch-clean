@@ -28,8 +28,16 @@ describe("versioned UDHR corpus", () => {
         vi.restoreAllMocks();
     });
 
-    test("publishes the complete audited catalog and reviewed featured subset", async () => {
-        const {UDHR_CORPUS, UDHR_LANGUAGES, UDHR_RECORDS} = await import("../functions/udhr");
+    test("publishes the complete audited catalog and deterministic language groups", async () => {
+        const {
+            getUdhrLanguageGroup,
+            getUdhrRecordDisplayLabel,
+            UDHR_CORPUS,
+            UDHR_FEATURED_LANGUAGES,
+            UDHR_LANGUAGE_GROUPS,
+            UDHR_LANGUAGES,
+            UDHR_RECORDS,
+        } = await import("../functions/udhr");
 
         expect(UDHR_RECORDS).toHaveLength(501);
         expect(new Set(UDHR_RECORDS.map(({id}) => id)).size).toBe(501);
@@ -40,9 +48,31 @@ describe("versioned UDHR corpus", () => {
         expect(UDHR_RECORDS.filter(({comparisonReady}) => !comparisonReady).map(({sourceKey}) => sourceKey))
             .toEqual(["csw", "ike", "kwi", "ojb", "ykg"]);
 
-        expect(UDHR_LANGUAGES).toHaveLength(61);
-        expect(new Set(UDHR_LANGUAGES.map(({id}) => id)).size).toBe(61);
-        expect(UDHR_LANGUAGES.every(({articleCount, segmentCount, sourceStage, comparisonReady}) => (
+        expect(UDHR_LANGUAGES).toBe(UDHR_RECORDS);
+        expect(UDHR_LANGUAGE_GROUPS).toHaveLength(431);
+        expect(new Set(UDHR_LANGUAGE_GROUPS.map(({id}) => id)).size).toBe(431);
+        expect(new Set(UDHR_LANGUAGE_GROUPS.map(({name}) => name)).size).toBe(431);
+        expect(UDHR_LANGUAGE_GROUPS.flatMap(({records}) => records)).toHaveLength(501);
+        expect(UDHR_LANGUAGE_GROUPS.filter(({records}) => records.length > 1)).toHaveLength(46);
+        expect(UDHR_LANGUAGE_GROUPS.every((group) => (
+            group.records.every(({languageId}) => languageId === group.id)
+        ))).toBe(true);
+
+        const displayLabels = UDHR_RECORDS.map(({id}) => getUdhrRecordDisplayLabel(id));
+        expect(displayLabels.every(Boolean)).toBe(true);
+        expect(new Set(displayLabels).size).toBe(501);
+        expect(getUdhrLanguageGroup("deu")).toMatchObject({name: "German"});
+        expect(getUdhrLanguageGroup("deu")?.records.map(({id}) => (
+            getUdhrRecordDisplayLabel(id)
+        ))).toEqual(["German, Standard (1901)", "German, Standard (1996)"]);
+        expect(getUdhrLanguageGroup("mal")?.records.map(({id}) => (
+            getUdhrRecordDisplayLabel(id)
+        ))).toEqual(["Malayalam [mal]", "Malayalam [mal_chillus]"]);
+        expect(getUdhrLanguageGroup("und")?.name).toBe("Unclassified records");
+
+        expect(UDHR_FEATURED_LANGUAGES).toHaveLength(61);
+        expect(new Set(UDHR_FEATURED_LANGUAGES.map(({id}) => id)).size).toBe(61);
+        expect(UDHR_FEATURED_LANGUAGES.every(({articleCount, segmentCount, sourceStage, comparisonReady}) => (
             articleCount === 30 && segmentCount === 30 && sourceStage === 4 && comparisonReady
         ))).toBe(true);
         expect(UDHR_CORPUS.schemaVersion).toBe(2);
@@ -50,14 +80,14 @@ describe("versioned UDHR corpus", () => {
         expect(UDHR_CORPUS.assetBasePath).toBe("udhr/v2/records");
         expect(UDHR_CORPUS.source.commit).toMatch(/^[a-f0-9]{40}$/u);
 
-        expect(UDHR_LANGUAGES.find(({legacyId}) => legacyId === "fil")?.name).toBe("Tagalog");
-        expect(UDHR_LANGUAGES.find(({legacyId}) => legacyId === "fas")?.direction).toBe("rtl");
-        expect(UDHR_LANGUAGES.find(({legacyId}) => legacyId === "bel")).toMatchObject({
+        expect(UDHR_FEATURED_LANGUAGES.find(({legacyId}) => legacyId === "fil")?.name).toBe("Tagalog");
+        expect(UDHR_FEATURED_LANGUAGES.find(({legacyId}) => legacyId === "fas")?.direction).toBe("rtl");
+        expect(UDHR_FEATURED_LANGUAGES.find(({legacyId}) => legacyId === "bel")).toMatchObject({
             id: "udhr:bel",
             name: "Belarusian",
             sourceName: "Belarusan",
         });
-        expect(Object.fromEntries(UDHR_LANGUAGES.filter(({sourceName}) => sourceName).map((record) => (
+        expect(Object.fromEntries(UDHR_FEATURED_LANGUAGES.filter(({sourceName}) => sourceName).map((record) => (
             [record.legacyId, {name: record.name, sourceName: record.sourceName}]
         )))).toEqual({
             bel: {name: "Belarusian", sourceName: "Belarusan"},
@@ -78,7 +108,7 @@ describe("versioned UDHR corpus", () => {
             uzb: {name: "Uzbek", sourceName: "Uzbek, Northern (Latin)"},
         });
 
-        expect(UDHR_LANGUAGES.filter(({legacyId}) => ["rus", "ukr", "bel"].includes(legacyId ?? "")).map((record) => ({
+        expect(UDHR_FEATURED_LANGUAGES.filter(({legacyId}) => ["rus", "ukr", "bel"].includes(legacyId ?? "")).map((record) => ({
             id: record.id,
             languageId: record.languageId,
             languageTag: record.languageTag,
