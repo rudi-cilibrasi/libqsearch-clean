@@ -27,4 +27,15 @@ describe("display-label protocol", () => {
     expect(() => createDisplayLabelMap(["eng"], [" "]))
       .toThrow('Display label for "eng" is empty');
   });
+
+  test("keeps variants of one language distinct for matrix and tree presentation", () => {
+    const labels = createDisplayLabelMap(
+      ["udhr:mal", "udhr:mal_chillus"],
+      ["Malayalam [mal]", "Malayalam [mal_chillus]"],
+    );
+
+    expect(getDisplayLabel(labels, "udhr:mal")).toBe("Malayalam [mal]");
+    expect(getDisplayLabel(labels, "udhr:mal_chillus")).toBe("Malayalam [mal_chillus]");
+    expect(new Set(labels.values()).size).toBe(2);
+  });
 });

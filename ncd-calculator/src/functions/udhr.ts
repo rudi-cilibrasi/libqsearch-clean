@@ -27,6 +27,13 @@ export interface UdhrLanguageRecord {
   readonly articleNumbers: readonly number[];
 }
 
+export interface UdhrLanguageGroup {
+  readonly id: string;
+  readonly name: string;
+  readonly records: readonly UdhrLanguageRecord[];
+  readonly comparisonReadyRecords: readonly UdhrLanguageRecord[];
+}
+
 interface UdhrSourceRecord {
   readonly name: string;
   readonly repository: string;
@@ -230,16 +237,126 @@ const recordById = new Map(UDHR_RECORDS.map((record) => [record.id, record]));
 const legacyAliases = new Map(Object.entries(manifest.legacyAliases));
 
 /**
- * Reviewed records exposed by the current language browser. The complete
- * 501-record catalog is available through UDHR_RECORDS for the second release.
+ * Records retained by the original reviewed browser. Legacy IDs continue to
+ * resolve to these records, but the grouped browser uses UDHR_LANGUAGE_GROUPS.
  */
-export const UDHR_LANGUAGES: readonly UdhrLanguageRecord[] = Object.freeze(
+export const UDHR_FEATURED_LANGUAGES: readonly UdhrLanguageRecord[] = Object.freeze(
   Object.keys(manifest.legacyAliases).map((legacyId) => {
     const record = recordById.get(manifest.legacyAliases[legacyId]);
     if (!record) throw new Error(`Missing featured UDHR record for ${legacyId}`);
     return record;
   }),
 );
+
+/** @deprecated Use UDHR_RECORDS or UDHR_LANGUAGE_GROUPS explicitly. */
+export const UDHR_LANGUAGES: readonly UdhrLanguageRecord[] = UDHR_RECORDS;
+
+const compareText = (left: string, right: string): number => (
+  left < right ? -1 : left > right ? 1 : 0
+);
+
+const getNameSortKey = (name: string): string => name
+  .normalize("NFKD")
+  .replace(/\p{Mark}+/gu, "")
+  .toLocaleLowerCase("en");
+
+const removeTrailingVariant = (name: string): string => {
+  const concise = name.replace(/\s*\([^()]+\)\s*$/u, "").trim();
+  return concise || name;
+};
+
+const deriveGroupName = (
+  languageId: string,
+  records: readonly UdhrLanguageRecord[],
+): string => {
+  if (languageId === "und") return "Unclassified records";
+
+  const featured = records.find(({legacyId}) => legacyId !== undefined);
+  if (featured) return featured.name;
+
+  const exactSource = records.find(({sourceKey}) => sourceKey === languageId);
+  if (exactSource) return exactSource.name;
+
+  return records
+    .map(({name}) => removeTrailingVariant(name))
+    .sort((left, right) => left.length - right.length || compareText(left, right))[0];
+};
+
+const groupedRecords = new Map<string, UdhrLanguageRecord[]>();
+for (const record of UDHR_RECORDS) {
+  const group = groupedRecords.get(record.languageId);
+  if (group) group.push(record);
+  else groupedRecords.set(record.languageId, [record]);
+}
+
+export const UDHR_LANGUAGE_GROUPS: readonly UdhrLanguageGroup[] = Object.freeze(
+  [...groupedRecords].map(([languageId, records]) => {
+    const sortedRecords = Object.freeze([...records].sort((left, right) => (
+      compareText(left.sourceKey, right.sourceKey)
+    )));
+    return Object.freeze({
+      id: languageId,
+      name: deriveGroupName(languageId, sortedRecords),
+      records: sortedRecords,
+      comparisonReadyRecords: Object.freeze(sortedRecords.filter(({comparisonReady}) => comparisonReady)),
+    });
+  }).sort((left, right) => (
+    compareText(getNameSortKey(left.name), getNameSortKey(right.name))
+    || compareText(left.id, right.id)
+  )),
+);
+
+const groupByLanguageId = new Map(UDHR_LANGUAGE_GROUPS.map((group) => [group.id, group]));
+const baseRecordLabels = new Map<string, string>();
+const baseLabelCounts = new Map<string, number>();
+for (const group of UDHR_LANGUAGE_GROUPS) {
+  for (const record of group.records) {
+    const label = group.records.length === 1
+      ? group.name
+      : (record.sourceName ?? record.name);
+    baseRecordLabels.set(record.id, label);
+    baseLabelCounts.set(label, (baseLabelCounts.get(label) ?? 0) + 1);
+  }
+}
+const displayLabelByRecordId = new Map<string, string>();
+for (const record of UDHR_RECORDS) {
+  const baseLabel = baseRecordLabels.get(record.id) ?? record.name;
+  displayLabelByRecordId.set(
+    record.id,
+    (baseLabelCounts.get(baseLabel) ?? 0) > 1
+      ? `${baseLabel} [${record.sourceKey}]`
+      : baseLabel,
+  );
+}
+if (new Set(displayLabelByRecordId.values()).size !== UDHR_RECORDS.length) {
+  throw new Error("The bundled UDHR record display labels are not globally unique");
+}
+
+/**
+ * A concise, globally unique presentation label for matrices, trees, and the
+ * comparison set. Source keys appear only when upstream variant names collide.
+ */
+export const getUdhrRecordDisplayLabel = (identifier: string): string | undefined => {
+  const record = getUdhrLanguage(identifier);
+  if (!record) return undefined;
+  return displayLabelByRecordId.get(record.id);
+};
+
+export const getUdhrLanguageGroup = (languageId: string): UdhrLanguageGroup | undefined => (
+  groupByLanguageId.get(languageId)
+);
+
+export const UDHR_SCRIPT_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  Adlm: "Adlam", Arab: "Arabic", Armn: "Armenian", Beng: "Bengali", Cakm: "Chakma",
+  Cans: "Canadian Aboriginal syllabics", Cher: "Cherokee", Cyrl: "Cyrillic", Deva: "Devanagari",
+  Ethi: "Ethiopic", Geor: "Georgian", Gran: "Grantha", Grek: "Greek", Gujr: "Gujarati",
+  Guru: "Gurmukhi", Hang: "Hangul", Hani: "Han", Hans: "Simplified Han", Hant: "Traditional Han",
+  Hebr: "Hebrew", Java: "Javanese", Jpan: "Japanese", Khmr: "Khmer", Knda: "Kannada",
+  Kore: "Korean", Lana: "Tai Tham", Laoo: "Lao", Latn: "Latin", Mlym: "Malayalam",
+  Mymr: "Myanmar", Sinh: "Sinhala", Syrc: "Syriac", Taml: "Tamil", Tavt: "Tai Viet",
+  Telu: "Telugu", Tfng: "Tifinagh", Thaa: "Thaana", Thai: "Thai", Tibt: "Tibetan",
+  Vaii: "Vai", Yiii: "Yi",
+});
 
 const memoryCache = new Map<string, string>();
 const pendingLoads = new Map<string, Promise<string>>();
@@ -280,10 +397,13 @@ export const getUdhrLanguage = (identifier: string): UdhrLanguageRecord | undefi
 };
 
 export const LANGUAGE_NAMES: Readonly<Record<string, string>> = Object.freeze({
-  ...Object.fromEntries(UDHR_RECORDS.map(({id, name}) => [id, name])),
+  ...Object.fromEntries(UDHR_RECORDS.map(({id, name}) => [
+    id,
+    getUdhrRecordDisplayLabel(id) ?? name,
+  ])),
   ...Object.fromEntries([...legacyAliases].map(([legacyId, recordId]) => [
     legacyId,
-    recordById.get(recordId)?.name ?? legacyId,
+    getUdhrRecordDisplayLabel(recordId) ?? recordById.get(recordId)?.name ?? legacyId,
   ])),
 });
 
