@@ -1,6 +1,6 @@
 # CompLearn NCD Calculator
 
-Browser-based normalized compression distance analysis for GenBank sequences, Universal Declaration of Human Rights translations, and local files. Compression, matrix construction, and layout optimization run in web workers so the interface remains responsive.
+Browser-based normalized compression distance analysis for GenBank sequences, Universal Declaration of Human Rights translations, astronomical time series, and local files. Compression, matrix construction, and layout optimization run in web workers so the interface remains responsive.
 
 ## Start the interface
 
@@ -14,12 +14,12 @@ Open `http://localhost:3000`. The built-in example set and local-file workflow d
 
 ## Workbench workflow
 
-The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source, or select **Try example data** beside the source tabs for an immediate self-contained run.
+The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source. **Sequence example** provides a small interface check; **Astronomy example** loads a verified 16-object RXTE time-series corpus inspired by the astronomy experiment in *Clustering by Compression*.
 
 1. Add at least four objects, or use the example data.
 2. Select **Show Similarity**. The page reports compression progress and exposes quartet-tree, K-grid, and distance-matrix result views.
 
-The example data contains two intentionally related sequence pairs. It exercises the same compression pipeline as uploaded content and is suitable for interface and worker verification; it is not a scientific benchmark dataset.
+The sequence example contains two intentionally related pairs. It exercises the same compression pipeline as uploaded content and is suitable for interface and worker verification; it is not a scientific benchmark dataset. The astronomy example is a reproducible public analogue of the paper's private GRS 1915+105 intervals. Its exact source, objective interval-selection rule, canonical signal encoding, integrity checks, and scientific limits are documented in [`docs/ASTRONOMY_EXAMPLE.md`](docs/ASTRONOMY_EXAMPLE.md).
 
 The quartet-tree result opens in a planar 2D presentation so topology and labels can be read without manipulating a camera. The view automatically fits after layout and when the viewport changes, and provides explicit zoom, fit, and reset controls. **Interactive 3D** remains available for spatial exploration; its camera also fits the complete tree on entry and resize, while node selection reports whether the selected point is a leaf or an internal node.
 
@@ -30,6 +30,7 @@ Pair compression is explicitly order-dependent. The worker first constructs the 
 ```bash
 npm run build
 npm run graphviz:verify-dev
+npm run astronomy:verify
 npm run lint
 npm run test
 npm run typecheck
