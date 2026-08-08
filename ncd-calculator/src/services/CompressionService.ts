@@ -23,6 +23,7 @@ export type WorkerFactory = (algorithm: CompressionAlgorithm) => Promise<Worker>
  */
 export class CompressionService {
 	private static instance: CompressionService;
+	private static readonly DEFAULT_INITIALIZATION_TIMEOUT_MS = 30_000;
 	
 	// Configuration constants for compression algorithms
 	private static readonly MAX_SIZES = {
@@ -47,7 +48,7 @@ export class CompressionService {
 	private workerFactory: WorkerFactory;
 	
 	// Timeout for worker initialization in milliseconds
-	private initializationTimeout: number = 10000;
+	private initializationTimeout: number = CompressionService.DEFAULT_INITIALIZATION_TIMEOUT_MS;
 	
 	/**
 	 * Private constructor that accepts optional worker factory and default algorithm
@@ -59,7 +60,7 @@ export class CompressionService {
 	private constructor(
 		workerFactory?: WorkerFactory,
 		defaultAlgorithm: CompressionAlgorithm = "zstd",
-		timeout: number = 10000
+		timeout: number = CompressionService.DEFAULT_INITIALIZATION_TIMEOUT_MS
 	) {
 		this.workerFactory = workerFactory || this.defaultWorkerFactory.bind(this);
 		this.initializationTimeout = timeout;
@@ -275,13 +276,15 @@ export class CompressionService {
 	private async defaultWorkerFactory(algorithm: CompressionAlgorithm): Promise<Worker> {
 		switch (algorithm) {
 			case "lzma":
-				// @ts-ignore
-				const LzmaWorkerModule = await import("../workers/lzmaWorker?worker");
-				return new LzmaWorkerModule.default();
+				return new Worker(
+					new URL("../workers/lzmaWorker.ts", import.meta.url),
+					{type: "module", name: "lzma-compression"},
+				);
 			case "zstd":
-				// @ts-ignore
-				const ZstdWorkerModule = await import("../workers/zstdWorker?worker");
-				return new ZstdWorkerModule.default();
+				return new Worker(
+					new URL("../workers/zstdWorker.ts", import.meta.url),
+					{type: "module", name: "zstd-compression"},
+				);
 			default:
 				throw new Error(`Unsupported compression algorithm: ${algorithm}`);
 		}
@@ -307,6 +310,7 @@ export class CompressionService {
 			console.log(`Worker for algorithm: ${this.currentAlgorithm} is ready`);
 		} catch (error) {
 			console.error(`Failed to initialize ${algorithm} worker:`, error);
+			this.worker?.terminate();
 			this.worker = null;
 			this.currentAlgorithm = null;
 			throw error;
@@ -329,9 +333,10 @@ export class CompressionService {
 		try {
 			await this.listenForWorkerReady(abortController.signal);
 		} catch (error) {
-			console.log(error);
 			if (error instanceof DOMException && error.name === 'AbortError') {
-				throw new Error(`Worker initialization timed out after ${this.initializationTimeout}ms`);
+				throw new Error(
+					`Compression worker did not become ready within ${Math.ceil(this.initializationTimeout / 1000)} seconds.`
+				);
 			}
 			throw error;
 		} finally {
@@ -347,6 +352,11 @@ export class CompressionService {
 	 */
 	private async listenForWorkerReady(signal: AbortSignal): Promise<void> {
 		return new Promise((resolve, reject) => {
+			const worker = this.worker;
+			if (!worker) {
+				reject(new Error("Compression worker is unavailable."));
+				return;
+			}
 			const handleMessage = (e: MessageEvent<WorkerMessage>) => {
 				if (e.data.type === "ready") {
 					cleanup();
@@ -356,9 +366,23 @@ export class CompressionService {
 					reject(new Error(e.data.message));
 				}
 			};
+
+			const handleError = (event: ErrorEvent) => {
+				event.preventDefault();
+				cleanup();
+				const detail = event.message?.trim() || "the worker script could not be loaded";
+				reject(new Error(`Compression worker failed to start: ${detail}.`));
+			};
+
+			const handleMessageError = () => {
+				cleanup();
+				reject(new Error("Compression worker failed to start because its response could not be decoded."));
+			};
 			
 			const cleanup = () => {
-				this.worker?.removeEventListener("message", handleMessage);
+				worker.removeEventListener("message", handleMessage);
+				worker.removeEventListener("error", handleError);
+				worker.removeEventListener("messageerror", handleMessageError);
 				signal.removeEventListener("abort", handleAbort);
 			};
 			
@@ -367,7 +391,9 @@ export class CompressionService {
 				reject(new DOMException("Aborted", "AbortError"));
 			};
 			
-			this.worker?.addEventListener("message", handleMessage);
+			worker.addEventListener("message", handleMessage);
+			worker.addEventListener("error", handleError);
+			worker.addEventListener("messageerror", handleMessageError);
 			signal.addEventListener("abort", handleAbort);
 		});
 	}
@@ -384,6 +410,11 @@ export class CompressionService {
 		onProgress?: (message: WorkerMessage) => void
 	): Promise<WorkerResultMessage> {
 		return new Promise((resolve, reject) => {
+			const worker = this.worker;
+			if (!worker) {
+				reject(new Error("Compression worker is unavailable."));
+				return;
+			}
 			const handleMessage = (e: MessageEvent<WorkerMessage>) => {
 				const message = e.data;
 				switch (message.type) {
@@ -401,13 +432,33 @@ export class CompressionService {
 						break;
 				}
 			};
-			
-			const cleanup = () => {
-				this.worker?.removeEventListener("message", handleMessage);
+
+			const handleError = (event: ErrorEvent) => {
+				event.preventDefault();
+				cleanup();
+				if (this.worker === worker) this.terminate();
+				else worker.terminate();
+				const detail = event.message?.trim() || "the worker stopped unexpectedly";
+				reject(new Error(`Compression worker failed during computation: ${detail}.`));
+			};
+
+			const handleMessageError = () => {
+				cleanup();
+				if (this.worker === worker) this.terminate();
+				else worker.terminate();
+				reject(new Error("Compression worker returned a response that could not be decoded."));
 			};
 			
-			this.worker?.addEventListener("message", handleMessage);
-			this.worker?.postMessage(input);
+			const cleanup = () => {
+				worker.removeEventListener("message", handleMessage);
+				worker.removeEventListener("error", handleError);
+				worker.removeEventListener("messageerror", handleMessageError);
+			};
+			
+			worker.addEventListener("message", handleMessage);
+			worker.addEventListener("error", handleError);
+			worker.addEventListener("messageerror", handleMessageError);
+			worker.postMessage(input);
 		});
 	}
 	

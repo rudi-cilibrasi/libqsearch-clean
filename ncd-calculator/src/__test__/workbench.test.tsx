@@ -9,9 +9,20 @@ import {getWorkbenchExampleItems} from "../components/workbenchExamples";
 import {FASTA, LANGUAGE} from "../constants/modalConstants";
 import {STORAGE_VERSION, STORAGE_VERSION_NAME} from "../cache/LocalStorageKeyManager";
 
+const compressionWorkerLifecycleMocks = vi.hoisted(() => ({
+    initialize: vi.fn(),
+    terminate: vi.fn(),
+}));
+
+
 vi.mock("../services/CompressionService", () => ({
     CompressionService: {
-        getInstance: () => ({initialize: vi.fn(), terminate: vi.fn()}),
+        getInstance: () => compressionWorkerLifecycleMocks,
+        getAvailableAlgorithms: () => ["lzma", "zstd"],
+        getAlgorithmInfo: (algorithm: string) => ({
+            maxSize: algorithm === "lzma" ? 2 * 1024 * 1024 : 128 * 1024 * 1024,
+            description: `${algorithm} compression`,
+        }),
     },
 }));
 
@@ -131,6 +142,23 @@ describe("NCD workbench", () => {
         const showSimilarity = screen.getByRole("button", {name: "Show Similarity"});
         expect(showSimilarity.closest(".workbench-actions")).not.toBeNull();
         expect(showSimilarity.closest(".workbench-sourcebar")).toBeNull();
+    });
+
+    test("does not prewarm an unused compression worker", () => {
+        compressionWorkerLifecycleMocks.initialize.mockClear();
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={vi.fn()}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+
+        expect(compressionWorkerLifecycleMocks.initialize).not.toHaveBeenCalled();
     });
 
     test("upgrades saved UDHR identifiers to canonical language names", async () => {
