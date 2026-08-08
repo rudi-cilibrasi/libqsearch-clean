@@ -23,9 +23,14 @@ vi.mock("../services/astronomyExample", () => ({
     verifyAstronomyExampleItem: vi.fn(async () => undefined),
 }));
 
+const compressionWorkerLifecycleMocks = vi.hoisted(() => ({
+    initialize: vi.fn(),
+    terminate: vi.fn(),
+}));
+
 vi.mock("../services/CompressionService", () => ({
     CompressionService: {
-        getInstance: () => ({initialize: vi.fn(), terminate: vi.fn()}),
+        getInstance: () => compressionWorkerLifecycleMocks,
         getAvailableAlgorithms: () => ["lzma", "zstd"],
         getAlgorithmInfo: (algorithm: string) => ({
             maxSize: algorithm === "lzma" ? 2 * 1024 * 1024 : 128 * 1024 * 1024,
@@ -171,6 +176,23 @@ describe("NCD workbench", () => {
         expect(screen.getByText("Astronomy 1")).toBeInTheDocument();
         expect(screen.getByText("Astronomy 16")).toBeInTheDocument();
         expect(getAstronomyExampleItemsMock).toHaveBeenCalledOnce();
+    });
+
+    test("does not prewarm an unused compression worker", () => {
+        compressionWorkerLifecycleMocks.initialize.mockClear();
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={vi.fn()}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+
+        expect(compressionWorkerLifecycleMocks.initialize).not.toHaveBeenCalled();
     });
 
     test("upgrades saved UDHR identifiers to canonical language names", async () => {

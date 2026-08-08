@@ -31,6 +31,7 @@ Pair compression is explicitly order-dependent. The worker first constructs the 
 npm run build
 npm run graphviz:verify-dev
 npm run astronomy:verify
+npm run workers:verify-dev
 npm run lint
 npm run test
 npm run typecheck
@@ -45,7 +46,7 @@ After changing dependencies or switching branches while the development server i
 npm run dev -- --force
 ```
 
-The planar-tree interface reports initialization failures and offers **Retry renderer**. The shared loader deduplicates concurrent initialization and clears failed attempts before retrying.
+The planar-tree interface reports initialization failures and offers **Retry renderer**. The shared loader deduplicates concurrent initialization and clears failed attempts before retrying. Compression workers use Vite's native `new Worker(new URL(...))` transform rather than dynamically importing `?worker` wrapper modules; `workers:verify-dev` transforms and serves both entries in middleware mode so development-only worker regressions fail before a build. The selected compressor starts lazily when a calculation begins—there is no competing ZSTD prewarm—and has a 30-second cold-start window. Native worker load and message-decoding failures are reported immediately and failed workers are terminated.
 
 Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__test__/workbench.test.tsx`.
 
