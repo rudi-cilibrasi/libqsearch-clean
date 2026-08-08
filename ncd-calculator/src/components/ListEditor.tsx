@@ -2,7 +2,7 @@
  * @module components/ListEditor
  *
  * Input management component for the NCD calculator. Provides three input modes:
- * - **FASTA Search** — Search NCBI GenBank for DNA/protein sequences by accession or name
+ * - **FASTA Search** — Search NCBI Nucleotide for versioned nucleotide sequences
  * - **File Upload** — Drag-and-drop or browse for local files (any format)
  * - **Languages** — Select UDHR (Universal Declaration of Human Rights) translations
  *
@@ -34,19 +34,14 @@ import {saveAs} from "file-saver";
 import type {QTreeResponse} from "@/types/qsearch";
 import {getWorkbenchExampleItems} from "./workbenchExamples";
 import type {SelectedItem} from "./workbenchTypes";
+import {
+	type GenBankSequenceRecord,
+	validateGenBankNucleotideSequence,
+	verifyCachedGenBankRecord,
+} from "../services/genbankSequencePipeline";
 export type {SelectedItem} from "./workbenchTypes";
 export interface SearchMode {
 	searchMode: string;
-}
-
-export interface FastaSequenceResponse {
-	accessions: string[];
-	contents: string[];
-}
-
-export interface ProcessedFastaItem {
-	sequence: string;
-	accession: string;
 }
 
 export interface NcdInput {
@@ -215,8 +210,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		[]
 	);
 	
-	const apiKey = import.meta.env.VITE_NCBI_API_KEY ?? "";
-	
 	const [fastaSuggestionStartIndex, setFastaSuggestionStartIndex] =
 		React.useState<Record<string, number>>({});
 	
@@ -228,8 +221,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	// Computed values
 	const isSearchDisabled =
-		selectedItems.length < MIN_ITEMS ||
-		(searchMode.searchMode === "fasta" && !apiKey && selectedItems.length < MIN_ITEMS);
+		selectedItems.length < MIN_ITEMS;
 	const isClearDisabled = selectedItems.length === 0;
 	
 	// Rehydrate canonical names for selections restored from older localStorage
@@ -302,6 +294,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				});
 			} else {
 				const computedNcdInput = await computeNcdInput(selectedItems);
+				await assertCompleteComparisonSet(selectedItems, computedNcdInput);
 				// update the items with their computed content
 				const ncdSelectedItems = updateLabelsWithComputedContent(computedNcdInput, selectedItems);
 				
@@ -324,25 +317,39 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	const computeNcdInput = async (selectedItems: SelectedItem[]): Promise<SelectedItem[]> => {
 		const langItems = selectedItems.filter((item) => item.type === LANGUAGE);
-		const fastaItems = selectedItems.filter(
-			(item) => item.type === FASTA || item.type === FILE_UPLOAD
-		);
+		const fastaItems = selectedItems.filter((item) => item.type === FASTA);
+		const fileItems = selectedItems.filter((item) => item.type === FILE_UPLOAD);
 		
 		const orderMap = getOrderMap(selectedItems);
 		const langNcdInput = await computeLanguageNcdInput(langItems);
-		const fastaNcdInput = getCachedFastaContent(fastaItems);
+		const fastaNcdInput = await getCachedFastaContent(fastaItems);
+		const resolvedFastaIds = new Set(fastaNcdInput.map(item => item.id));
 		
 		const needComputeFastaList = await computeFastaNcdInput(
-			fastaItems.filter((item) => !item.content || item.content.trim() === ""),
-			apiKey
+			fastaItems.filter(item => !resolvedFastaIds.has(item.id)),
 		);
 		
-		const mergedFastaInput = [
+		const mergedObjectInput = [
+			...fileItems,
 			...fastaNcdInput,
-			...(needComputeFastaList || []),
+			...needComputeFastaList,
 		];
 		
-		return mergeAndPreserveInitialOrder(langNcdInput, mergedFastaInput, orderMap);
+		return mergeAndPreserveInitialOrder(langNcdInput, mergedObjectInput, orderMap);
+	};
+
+	const assertCompleteComparisonSet = async (
+		requestedItems: readonly SelectedItem[],
+		resolvedItems: readonly SelectedItem[],
+	): Promise<void> => {
+		const resolvedById = new Map(resolvedItems.map(item => [item.id, item]));
+		const missing = requestedItems.filter(item => !resolvedById.get(item.id)?.content?.trim());
+		if (missing.length > 0) {
+			throw new Error(`Unable to retrieve valid content for: ${missing.map(item => item.label || item.id).join(", ")}.`);
+		}
+		for (const item of resolvedItems) {
+			if (item.type === FASTA) validateGenBankNucleotideSequence(item.content ?? "");
+		}
 	};
 	
 	
@@ -365,22 +372,20 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	}
 	
 	
-	const getCachedFastaContent = (items: SelectedItem[]): SelectedItem[] => {
-		const res = items.filter(
-			(item) => item.content && item.content.trim() !== ""
-		);
-		
-		const withoutContent = items.filter(
-			(item) => !item.content || item.content.trim() === ""
-		);
-		
-		for (let i = 0; i < withoutContent.length; i++) {
-			const item = withoutContent[i];
-			const sequence = localStorageManager.get<string>(LocalStorageKeys.ACCESSION_SEQUENCE, item.id) || "";
-			if (sequence && sequence.trim() !== "") {
-				item.content = sequence;
-				res.push(item);
+	const getCachedFastaContent = async (items: SelectedItem[]): Promise<SelectedItem[]> => {
+		const res: SelectedItem[] = [];
+		for (const item of items) {
+			const inlineRecord: GenBankSequenceRecord | null = item.content && item.genBankProvenance
+				? {sequence: item.content, provenance: item.genBankProvenance}
+				: null;
+			const cachedRecord = inlineRecord
+				?? localStorageManager.get<GenBankSequenceRecord>(LocalStorageKeys.ACCESSION_SEQUENCE, item.id);
+			const verified = await verifyCachedGenBankRecord(cachedRecord, item.id);
+			if (!verified) {
+				localStorageManager.remove(LocalStorageKeys.ACCESSION_SEQUENCE, item.id);
+				continue;
 			}
+			res.push({...item, content: verified.sequence, genBankProvenance: verified.provenance});
 		}
 		
 		return res;
@@ -453,26 +458,20 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	
 	const computeFastaNcdInput = async (
 		fastaItems: SelectedItem[],
-		_apiKey: string
 	): Promise<SelectedItem[]> => {
 		if (!isValidInput(fastaItems)) return [];
-		try {
-			const searchResults = await fetchFastaSequenceAndProcess(fastaItems);
-			if (searchResults.length === 0) return [];
-			cacheAccessionSequence(searchResults);
-			return searchResults;
-		} catch (error) {
-			console.error("Error in computeFastaNcdInput:", error);
-			return [];
-		}
+		const searchResults = await fetchFastaSequenceAndProcess(fastaItems);
+		cacheAccessionSequence(searchResults);
+		return searchResults;
 	};
 	
 	const cacheAccessionSequence = (suggestions: SelectedItem[]): void => {
 		suggestions.forEach((suggestion) => {
-			const id = suggestion.id;
-			const content = suggestion.content;
-			if (content) {
-				localStorageManager.set(LocalStorageKeys.ACCESSION_SEQUENCE, id, content);
+			if (suggestion.content && suggestion.genBankProvenance) {
+				localStorageManager.set<GenBankSequenceRecord>(LocalStorageKeys.ACCESSION_SEQUENCE, suggestion.id, {
+					sequence: suggestion.content,
+					provenance: suggestion.genBankProvenance,
+				});
 			}
 		});
 	};
@@ -497,21 +496,18 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		});
 		
 		const response = await getFastaSequences(idsToFetch);
-		const arr = toArr(response);
-		arr.forEach((item) => {
-			const fastItem = map.get(item.accession);
-			if (fastItem) {
-				fastItem.content = item.sequence;
-			}
+		response.forEach((record) => {
+			const fastItem = map.get(record.provenance.requestedId);
+			if (!fastItem) throw new Error(`Unexpected GenBank response for ${record.provenance.requestedId}.`);
+			fastItem.content = record.sequence;
+			fastItem.genBankProvenance = record.provenance;
 		});
-		return Array.from(map.values());
-	};
-	
-	const toArr = (response: FastaSequenceResponse): ProcessedFastaItem[] => {
-		return response.accessions.map((accession, i) => ({
-			sequence: response.contents[i],
-			accession,
-		}));
+		const resolved = Array.from(map.values());
+		const missing = resolved.filter(item => !item.content || !item.genBankProvenance);
+		if (missing.length > 0) {
+			throw new Error(`NCBI did not resolve: ${missing.map(item => item.id).join(", ")}.`);
+		}
+		return resolved;
 	};
 	
 	const addItem = (item: SelectedItem): void => {

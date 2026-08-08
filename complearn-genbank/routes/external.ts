@@ -1,77 +1,60 @@
-import express, { Request, Response } from "express";
+import express, {Request, Response} from "express";
 import axios from "axios";
-import ENV_LOADER from "../configurations/envLoader";
 import logger from "../configurations/logger";
+import {isGenbankHostname} from "../genbank/genbankUtils";
 import {
-  addApiKey,
-  GenBankHostName,
-  isGenbankHostname,
-} from "../genbank/genbankUtils";
-import { clURL } from "../commonTypes/clURL";
+  NcbiQueueFullError,
+  ncbiRequestScheduler,
+  prepareNcbiUrl,
+} from "../genbank/ncbiClient";
 
 const router = express.Router();
 
-let apiKeyIndex = 0;
-
-const apiKeys = [
-  ENV_LOADER.GENBANK_API_KEY_1,
-  ENV_LOADER.GENBANK_API_KEY_2,
-  ENV_LOADER.GENBANK_API_KEY_3,
-];
-
-function getNextApiKey() {
-  const apiKey = apiKeys[apiKeyIndex];
-  apiKeyIndex = (apiKeyIndex + 1) % apiKeys.length;
-  return apiKey;
-}
-
 router.post("/forward", async (req: Request, res: Response): Promise<any> => {
   try {
-    const {
-      externalUrl = "",
-      method = "GET",
-      body = null,
-      responseType = "json",
-      responseHeaders = {},
-    } = req.body;
-
-    if (!externalUrl) {
-      return res.status(400).send({ error: "Target URL is required" });
-    }
+    const externalUrl = typeof req.body?.externalUrl === "string" ? req.body.externalUrl : "";
+    if (!externalUrl) return res.status(400).json({error: "Target URL is required"});
 
     const parsedUrl = new URL(externalUrl);
-    console.log("hostname: " + parsedUrl.hostname);
-    if (!isGenbankHostname(parsedUrl.hostname as GenBankHostName)) {
-      throw new Error(`Invalid hostname: ${parsedUrl.hostname}`);
+    if (!isGenbankHostname(parsedUrl.hostname)) {
+      return res.status(400).json({error: "Target host is not allowed"});
     }
-    const urlWithApiKey: clURL = addApiKey(
-      "GET",
-      parsedUrl.toString() as clURL,
-      getNextApiKey()
-    );
+    if (parsedUrl.hostname !== "eutils.ncbi.nlm.nih.gov") {
+      return res.status(400).json({error: "This endpoint only proxies NCBI E-utilities requests"});
+    }
 
-    Object.entries(responseHeaders).forEach(([key, value]: [any, any]) => {
-      res.setHeader(key, value);
+    const safeUrl = prepareNcbiUrl(externalUrl);
+    logger.info({requestId: req.requestId, message: "Forwarding NCBI E-utilities request", path: parsedUrl.pathname});
+    const response = await ncbiRequestScheduler.request({
+      url: safeUrl,
+      method: "GET",
+      responseType: "text",
+      transformResponse: [(value: string) => value],
+      validateStatus: status => status >= 200 && status < 300,
     });
-    logger.info(`Forwarding request to ${parsedUrl.toString()}`);
-    const axiosParams = {
-      url: urlWithApiKey,
-      method: method,
-      data: body,
-      responseType: responseType,
-    };
-    console.log("Params: " + JSON.stringify(axiosParams));
-    const response = await axios(axiosParams);
 
-    res.status(response.status);
-    if (responseType === "stream") {
-      response.data.pipe(res);
-    } else {
-      res.send(response.data);
+    const expectsJson = parsedUrl.searchParams.get("retmode") === "json";
+    if (expectsJson) {
+      try {
+        return res.status(response.status).json(JSON.parse(String(response.data)));
+      } catch {
+        return res.status(502).json({error: "NCBI returned malformed JSON."});
+      }
     }
+    return res.status(response.status).type("text/plain").send(response.data);
   } catch (error) {
-    logger.error(`Error in forwarding request: ${error}`);
-    res.status(500).send({ error: error });
+    if (error instanceof NcbiQueueFullError) return res.status(503).json({error: error.message});
+    if (axios.isAxiosError(error)) {
+      const upstreamStatus = error.response?.status;
+      logger.warn({requestId: req.requestId, message: "NCBI request failed", upstreamStatus});
+      return res.status(upstreamStatus === 429 ? 429 : 502).json({
+        error: upstreamStatus === 429
+          ? "NCBI is rate limiting requests. Try again shortly."
+          : "NCBI is temporarily unavailable.",
+      });
+    }
+    logger.warn({requestId: req.requestId, message: "Rejected external request", error: String(error)});
+    return res.status(400).json({error: "Invalid external request"});
   }
 });
 

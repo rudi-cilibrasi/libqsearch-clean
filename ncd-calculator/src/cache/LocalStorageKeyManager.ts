@@ -1,5 +1,5 @@
 export const STORAGE_VERSION_NAME = "complearn_storage_version";
-export const STORAGE_VERSION = 51;
+export const STORAGE_VERSION = 52;
 export const LOG_PREFIX = "[Storage Manager]";
 
 type StorageKeyFunction = () => string;

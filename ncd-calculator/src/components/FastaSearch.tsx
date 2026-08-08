@@ -57,6 +57,9 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
               displayMode="common"
           />
         </div>
+        <p className="source-browser__provenance">
+          Records are retrieved from NCBI Nucleotide. NCBI does not endorse this application.
+        </p>
       </div>
   );
 };
