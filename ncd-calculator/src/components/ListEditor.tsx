@@ -27,7 +27,6 @@ import {LocalStorageKeyManager, LocalStorageKeys} from "../cache/LocalStorageKey
 import {getFastaSequences} from "../functions/getPublicGenbank";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 import {useSearchParams} from "react-router-dom";
-import {CompressionService} from "@/services/CompressionService";
 import {NCDImportFormat} from "@/types/ncd";
 import createGraph from "@/functions/graphExport.ts";
 import {saveAs} from "file-saver";
@@ -223,7 +222,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	// Constants and Refs
 	const MIN_ITEMS = 4;
 	const localStorageManager = LocalStorageKeyManager.getInstance();
-	const compressionServiceRef = useRef(CompressionService.getInstance());
 	const [, setSearchParams] = useSearchParams();
 	
 	// Computed values
@@ -256,12 +254,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			setSelectedItems([]);
 		}
 		
-		// Initialize compression service
-		compressionServiceRef.current.initialize();
-		
-		return () => {
-			compressionServiceRef.current.terminate();
-		};
 	}, []);
 	
 	// Update search mode when initialSearchMode changes
