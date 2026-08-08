@@ -1,5 +1,5 @@
 import React from "react";
-import {Dna, FileType2, Globe2, X} from "lucide-react";
+import {Dna, FileType2, Globe2, Telescope, X} from "lucide-react";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 import type {SelectedItem} from "./workbenchTypes";
 
@@ -41,7 +41,9 @@ export const InputHolder: React.FC<InputAccumulatorProps> = ({
       default:
         return (
           <div className="selected-object__identity">
-            <FileType2 size={17} aria-hidden="true" />
+            {item.astronomyProvenance
+              ? <Telescope size={17} aria-hidden="true" />
+              : <FileType2 size={17} aria-hidden="true" />}
             <span>{item.label}</span>
           </div>
         );

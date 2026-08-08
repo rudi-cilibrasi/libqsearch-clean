@@ -12,7 +12,7 @@
  */
 
 import React, {useEffect, useRef, useState} from "react";
-import {AlertCircle, Dna, Download, FileType2, FlaskConical, Globe2, Upload} from "lucide-react";
+import {AlertCircle, Dna, Download, FileType2, FlaskConical, Globe2, Telescope, Upload} from "lucide-react";
 import {
 	getTranslationResponse,
 	getUdhrLanguage,
@@ -38,6 +38,7 @@ import {
 	validateGenBankNucleotideSequence,
 	verifyCachedGenBankRecord,
 } from "../services/genbankSequencePipeline";
+import {getAstronomyExampleItems, verifyAstronomyExampleItem} from "../services/astronomyExample";
 export type {SelectedItem} from "./workbenchTypes";
 export interface SearchMode {
 	searchMode: string;
@@ -79,6 +80,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [hasImportedMatrix, setHasImportedMatrix] = useState<boolean>(false);
 	const [isAutoProcessing, setIsAutoProcessing] = useState<boolean>(false);
+	const [isLoadingAstronomy, setIsLoadingAstronomy] = useState<boolean>(false);
 	
 	
 	const triggerFileInput = () => {
@@ -341,6 +343,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		}
 		for (const item of resolvedItems) {
 			if (item.type === FASTA) validateGenBankNucleotideSequence(item.content ?? "");
+			await verifyAstronomyExampleItem(item);
 		}
 	};
 	
@@ -535,6 +538,22 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		setHasImportedMatrix(false);
 		setImportError(null);
 	};
+
+	const loadAstronomyExample = async (): Promise<void> => {
+		setImportError(null);
+		setIsLoadingAstronomy(true);
+		try {
+			const examples = await getAstronomyExampleItems();
+			resetDisplay();
+			setMode(FILE_UPLOAD);
+			setSelectedItems(examples);
+			setHasImportedMatrix(false);
+		} catch (error) {
+			setImportError(error instanceof Error ? error.message : "Unable to load the astronomy example");
+		} finally {
+			setIsLoadingAstronomy(false);
+		}
+	};
 	
 	const getAllFastaSuggestionWithLastIndex = (): Record<string, number> => {
 		return fastaSuggestionStartIndex;
@@ -590,7 +609,16 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				<div className="workbench-sourcebar__actions">
 					<button type="button" onClick={loadExampleSet} className="workbench-button workbench-button--example">
 						<FlaskConical size={17} aria-hidden="true"/>
-						Try example data
+						Sequence example
+					</button>
+					<button
+						type="button"
+						onClick={loadAstronomyExample}
+						className="workbench-button workbench-button--example"
+						disabled={isLoadingAstronomy}
+					>
+						<Telescope size={17} aria-hidden="true"/>
+						{isLoadingAstronomy ? "Loading…" : "Astronomy example"}
 					</button>
 				</div>
 			</div>

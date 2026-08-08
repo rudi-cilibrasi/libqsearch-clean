@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm run graphviz:verify-dev && npm run workers:verify-dev && npm run udhr:verify && vite build && node scripts/verify-production-bundle.mjs",
+    "build": "npm run graphviz:verify-dev && npm run workers:verify-dev && npm run udhr:verify && npm run astronomy:verify && vite build && node scripts/verify-production-bundle.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "debug": "vite --debug",
@@ -18,7 +18,9 @@
     "workers:verify-dev": "node scripts/verify-dev-compression-workers.mjs",
     "udhr:audit": "node scripts/build-udhr-corpus.mjs --audit-only",
     "udhr:refresh": "node scripts/build-udhr-corpus.mjs",
-    "udhr:verify": "node scripts/verify-udhr-corpus.mjs"
+    "udhr:verify": "node scripts/verify-udhr-corpus.mjs",
+    "astronomy:refresh": "python3 scripts/build-astronomy-corpus.py",
+    "astronomy:verify": "node scripts/verify-astronomy-corpus.mjs"
   },
   "dependencies": {
     "@hpcc-js/wasm": "^2.22.4",

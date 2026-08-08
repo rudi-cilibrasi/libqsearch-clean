@@ -9,11 +9,24 @@ import {getWorkbenchExampleItems} from "../components/workbenchExamples";
 import {FASTA, LANGUAGE} from "../constants/modalConstants";
 import {STORAGE_VERSION, STORAGE_VERSION_NAME} from "../cache/LocalStorageKeyManager";
 
+const getAstronomyExampleItemsMock = vi.hoisted(() => vi.fn(async () => (
+    Array.from({length: 16}, (_, index) => ({
+        id: `astronomy:test:${index}`,
+        label: `Astronomy ${index + 1}`,
+        type: "file_upload" as const,
+        content: "1,2,3,4\n".repeat(480),
+    }))
+)));
+
+vi.mock("../services/astronomyExample", () => ({
+    getAstronomyExampleItems: getAstronomyExampleItemsMock,
+    verifyAstronomyExampleItem: vi.fn(async () => undefined),
+}));
+
 const compressionWorkerLifecycleMocks = vi.hoisted(() => ({
     initialize: vi.fn(),
     terminate: vi.fn(),
 }));
-
 
 vi.mock("../services/CompressionService", () => ({
     CompressionService: {
@@ -142,6 +155,27 @@ describe("NCD workbench", () => {
         const showSimilarity = screen.getByRole("button", {name: "Show Similarity"});
         expect(showSimilarity.closest(".workbench-actions")).not.toBeNull();
         expect(showSimilarity.closest(".workbench-sourcebar")).toBeNull();
+    });
+
+    test("loads the verified astronomy example from one concise action", async () => {
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={vi.fn()}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(screen.getByRole("button", {name: "Astronomy example"}));
+
+        expect(await screen.findByText("16 objects")).toBeInTheDocument();
+        expect(screen.getByText("Astronomy 1")).toBeInTheDocument();
+        expect(screen.getByText("Astronomy 16")).toBeInTheDocument();
+        expect(getAstronomyExampleItemsMock).toHaveBeenCalledOnce();
     });
 
     test("does not prewarm an unused compression worker", () => {
