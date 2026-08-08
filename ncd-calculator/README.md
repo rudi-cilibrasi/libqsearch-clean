@@ -2,6 +2,8 @@
 
 Browser-based normalized compression distance analysis for GenBank sequences, Universal Declaration of Human Rights translations, astronomical time series, and local files. Compression, matrix construction, and layout optimization run in web workers so the interface remains responsive.
 
+GenBank/NCBI Nucleotide retrieval is fail-fast and version-pinned: ESummary metadata and FASTA content must agree on accession version and sequence length before a record can enter a comparison. Cached records carry a SHA-256 digest and typed provenance and are revalidated before reuse. See [`docs/GENBANK_SEQUENCE_PIPELINE.md`](docs/GENBANK_SEQUENCE_PIPELINE.md) for the scientific scope, limits, and reproducibility contract.
+
 ## Start the interface
 
 ```bash

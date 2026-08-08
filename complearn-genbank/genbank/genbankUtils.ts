@@ -8,13 +8,12 @@ export const ALLOWED_GENBANK_HOSTNAMES: Set<GenBankHostName> = new Set(Array.fro
 
 
 // Invalid URL might throw an exception TypeError: Invalid URL
-export const addApiKey = (httpVerb: string, uri: clURL, apiKey: string) => {
+export const addApiKey = (_httpVerb: string, uri: clURL, apiKey: string) => {
     const url = new URL(uri);
-    const params = url.searchParams;
-    params.append("api_key", apiKey);
+    if (apiKey) url.searchParams.set("api_key", apiKey);
     return url.toString() as clURL;
 }
 
-export const isGenbankHostname = (hostname: clHostname): boolean => {
+export const isGenbankHostname = (hostname: clHostname | string): boolean => {
     return ALLOWED_GENBANK_HOSTNAMES.has(hostname as GenBankHostName);
 }

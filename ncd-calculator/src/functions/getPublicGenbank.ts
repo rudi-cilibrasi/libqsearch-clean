@@ -1,52 +1,53 @@
 import {sendRequestToProxy} from "./fetchProxy";
-import {parseFastaAndClean} from "./fasta";
+import {
+    assembleValidatedGenBankRecords,
+    MAX_GENBANK_RECORDS_PER_REQUEST,
+    type GenBankSequenceRecord,
+} from "../services/genbankSequencePipeline";
 
-const parseGenbankList = (text: string): {
-    labels: string[],
-    scientificNames: string[],
-    accessions: string[],
-    commonNames: string[],
-    contents: string[]
-} => {
-    if (!text) {
-        return {
-            labels: [],
-            scientificNames: [],
-            accessions: [],
-            commonNames: [],
-            contents: []
-        };
+const EUTILS_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+
+const createEutilsUri = (
+    endpoint: "efetch.fcgi" | "esummary.fcgi",
+    params: Record<string, string>,
+): string => {
+    const url = new URL(`${EUTILS_BASE_URL}/${endpoint}`);
+    url.search = new URLSearchParams({
+        db: "nuccore",
+        tool: "complearn-ncd",
+        ...params,
+    }).toString();
+    return url.toString();
+};
+
+/**
+ * Retrieve a bounded batch of versioned nucleotide records and verify every
+ * FASTA payload against its NCBI ESummary accession and sequence length.
+ */
+export const getFastaSequences = async (
+    ids: readonly string[],
+): Promise<readonly GenBankSequenceRecord[]> => {
+    if (ids.length > MAX_GENBANK_RECORDS_PER_REQUEST) {
+        throw new Error(`Select no more than ${MAX_GENBANK_RECORDS_PER_REQUEST} GenBank records per comparison.`);
     }
-    const parsed = parseFastaAndClean(text);
-    const scientificNames = parsed.map(item => item.scientificName);
-    const commonNames = parsed.map(item => item.commonName);
-    const accessions = parsed.map(item => item.accession);
-    const contents = parsed.map(item => item.sequence);
-    return {
-        labels: commonNames,
-        scientificNames: scientificNames,
-        accessions: accessions,
-        commonNames: commonNames,
-        contents: contents
-    };
-};
-
-
-const getGenbankListUri = (ids: string[]): string => {
-    const IDS = ids.join(",");
-    return `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${IDS}&rettype=fasta&retmode=text`;
-};
-
-export const getFastaSequences = async (ids: string[]): Promise<{
-    labels: string[],
-    scientificNames: string[],
-    accessions: string[],
-    commonNames: string[],
-    contents: string[]
-}> => {
-    const uri = getGenbankListUri(ids);
-    const textResponse = await sendRequestToProxy({
-        externalUrl: uri
+    const joinedIds = ids.join(",");
+    const summaryUri = createEutilsUri("esummary.fcgi", {
+        id: joinedIds,
+        retmode: "json",
+        version: "2.0",
     });
-    return parseGenbankList(textResponse);
+    const fastaUri = createEutilsUri("efetch.fcgi", {
+        id: joinedIds,
+        rettype: "fasta",
+        retmode: "text",
+    });
+
+    // Keep the requests sequential. This respects NCBI's shared rate budget and
+    // lets us fail on malformed metadata before transferring sequence payloads.
+    const summaryResponse = await sendRequestToProxy({externalUrl: summaryUri});
+    const fastaResponse = await sendRequestToProxy({externalUrl: fastaUri});
+    if (typeof fastaResponse !== "string") {
+        throw new Error("NCBI returned an unexpected FASTA response type.");
+    }
+    return assembleValidatedGenBankRecords(ids, fastaResponse, summaryResponse);
 };

@@ -159,6 +159,15 @@
     scrollbar-gutter: stable;
 }
 
+.source-browser__provenance {
+    margin: 0;
+    padding: 9px 26px;
+    color: var(--ink-muted);
+    border-top: 1px solid var(--line);
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+
 .source-option-list {
     margin: 0;
     padding: 0;

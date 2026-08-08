@@ -12,10 +12,10 @@ Based on the paper [Clustering by Compression](https://homepages.cwi.nl/~paulv/p
 The calculator includes a locally bundled, integrity-checked GRS 1915+105 RXTE time-series example based on the astronomy experiment in Section VIII-F. It uses a reproducible CC BY 4.0 public analogue because the paper's exact 16 privately supplied intervals are not publicly identified. The data contract and scientific limitations are in [`ncd-calculator/docs/ASTRONOMY_EXAMPLE.md`](ncd-calculator/docs/ASTRONOMY_EXAMPLE.md).
 
 ### Development environment
-##### Config the API key for using NCBI APIs
+##### Configure NCBI E-utilities
 1. Go to: https://account.ncbi.nlm.nih.gov/settings/ > *Account Settings*
 2. In the *API Key Management* section at the bottom, take the API key
-##### Add ENV variables for `ncd-calculator`:
+##### Add environment variables for `ncd-calculator`:
 ```
 cd ncd-calculator
 ```
@@ -29,7 +29,6 @@ cd ncd-calculator
 ```
 2. Create environment variables in .env file:
 ```
-VITE_NCBI_API_KEY=<XXX-API-KEY-FROM-NCBI>
 VITE_BACKEND_BASE_URL=<BACKEND-SERVER-DOMAIN> (i.e. https://openscienceresearchpark.com/api)
 ```
 3. Running commands
@@ -62,14 +61,15 @@ GOOGLE_CLIENT_SECRET=<GOOGLE_CLIENT_SECRET>
 GITHUB_CLIENT_ID=<GITHUB_CLIENT_ID>
 GITHUB_CLIENT_SECRET=<GITHUB_CLIENT_SECRET>
 
-GENBANK_API_KEY_1=<GENBANK_SHARED_API_KEY_1>
-GENBANK_API_KEY_2=<GENBANK_SHARED_API_KEY_2>
-GENBANK_API_KEY_3=<GENBANK_SHARED_API_KEY_3>
+GENBANK_API_KEY=<NCBI_API_KEY>
+NCBI_EMAIL=<MAINTAINER_EMAIL>
 
 FRONTEND_BASE_URL=<FRONTEND_BASE_URL> (i.e. https://openscienceresearchpark.com)
 BASE_URL=<BACKEND_BASE_URL> (i.e. https://openscienceresearchpark.com/api)
 PORT=3001
 ```
+
+The API key is kept on the backend and must not be exposed through a `VITE_` variable. NCBI permits one API key per account. Without a key, the backend automatically uses the documented three-request-per-second limit; with a key it uses ten requests per second. `NCBI_EMAIL` identifies the maintainer to NCBI for operational contact.
 
 ##### Start up all services:
 Each sub-project has their own respective Dockerfile. All running by the `docker-compose.yml` in the root folder. Run this to start all services:
