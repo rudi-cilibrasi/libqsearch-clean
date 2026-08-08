@@ -658,11 +658,22 @@
     letter-spacing: -0.035em;
 }
 
-.workbench-results__header > span {
+.workbench-results__summary {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 14px;
+}
+
+.workbench-results__summary > span {
     color: var(--ink-muted);
     font-family: var(--font-mono);
     font-size: 0.72rem;
     font-weight: 600;
+}
+
+.workbench-results__export {
+	white-space: nowrap;
 }
 
 .ncd-visualization {
@@ -1205,6 +1216,12 @@ button.genbank-suggestions__status:hover {
         align-items: flex-start;
         flex-direction: column;
     }
+
+	.workbench-results__summary {
+		width: 100%;
+		justify-content: space-between;
+		flex-wrap: wrap;
+	}
 
     .workbench-sourcebar {
         align-items: stretch;

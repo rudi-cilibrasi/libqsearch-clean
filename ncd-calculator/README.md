@@ -25,6 +25,8 @@ The sequence example contains two intentionally related pairs. It exercises the 
 
 The quartet-tree result opens in a planar 2D presentation so topology and labels can be read without manipulating a camera. The view automatically fits after layout and when the viewport changes, and provides explicit zoom, fit, and reset controls. **Interactive 3D** remains available for spatial exploration; its camera also fits the complete tree on entry and resize, while node selection reports whether the selected point is a leaf or an internal node.
 
+After QSearch finishes, **Download JSON** exports the complete current experiment: exact UTF-8 inputs and source provenance, content hashes, all single and ordered-pair compressed sizes, directed and reflected-minimum matrices, the selected unrooted tree, edge stability, search seeds and score summary, timing, and integrity metadata. Imported matrices are marked explicitly and do not claim unavailable raw objects or compressor records. The versioned format and privacy implications are documented in [`docs/CLUSTERING_EXPERIMENT_EXPORT.md`](docs/CLUSTERING_EXPERIMENT_EXPORT.md), with its JSON Schema in [`public/schemas/clustering-experiment-v1.schema.json`](public/schemas/clustering-experiment-v1.schema.json).
+
 Pair compression is explicitly order-dependent. The worker first constructs the complete directed matrix with separate `C(x || y)` and `C(y || x)` cells, then derives the symmetric QSearch/K-grid input by taking the minimum of each pair of reflected matrix cells. Both matrices are retained in the typed result. Directed compression results are stored in a SHA-256 content-addressed, versioned cache; incompatible legacy caches are removed automatically. QSearch uses a deterministic multi-start seed schedule and records selected-topology frequency and per-edge split stability for reproducibility. These diagnostics are kept out of the primary interface and retained in the typed result, explicit DOT exports, and technical documentation. The complete numerical contract is in [`docs/NCD_QSEARCH_REPRODUCIBILITY.md`](docs/NCD_QSEARCH_REPRODUCIBILITY.md).
 
 ## Verification
@@ -34,6 +36,7 @@ npm run build
 npm run graphviz:verify-dev
 npm run astronomy:verify
 npm run workers:verify-dev
+npm run export-schema:verify
 npm run lint
 npm run test
 npm run typecheck
@@ -50,7 +53,7 @@ npm run dev -- --force
 
 The planar-tree interface reports initialization failures and offers **Retry renderer**. The shared loader deduplicates concurrent initialization and clears failed attempts before retrying. Compression workers use Vite's native `new Worker(new URL(...))` transform rather than dynamically importing `?worker` wrapper modules; `workers:verify-dev` transforms and serves both entries in middleware mode so development-only worker regressions fail before a build. The selected compressor starts lazily when a calculation begins—there is no competing ZSTD prewarm—and has a 30-second cold-start window. Native worker load and message-decoding failures are reported immediately and failed workers are terminated.
 
-Focused interface coverage is in `src/__test__/landingPage.test.tsx` and `src/__test__/workbench.test.tsx`.
+Focused interface and export coverage is in `src/__test__/landingPage.test.tsx`, `src/__test__/workbench.test.tsx`, and `src/__test__/clusteringExperimentExport.test.ts`.
 
 ### Reproducible UDHR inputs
 

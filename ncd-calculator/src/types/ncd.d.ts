@@ -3,6 +3,7 @@ import type {
     PairCompressionRecord,
     SingleCompressionRecord,
 } from "./compression";
+import type {ExperimentInputObjectMetadata} from "./experiment";
 
 export interface CompressionStats {
     processedPairs: number;
@@ -21,6 +22,10 @@ export interface NCDInput {
     /** Human-readable labels in the same order as `labels`. */
     displayLabels?: string[];
     kind?: 'objects' | 'distance-matrix';
+    /** Source and presentation metadata in the same order as `labels`. */
+    objectMetadata?: ExperimentInputObjectMetadata[];
+    /** Original filename when `kind` is an imported distance matrix. */
+    sourceFileName?: string;
     cachedSizes?: Map<string, number>;
     contentKeys?: string[];
 }

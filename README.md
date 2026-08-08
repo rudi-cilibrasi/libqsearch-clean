@@ -11,6 +11,8 @@ Based on the paper [Clustering by Compression](https://homepages.cwi.nl/~paulv/p
 
 The calculator includes a locally bundled, integrity-checked GRS 1915+105 RXTE time-series example based on the astronomy experiment in Section VIII-F. It uses a reproducible CC BY 4.0 public analogue because the paper's exact 16 privately supplied intervals are not publicly identified. The data contract and scientific limitations are in [`ncd-calculator/docs/ASTRONOMY_EXAMPLE.md`](ncd-calculator/docs/ASTRONOMY_EXAMPLE.md).
 
+Completed clustering experiments can be downloaded as versioned JSON containing the exact inputs, compression records, NCD matrices, quartet topology, search metadata, and integrity hashes. See [`ncd-calculator/docs/CLUSTERING_EXPERIMENT_EXPORT.md`](ncd-calculator/docs/CLUSTERING_EXPERIMENT_EXPORT.md).
+
 ### Development environment
 ##### Configure NCBI E-utilities
 1. Go to: https://account.ncbi.nlm.nih.gov/settings/ > *Account Settings*
