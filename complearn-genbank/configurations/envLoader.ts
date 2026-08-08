@@ -16,9 +16,10 @@ const ENV_LOADER = {
     GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || "",
     GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",
 
-    GENBANK_API_KEY_1: process.env.GENBANK_API_KEY_1 || "",
-    GENBANK_API_KEY_2: process.env.GENBANK_API_KEY_2 || "",
-    GENBANK_API_KEY_3: process.env.GENBANK_API_KEY_3 || "",
+    // NCBI permits one API key per account. Keep a single configured key so
+    // deployments do not imply that round-robin key rotation increases quota.
+    GENBANK_API_KEY: process.env.GENBANK_API_KEY || process.env.GENBANK_API_KEY_1 || "",
+    NCBI_EMAIL: process.env.NCBI_EMAIL || "",
 
     FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL || "",
     BASE_URL: process.env.BASE_URL || "",
