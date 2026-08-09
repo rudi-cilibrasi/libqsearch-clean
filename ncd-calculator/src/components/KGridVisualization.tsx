@@ -48,7 +48,7 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                                                                    errorMsg
                                                                }) => {
     // State management
-    const [activeViz, setActiveViz] = useState<VisualizationTypeValue>(VisualizationType.REPORT);
+    const [activeViz, setActiveViz] = useState<VisualizationTypeValue>(VisualizationType.QUARTET);
     const [selectedTheme, setSelectedTheme] = useState("scientific");
     const [isRunning, setIsRunning] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
