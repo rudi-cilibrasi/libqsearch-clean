@@ -75,6 +75,55 @@ export interface Suggestion {
   source: string;
 }
 
+export type GenBankSearchScope = "mitochondrial-genome" | "coi" | "cytb";
+
+export interface GenBankRecordSuggestion {
+  readonly uid: string;
+  readonly accession: string;
+  readonly accessionVersion: string;
+  readonly title: string;
+  readonly organism: string;
+  readonly taxId: string;
+  readonly length: number;
+  readonly scope: GenBankSearchScope | "unknown";
+  readonly isComplete: boolean;
+  readonly sourceDatabase: "RefSeq" | "GenBank";
+  readonly updatedAt?: string;
+  readonly recordUrl: string;
+  readonly variantName?: string;
+}
+
+export interface GenBankRecordSearchRequest {
+  readonly query: string;
+  readonly scope: GenBankSearchScope;
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface GenBankRecordSearchPage {
+  readonly records: readonly GenBankRecordSuggestion[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly hasMore: boolean;
+  readonly resolvedTaxId?: string;
+}
+
+export class GenBankSearchError extends Error {
+  readonly cause?: unknown;
+
+  constructor(
+    readonly code: "INVALID_QUERY" | "NO_MATCH" | "UPSTREAM_UNAVAILABLE" | "MALFORMED_RESPONSE",
+    message: string,
+    cause?: unknown,
+  ) {
+    super(message);
+    this.name = "GenBankSearchError";
+    this.cause = cause;
+  }
+}
+
 export interface TaxonomicInfo {
   taxId: string | null;
   taxonomicGroup: string[];

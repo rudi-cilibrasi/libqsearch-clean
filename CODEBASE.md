@@ -42,7 +42,7 @@ ncd-calculator/
 │   │   ├── KGridDualOptimization.tsx # Dual-run grid optimization
 │   │   ├── GridDisplay.tsx         # Grid cell rendering
 │   │   ├── DotGraphVisualizer.tsx  # Graphviz DOT tree rendering
-│   │   ├── FastaSearch.tsx         # GenBank FASTA sequence search
+│   │   ├── FastaSearch.tsx         # Scoped, version-preserving GenBank record search
 │   │   ├── FileUpload.tsx          # File drag-and-drop upload
 │   │   ├── Language.tsx            # UDHR language selection
 │   │   ├── LandingPage.tsx         # Home/marketing page
@@ -74,7 +74,9 @@ ncd-calculator/
 │   │   ├── QSearchProtocol.ts      # Seed schedule, canonical splits, support
 │   │   ├── CompressorCapabilities.ts
 │   │   ├── ZSTDCompressor.ts       # ZSTD wrapper
-│   │   ├── GenBankSearchService.ts # NCBI GenBank API client
+│   │   ├── GenBankSearchService.ts # Typed NCBI record metadata search and pagination
+│   │   ├── GenBankSequenceCache.ts # IndexedDB cache for validated sequence records
+│   │   ├── genbankExperimentPreflight.ts # Biological-structure comparison checks
 │   │   └── genbank.ts              # GenBank utilities
 │   ├── wasm/
 │   │   ├── qsearch.js              # Checked-in QSearch WASM module

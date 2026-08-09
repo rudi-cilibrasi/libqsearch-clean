@@ -1,41 +1,21 @@
 import { BACKEND_BASE_URL } from "@/configs/api.js";
-import axios, { AxiosError } from "axios";
-import axiosRetry from "axios-retry";
-
-const delay = (ms: number) => new Promise((_) => setTimeout(_, ms));
-
-axiosRetry(axios, {
-  retries: 3,
-  retryDelay: (retryCount) => {
-    const baseDelay = 500; // in ms
-    return baseDelay * Math.pow(2, retryCount - 1) + Math.random() * 500;
-  },
-  retryCondition: (error: AxiosError): boolean => {
-    return !!error.response && error.response.status === 429;
-  },
-});
+import axios, {type AxiosRequestConfig} from "axios";
 
 interface ProxyRequestBody {
-  [key: string]: any;
-}
-
-interface ProxyRequestHeader {
-  [key: string]: string;
+  readonly externalUrl: string;
 }
 
 export const sendRequestToProxy = async (
   requestBody: ProxyRequestBody,
-  requestHeader: ProxyRequestHeader = {}
+  requestConfig: AxiosRequestConfig = {},
 ): Promise<any> => {
   try {
-    const waitTime = delay(300);
-    const response = axios.post(
+    const response = await axios.post(
       `${BACKEND_BASE_URL}/external/forward`,
       requestBody,
-      requestHeader
+      requestConfig,
     );
-    const results = await Promise.all([waitTime, response]);
-    return results[1].data;
+    return response.data;
   } catch (error) {
     console.error("Error in sending request to proxy:", error);
     throw error;

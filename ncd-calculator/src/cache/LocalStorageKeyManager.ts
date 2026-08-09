@@ -1,5 +1,5 @@
 export const STORAGE_VERSION_NAME = "complearn_storage_version";
-export const STORAGE_VERSION = 52;
+export const STORAGE_VERSION = 53;
 export const LOG_PREFIX = "[Storage Manager]";
 
 type StorageKeyFunction = () => string;
@@ -24,19 +24,9 @@ export const LocalStorageKeys: StorageKeyMap = {
 
 export class LocalStorageKeyManager {
   private static instance: LocalStorageKeyManager;
-  private readonly patterns: ReadonlyArray<string>;
   private initialized: boolean = false;
 
-  private constructor() {
-    this.patterns = [
-      "^fasta_suggestions:",
-      "^fasta_localPageCount:",
-      "^fasta_searchTermAccessions:",
-      "^fasta_accessionSequence:",
-      "^selectedItems$",
-      "^searchMode$"
-    ] as const;
-  }
+  private constructor() {}
 
   public static getInstance(): LocalStorageKeyManager {
     if (!LocalStorageKeyManager.instance) {
@@ -126,9 +116,20 @@ export class LocalStorageKeyManager {
   public clearAllCaches(): void {
     console.log(`${LOG_PREFIX} Clearing all caches`);
     try {
-      // First remove all items
+      // Remove only CompLearn-owned keys. Other applications or authentication
+      // state may share the origin and must never be deleted by a cache upgrade.
+      const ownedExactKeys = new Set(["selectedItems", "searchMode", STORAGE_VERSION_NAME]);
+      const ownedPrefixes = [
+        "fasta_suggestions",
+        "fasta_localPageCount",
+        "fasta_searchTermAccessions",
+        "fasta_accessionSequence",
+        "fasta_searchTermRecord",
+      ];
       Object.keys(localStorage).forEach((key) => {
-        localStorage.removeItem(key);
+        if (ownedExactKeys.has(key) || ownedPrefixes.some(prefix => key === prefix || key.startsWith(`${prefix}:`))) {
+          localStorage.removeItem(key);
+        }
       });
 
       // Then set version first

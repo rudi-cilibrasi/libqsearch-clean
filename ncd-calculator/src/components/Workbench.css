@@ -95,6 +95,37 @@
     border-bottom: 1px solid var(--line);
 }
 
+.genbank-scope-control {
+    display: grid;
+    gap: 7px;
+    margin-top: 14px;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.69rem;
+    font-weight: 700;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+.genbank-scope-control select {
+    min-height: 40px;
+    padding: 8px 10px;
+    color: var(--ink);
+    background: var(--white);
+    border: 1px solid var(--line-dark);
+    border-radius: 0;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    text-transform: none;
+}
+
+.source-browser__hint {
+    margin: 10px 0 0;
+    color: var(--ink-muted);
+    font-size: 0.7rem;
+    line-height: 1.45;
+}
+
 .language-browser__count {
     display: block;
     margin-top: 10px;
@@ -380,12 +411,35 @@
     color: var(--forest);
 }
 
-.selected-object__identity span {
+.selected-object__identity > span,
+.selected-object__copy > span {
     overflow: hidden;
     font-size: 0.79rem;
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.selected-object__copy {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.selected-object__copy small {
+    color: var(--ink-muted);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+}
+
+.selected-object__copy a {
+    color: var(--forest);
+    text-underline-offset: 2px;
+}
+
+.selected-object__copy a:hover {
+    color: var(--oxide);
 }
 
 .selected-object > button {
@@ -1086,7 +1140,7 @@
     width: 100%;
     min-height: 54px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(120px, 0.7fr) auto;
+    grid-template-columns: minmax(130px, 0.75fr) minmax(0, 1.25fr) auto;
     gap: 14px;
     align-items: center;
     padding: 11px 4px;
@@ -1110,13 +1164,21 @@
     gap: 9px;
 }
 
+.genbank-suggestion__name > span,
+.genbank-suggestion__record {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
 .genbank-suggestion__name svg {
     flex: 0 0 auto;
     color: var(--forest);
 }
 
 .genbank-suggestion__name strong,
-.genbank-suggestion small {
+.genbank-suggestion small,
+.genbank-suggestion__record strong {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1135,8 +1197,14 @@
 }
 
 .genbank-suggestion small {
-    font-family: var(--font-serif);
-    font-style: italic;
+    display: block;
+    font-family: var(--font-sans);
+    font-style: normal;
+}
+
+.genbank-suggestion__record strong {
+    font-family: var(--font-mono);
+    font-size: 0.71rem;
 }
 
 .genbank-suggestion > svg {
@@ -1168,6 +1236,78 @@ button.genbank-suggestions__status:hover {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.genbank-suggestions__footer {
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    color: var(--ink-muted);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.69rem;
+}
+
+.genbank-suggestions__footer button,
+.genbank-suggestions .workbench-inline-error button {
+    min-height: 34px;
+    padding: 6px 10px;
+    color: var(--oxide);
+    background: transparent;
+    border: 1px solid var(--oxide);
+    border-radius: 0;
+    font-weight: 700;
+}
+
+.genbank-preflight {
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: var(--paper-deep);
+    border: 1px solid var(--line-dark);
+}
+
+.genbank-preflight__heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    color: var(--forest-deep);
+    font-size: 0.76rem;
+}
+
+.genbank-preflight__heading > span {
+    margin-left: auto;
+    color: var(--ink-muted);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+}
+
+.genbank-preflight ul {
+    display: grid;
+    gap: 7px;
+    margin: 11px 0 0;
+    padding: 11px 0 0;
+    border-top: 1px solid var(--line);
+    list-style: none;
+}
+
+.genbank-preflight li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--ink-muted);
+    font-size: 0.71rem;
+    line-height: 1.45;
+}
+
+.genbank-preflight li[data-severity="error"] {
+    color: #6e2514;
+}
+
+.genbank-preflight li[data-severity="warning"] {
+    color: #79511a;
 }
 
 .genbank-suggestions .workbench-inline-error > button {

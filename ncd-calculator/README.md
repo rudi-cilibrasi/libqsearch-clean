@@ -2,7 +2,7 @@
 
 Browser-based normalized compression distance analysis for GenBank sequences, Universal Declaration of Human Rights translations, astronomical time series, and local files. Compression, matrix construction, and layout optimization run in web workers so the interface remains responsive.
 
-GenBank/NCBI Nucleotide retrieval is fail-fast and version-pinned: ESummary metadata and FASTA content must agree on accession version and sequence length before a record can enter a comparison. Cached records carry a SHA-256 digest and typed provenance and are revalidated before reuse. See [`docs/GENBANK_SEQUENCE_PIPELINE.md`](docs/GENBANK_SEQUENCE_PIPELINE.md) for the scientific scope, limits, and reproducibility contract.
+GenBank/NCBI Nucleotide retrieval is fail-fast and version-pinned: the requested accession version, ESummary metadata, and FASTA content must agree before a record can enter a comparison. Search supports complete mitochondrial genome, COI/COX1, and cytochrome b scopes with metadata, NCBI links, cancellation, and pagination. A structural preflight blocks mixed or partial sequence sets. Cached records carry separate sequence and provenance SHA-256 digests and are revalidated before reuse. See [`docs/GENBANK_SEQUENCE_PIPELINE.md`](docs/GENBANK_SEQUENCE_PIPELINE.md) and [`docs/GENBANK_ANIMAL_EXPERIMENTS.md`](docs/GENBANK_ANIMAL_EXPERIMENTS.md).
 
 ## Start the interface
 
@@ -14,9 +14,11 @@ npm run dev
 
 Open `http://localhost:3000`. The built-in example set and local-file workflow do not require the Node backend. GenBank search and authentication use the backend API configured in `src/configs/api.tsx`.
 
+If Vite reports `504 Outdated Optimize Dep` after dependencies or the Vite configuration change, stop the existing development server and run `npm run dev:clean`, then reload the browser tab. This performs a clean dependency optimization pass without deleting application data.
+
 ## Workbench workflow
 
-The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source. **Sequence example** provides a small interface check; **Astronomy example** loads a verified 16-object RXTE time-series corpus inspired by the astronomy experiment in *Clustering by Compression*.
+The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source. **Animal example** resolves a version-pinned four-record mitochondrial set from NCBI, **Sequence example** provides a small local interface check, and **Astronomy example** loads a verified 16-object RXTE time-series corpus inspired by the astronomy experiment in *Clustering by Compression*.
 
 1. Add at least four objects, or use the example data.
 2. Select **Show Similarity**. The page reports compression progress and exposes quartet-tree, K-grid, and distance-matrix result views.

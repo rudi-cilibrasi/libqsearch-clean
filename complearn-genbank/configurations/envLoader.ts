@@ -31,9 +31,7 @@ const ENV_LOADER = {
     MYSQL_PASSWORD: process.env.MYSQL_PASSWORD || "",
     MYSQL_DATABASE: process.env.MYSQL_DATABASE || "",
 
-    NODE_ENV: process.env.NODE_ENV || "",
-    REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-    REDIS_PASSWORD: process.env.REDIS_PASSWORD || 'complearn'
+    NODE_ENV: process.env.NODE_ENV || ""
 };
 
 export default ENV_LOADER;

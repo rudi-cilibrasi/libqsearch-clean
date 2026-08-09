@@ -305,18 +305,10 @@ export const TAXONOMIC_MAPPING: Record<string, TaxonomicEntry> = {
   },
 } as const;
 
-type TaxonomicGroup =
-  | "MAMMAL"
-  | "FISH"
-  | "BIRD"
-  | "REPTILE"
-  | "AMPHIBIAN"
-  | "INSECT";
-
 // Interface for species entries
 export interface SpeciesEntry {
   id: string;
-  group: TaxonomicGroup;
+  group: TaxonomicGroupKey;
   commonNames: string[];
 }
 
@@ -324,7 +316,7 @@ export interface SpeciesEntry {
 export interface GroupEntry {
   id: string;
   searchTerms: string[];
-  group: string;
+  group: TaxonomicGroupKey;
   generalCommonNames: string[];
 }
 

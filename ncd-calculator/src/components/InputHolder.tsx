@@ -28,7 +28,23 @@ export const InputHolder: React.FC<InputAccumulatorProps> = ({
         return (
           <div className="selected-object__identity">
             <Dna size={17} aria-hidden="true" />
-            <span>{item.label}</span>
+            <span className="selected-object__copy">
+              <span>{item.label}</span>
+              {item.genBankCandidate && (
+                <small>
+                  {item.genBankCandidate.length.toLocaleString()} bp · {item.genBankCandidate.sourceDatabase}
+                  {" · "}
+                  <a
+                    href={item.genBankCandidate.recordUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open ${item.genBankCandidate.accessionVersion} at NCBI`}
+                  >
+                    NCBI record
+                  </a>
+                </small>
+              )}
+            </span>
           </div>
         );
       case LANGUAGE:

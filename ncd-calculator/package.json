@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:clean": "vite --force",
     "build": "npm run graphviz:verify-dev && npm run workers:verify-dev && npm run udhr:verify && npm run astronomy:verify && npm run export-schema:verify && vite build && node scripts/verify-production-bundle.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -34,7 +35,6 @@
     "@types/three": "^0.169.0",
     "axios": "^1.7.7",
     "axios-mock-adapter": "^2.1.0",
-    "axios-retry": "^4.5.0",
     "buffer": "^6.0.3",
     "cors": "^2.8.5",
     "express": "^4.21.1",
@@ -58,7 +58,6 @@
     "react-router": "^6.28.0",
     "react-router-dom": "^6.22.1",
     "react-treebeard": "^3.2.4",
-    "redis": "^4.7.0",
     "shadcn-ui": "^0.9.3",
     "text-encoding-utf-8": "^1.0.2",
     "three": "^0.169.0",

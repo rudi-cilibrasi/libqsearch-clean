@@ -2,25 +2,20 @@ import React, {useState} from "react";
 import {SearchInput} from "./SearchInput.jsx";
 import {FastaSearchSuggestion} from "./FastaSearchSuggestion.jsx";
 import {GenBankSearchService} from "@/services/GenBankSearchService.ts";
+import type {GenBankSearchScope} from "@/services/genbank";
 import type {SelectedItem} from "./workbenchTypes";
 
 interface FastaSearchProps {
   addItem(item: SelectedItem): void;
   selectedItems: SelectedItem[];
-  getAllFastaSuggestionWithLastIndex(): Record<string, number>;
-  getFastaSuggestionStartIndex(searchTerm: string): number;
-  setFastaSuggestionStartIndex: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }
 
 export const FastaSearch: React.FC<FastaSearchProps> = ({
                                                           addItem,
                                                           selectedItems,
-                                                          getAllFastaSuggestionWithLastIndex,
-                                                          getFastaSuggestionStartIndex,
-                                                          setFastaSuggestionStartIndex,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [scope, setScope] = useState<GenBankSearchScope>("mitochondrial-genome");
   const genbankSearchService = React.useMemo(() => new GenBankSearchService(), []);
 
   const handleSearchTerm = (searchTerm: string) => {
@@ -35,26 +30,26 @@ export const FastaSearch: React.FC<FastaSearchProps> = ({
               label="GenBank query"
               type="fasta"
               handleSearchTerm={handleSearchTerm}
-              setSearchError={setSearchError}
-              genbankSearchService={genbankSearchService}
           />
+          <label className="genbank-scope-control">
+            <span>Comparable sequence scope</span>
+            <select value={scope} onChange={(event) => setScope(event.target.value as GenBankSearchScope)}>
+              <option value="mitochondrial-genome">Complete mitochondrial genome</option>
+              <option value="coi">COI / COX1 marker</option>
+              <option value="cytb">Cytochrome b marker</option>
+            </select>
+          </label>
+          <p className="source-browser__hint">
+            Animal names search within one comparable scope. An accession retrieves that exact versioned record.
+          </p>
         </div>
         <div className="source-browser__results">
-          {searchError && (
-              <div className="workbench-inline-error" role="alert">{searchError}</div>
-          )}
           <FastaSearchSuggestion
-              autoLabelingEnabled={true}
               selectedItems={selectedItems}
               searchTerm={searchTerm}
-              className="mt-2"
+              scope={scope}
               addItem={addItem}
               genbankSearchService={genbankSearchService}
-              setError={setSearchError}
-              getAllFastaSuggestionWithLastIndex={getAllFastaSuggestionWithLastIndex}
-              setFastaSuggestionStartIndex={setFastaSuggestionStartIndex}
-              getFastaSuggestionStartIndex={getFastaSuggestionStartIndex}
-              displayMode="common"
           />
         </div>
         <p className="source-browser__provenance">

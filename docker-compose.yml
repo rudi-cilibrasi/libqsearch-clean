@@ -60,8 +60,6 @@ services:
     volumes:
       - /home/nginx/hosts:/home/nginx/hosts
     depends_on:
-      redis:
-        condition: service_healthy
       complearn-genbank:
         condition: service_started
 
@@ -103,8 +101,6 @@ services:
       - app
     depends_on:
       mysql_container:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
 volumes:

@@ -24,7 +24,7 @@ import {Language} from "./Language";
 import {useStorageState} from "../cache/cache";
 import {FastaSearch} from "./FastaSearch";
 import {FileUpload} from "./FileUpload";
-import {LocalStorageKeyManager, LocalStorageKeys} from "../cache/LocalStorageKeyManager";
+import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager";
 import {getFastaSequences} from "../functions/getPublicGenbank";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 import {useSearchParams} from "react-router-dom";
@@ -38,6 +38,10 @@ import {
 	verifyCachedGenBankRecord,
 } from "../services/genbankSequencePipeline";
 import {getAstronomyExampleItems, verifyAstronomyExampleItem} from "../services/astronomyExample";
+import {GenBankSequenceCache} from "../services/GenBankSequenceCache";
+import {analyzeGenBankExperiment} from "../services/genbankExperimentPreflight";
+import {GenBankExperimentPreflight} from "./GenBankExperimentPreflight";
+import {getGenBankAnimalExampleItems} from "../services/genbankAnimalExample";
 export type {SelectedItem} from "./workbenchTypes";
 export interface SearchMode {
 	searchMode: string;
@@ -126,6 +130,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	const [hasImportedMatrix, setHasImportedMatrix] = useState<boolean>(false);
 	const [isAutoProcessing, setIsAutoProcessing] = useState<boolean>(false);
 	const [isLoadingAstronomy, setIsLoadingAstronomy] = useState<boolean>(false);
+	const [isLoadingAnimalExample, setIsLoadingAnimalExample] = useState<boolean>(false);
 	const [importedMatrixFileName, setImportedMatrixFileName] = useState<string | null>(null);
 	
 	
@@ -140,17 +145,17 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	const handleMatrixImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
 		if (!file) return;
-		
+
 		try {
 			setImportError(null);
 			const content = await file.text();
 			const data = JSON.parse(content) as NCDImportFormat;
-			
+
 			// Validate the imported data
 			if (!data.labels || !Array.isArray(data.labels) || !data.distances || !Array.isArray(data.distances)) {
 				throw new Error('Invalid format: missing labels or distances arrays');
 			}
-			
+
 			if (data.labels.length !== data.distances.length) {
 				throw new Error('Invalid format: number of labels must match number of rows in distance matrix');
 			}
@@ -169,7 +174,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			// Create items for each label in the matrix
 			const importedItems: SelectedItem[] = data.labels.map((label, index) => {
 				const displayLabel = getUdhrLanguage(label)?.name ?? label;
-				
+
 				return {
 					id: label,
 					label: displayLabel,
@@ -255,17 +260,16 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		[]
 	);
 	
-	const [fastaSuggestionStartIndex, setFastaSuggestionStartIndex] =
-		React.useState<Record<string, number>>({});
-	
 	// Constants and Refs
 	const MIN_ITEMS = 4;
 	const localStorageManager = LocalStorageKeyManager.getInstance();
+	const genBankSequenceCache = GenBankSequenceCache.getInstance();
 	const [, setSearchParams] = useSearchParams();
-	
+
 	// Computed values
+	const genBankPreflight = analyzeGenBankExperiment(selectedItems);
 	const isSearchDisabled =
-		selectedItems.length < MIN_ITEMS;
+		selectedItems.length < MIN_ITEMS || !genBankPreflight.canRun;
 	const isClearDisabled = selectedItems.length === 0;
 	
 	// Rehydrate canonical names for selections restored from older localStorage
@@ -316,6 +320,9 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		setImportError(null);
 		setIsLoading(true);
 		try {
+			if (!genBankPreflight.canRun) {
+				throw new Error(genBankPreflight.errors.map(issue => issue.message).join(" "));
+			}
 			if (hasImportedMatrix) {
 				const labels: string[] = [];
 				const contents: string[] = [];
@@ -425,13 +432,13 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		const res: SelectedItem[] = [];
 		for (const item of items) {
 			const inlineRecord: GenBankSequenceRecord | null = item.content && item.genBankProvenance
-				? {sequence: item.content, provenance: item.genBankProvenance}
-				: null;
+					? {sequence: item.content, provenance: item.genBankProvenance}
+					: null;
 			const cachedRecord = inlineRecord
-				?? localStorageManager.get<GenBankSequenceRecord>(LocalStorageKeys.ACCESSION_SEQUENCE, item.id);
+					?? await genBankSequenceCache.get(item.id);
 			const verified = await verifyCachedGenBankRecord(cachedRecord, item.id);
 			if (!verified) {
-				localStorageManager.remove(LocalStorageKeys.ACCESSION_SEQUENCE, item.id);
+				await genBankSequenceCache.remove(item.id);
 				continue;
 			}
 			res.push({...item, content: verified.sequence, genBankProvenance: verified.provenance});
@@ -510,29 +517,25 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	): Promise<SelectedItem[]> => {
 		if (!isValidInput(fastaItems)) return [];
 		const searchResults = await fetchFastaSequenceAndProcess(fastaItems);
-		cacheAccessionSequence(searchResults);
+		await cacheAccessionSequence(searchResults);
 		return searchResults;
 	};
-	
-	const cacheAccessionSequence = (suggestions: SelectedItem[]): void => {
-		suggestions.forEach((suggestion) => {
+
+	const cacheAccessionSequence = async (suggestions: SelectedItem[]): Promise<void> => {
+		await Promise.all(suggestions.map(async (suggestion) => {
 			if (suggestion.content && suggestion.genBankProvenance) {
-				localStorageManager.set<GenBankSequenceRecord>(LocalStorageKeys.ACCESSION_SEQUENCE, suggestion.id, {
+				await genBankSequenceCache.set({
 					sequence: suggestion.content,
 					provenance: suggestion.genBankProvenance,
 				});
 			}
-		});
+		}));
 	};
 	
 	const isValidInput = (fastaItems: SelectedItem[]): boolean => {
 		if (!fastaItems?.length) return false;
 		const searchTerms = fastaItems.map((item) => item.label.toLowerCase().trim());
 		return searchTerms.some((term) => term.length > 0);
-	};
-	
-	const getFastaSuggestionStartIndex = (searchTerm: string): number => {
-		return fastaSuggestionStartIndex[searchTerm] || 0;
 	};
 	
 	const fetchFastaSequenceAndProcess = async (
@@ -611,22 +614,32 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			setIsLoadingAstronomy(false);
 		}
 	};
-	
-	const getAllFastaSuggestionWithLastIndex = (): Record<string, number> => {
-		return fastaSuggestionStartIndex;
+
+	const loadAnimalExample = async (): Promise<void> => {
+		setImportError(null);
+		setIsLoadingAnimalExample(true);
+		try {
+			const examples = await getGenBankAnimalExampleItems();
+			resetDisplay();
+			setMode(FASTA);
+			setSelectedItems(examples);
+			setHasImportedMatrix(false);
+			setImportedMatrixFileName(null);
+		} catch (error) {
+			setImportError(error instanceof Error ? error.message : "Unable to load the guided animal example");
+		} finally {
+			setIsLoadingAnimalExample(false);
+		}
 	};
 	
 	const renderModal = (mode: SearchMode) => {
 		switch (mode.searchMode) {
 			case FASTA:
 				return (
-					<FastaSearch
-						addItem={addItem}
-						selectedItems={selectedItems}
-						getAllFastaSuggestionWithLastIndex={getAllFastaSuggestionWithLastIndex}
-						getFastaSuggestionStartIndex={getFastaSuggestionStartIndex}
-						setFastaSuggestionStartIndex={setFastaSuggestionStartIndex}
-					/>
+						<FastaSearch
+							addItem={addItem}
+							selectedItems={selectedItems}
+						/>
 				);
 			case LANGUAGE:
 				return (
@@ -663,8 +676,17 @@ const ListEditor: React.FC<ListEditorProps> = ({
 						<span>Local files</span>
 					</button>
 				</div>
-				<div className="workbench-sourcebar__actions">
-					<button type="button" onClick={loadExampleSet} className="workbench-button workbench-button--example">
+					<div className="workbench-sourcebar__actions">
+						<button
+							type="button"
+							onClick={() => void loadAnimalExample()}
+							className="workbench-button workbench-button--example"
+							disabled={isLoadingAnimalExample}
+						>
+							<Dna size={17} aria-hidden="true"/>
+							{isLoadingAnimalExample ? "Loading…" : "Animal example"}
+						</button>
+						<button type="button" onClick={loadExampleSet} className="workbench-button workbench-button--example">
 						<FlaskConical size={17} aria-hidden="true"/>
 						Sequence example
 					</button>
@@ -680,14 +702,15 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				</div>
 			</div>
 
-			<div className="workbench-input-grid">
+				<div className="workbench-input-grid">
 				<section className="workbench-panel workbench-panel--source" aria-label="Object source">
 					{renderModal(searchMode)}
 				</section>
-				<InputHolder selectedItems={selectedItems} onRemoveItem={removeItem} MIN_ITEMS={MIN_ITEMS}/>
-			</div>
+					<InputHolder selectedItems={selectedItems} onRemoveItem={removeItem} MIN_ITEMS={MIN_ITEMS}/>
+				</div>
+				<GenBankExperimentPreflight selectedItems={selectedItems}/>
 
-			<footer className="workbench-actions">
+				<footer className="workbench-actions">
 				<div className="workbench-actions__secondary">
 					<button type="button" onClick={triggerFileInput} className="workbench-button">
 						<Upload size={17} aria-hidden="true"/>

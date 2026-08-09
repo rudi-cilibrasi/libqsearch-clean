@@ -61,8 +61,10 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     environment: "jsdom",
     include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-    deps: {
-      inline: ["vitest-canvas-mock"],
+    server: {
+      deps: {
+        inline: ["vitest-canvas-mock"],
+      },
     },
   },
   server: {
@@ -80,7 +82,7 @@ export default defineConfig({
   },
   worker: {
     format: "es",
-    plugins: [wasm()],
+    plugins: () => [wasm()],
   },
   optimizeDeps: {
     // Graphviz is deliberately loaded only when the planar tree opens. Serving

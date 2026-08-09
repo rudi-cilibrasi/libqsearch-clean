@@ -2,6 +2,7 @@ import { getUri } from "../functions/url.js";
 import {
   ANIMAL_GROUPS,
 } from "../constants/taxonomy.js";
+import type {GenBankSearchScope} from "./genbank";
 
 export class GenBankQueries {
   DEFAULT_PAGE_SIZE: number;
@@ -153,5 +154,34 @@ export class GenBankQueries {
       retmode: "json",
     }).toString();
     return getUri(this.baseUrl, "esummary.fcgi", params);
+  }
+
+  buildRecordSearchUri(
+    taxId: string,
+    scope: GenBankSearchScope,
+    page = 1,
+    pageSize = this.DEFAULT_PAGE_SIZE,
+  ): string {
+    if (!/^\d+$/u.test(taxId)) throw new Error("A numeric taxonomy identifier is required.");
+    if (!Number.isSafeInteger(page) || page < 1) throw new Error("Search page must be a positive integer.");
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 20) {
+      throw new Error("Search page size must be between 1 and 20.");
+    }
+
+    const scopeQuery: Record<GenBankSearchScope, string> = {
+      "mitochondrial-genome": '(("mitochondrion, complete genome"[Title]) OR ("mitochondrial genome"[Title] AND complete[Title])) NOT (partial[Title] OR contig[Title] OR scaffold[Title] OR chromosome[Title] OR "whole genome shotgun"[Title])',
+      coi: '((COI[Gene Name]) OR (COX1[Gene Name]) OR ("cytochrome c oxidase subunit I"[Title])) NOT ("whole genome shotgun"[Title] OR scaffold[Title] OR contig[Title])',
+      cytb: '((CYTB[Gene Name]) OR ("cytochrome b"[Title])) NOT ("whole genome shotgun"[Title] OR scaffold[Title] OR contig[Title])',
+    };
+    const params = new URLSearchParams({
+      db: "nuccore",
+      term: `txid${taxId}[Organism:exp] AND ${scopeQuery[scope]}`,
+      retstart: ((page - 1) * pageSize).toString(),
+      retmax: pageSize.toString(),
+      retmode: "json",
+      sort: "relevance",
+      usehistory: "y",
+    });
+    return getUri(this.baseUrl, "esearch.fcgi", params);
   }
 }

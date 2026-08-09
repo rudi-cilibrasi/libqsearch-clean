@@ -21,8 +21,24 @@ describe("NCBI request validation", () => {
         "https://example.org/entrez/eutils/esearch.fcgi?db=nuccore",
         "https://eutils.ncbi.nlm.nih.gov/private?db=nuccore",
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=protein",
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=dog&retmax=10000&retmode=json",
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nuccore&id=NC_1.1,NC_1.1&retmode=json",
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_1.1&rettype=gb&retmode=text",
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=dog&retmode=json&evil=true",
     ])("rejects an unsafe target: %s", target => {
         expect(() => prepareNcbiUrl(target)).toThrow();
+    });
+
+    test("accepts the bounded request shapes used by sequence search and retrieval", () => {
+        expect(() => prepareNcbiUrl(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nuccore&term=txid9615%5BOrganism%5D&retstart=0&retmax=5&retmode=json&sort=relevance&usehistory=y",
+        )).not.toThrow();
+        expect(() => prepareNcbiUrl(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nuccore&id=NC_002008.4&retmode=json&version=2.0",
+        )).not.toThrow();
+        expect(() => prepareNcbiUrl(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_002008.4&rettype=fasta&retmode=text",
+        )).not.toThrow();
     });
 
     test("spaces concurrent upstream requests according to the shared rate budget", async () => {
@@ -49,5 +65,18 @@ describe("NCBI request validation", () => {
 
         request.mockRestore();
         jest.useRealTimers();
+    });
+
+    test("does not dispatch or retry a request that the browser has cancelled", async () => {
+        const request = jest.spyOn(axios, "request");
+        const controller = new AbortController();
+        controller.abort();
+
+        await expect(new NcbiRequestScheduler(10).request({
+            url: "https://example.test/cancelled",
+            signal: controller.signal,
+        })).rejects.toMatchObject({code: "ERR_CANCELED"});
+        expect(request).not.toHaveBeenCalled();
+        request.mockRestore();
     });
 });

@@ -11,6 +11,13 @@ import {
 const router = express.Router();
 
 router.post("/forward", async (req: Request, res: Response): Promise<any> => {
+  const upstreamController = new AbortController();
+  const abortUpstream = (): void => upstreamController.abort();
+  const abortIfResponseClosed = (): void => {
+    if (!res.writableEnded) abortUpstream();
+  };
+  req.once("aborted", abortUpstream);
+  res.once("close", abortIfResponseClosed);
   try {
     const externalUrl = typeof req.body?.externalUrl === "string" ? req.body.externalUrl : "";
     if (!externalUrl) return res.status(400).json({error: "Target URL is required"});
@@ -31,6 +38,7 @@ router.post("/forward", async (req: Request, res: Response): Promise<any> => {
       responseType: "text",
       transformResponse: [(value: string) => value],
       validateStatus: status => status >= 200 && status < 300,
+      signal: upstreamController.signal,
     });
 
     const expectsJson = parsedUrl.searchParams.get("retmode") === "json";
@@ -43,6 +51,7 @@ router.post("/forward", async (req: Request, res: Response): Promise<any> => {
     }
     return res.status(response.status).type("text/plain").send(response.data);
   } catch (error) {
+    if (upstreamController.signal.aborted || res.writableEnded) return;
     if (error instanceof NcbiQueueFullError) return res.status(503).json({error: error.message});
     if (axios.isAxiosError(error)) {
       const upstreamStatus = error.response?.status;
@@ -55,6 +64,9 @@ router.post("/forward", async (req: Request, res: Response): Promise<any> => {
     }
     logger.warn({requestId: req.requestId, message: "Rejected external request", error: String(error)});
     return res.status(400).json({error: "Invalid external request"});
+  } finally {
+    req.off("aborted", abortUpstream);
+    res.off("close", abortIfResponseClosed);
   }
 });
 

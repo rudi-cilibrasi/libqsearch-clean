@@ -16,6 +16,11 @@ import {
   createAccessionSearch,
   createCommonNameSearch,
   createScientificNameSearch,
+  GenBankRecordSearchPage,
+  GenBankRecordSearchRequest,
+  GenBankRecordSuggestion,
+  GenBankSearchError,
+  GenBankSearchScope,
   PaginatedResults,
   Suggestion,
   SuggestionAndDetailResponse,
@@ -27,6 +32,36 @@ import { TaxonomicInfo } from "./genbank";
 import { GenbankCache } from "@/cache/GenbankCache.js";
 import { ScientificNameSearch } from "./genbank";
 
+const DIRECT_RECORD_PATTERN = /^(?:\d+|[A-Z]{1,6}_?\d+(?:\.\d+)?)$/iu;
+const REFSEQ_ACCESSION_PATTERN = /^(?:NC_|NG_|NM_|NR_|NT_|NW_|NZ_|XM_|XR_)/u;
+
+interface TaxonomyLookupOptions {
+  readonly signal?: AbortSignal;
+  readonly strict?: boolean;
+}
+
+const sendNcbiRequest = (externalUrl: string, signal?: AbortSignal): Promise<any> => signal
+  ? sendRequestToProxy({externalUrl}, {signal})
+  : sendRequestToProxy({externalUrl});
+
+const parseRecordLength = (value: unknown, accessionVersion: string): number => {
+  const length = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isSafeInteger(length) || length <= 0) {
+    throw new GenBankSearchError("MALFORMED_RESPONSE", `NCBI returned an invalid length for ${accessionVersion}.`);
+  }
+  return length;
+};
+
+const inferRecordScope = (title: string): GenBankSearchScope | "unknown" => {
+  const normalized = title.toLowerCase();
+  if (/(mitochondrion|mitochondrial).*(complete genome)|complete.*(mitochondrion|mitochondrial)/u.test(normalized)) {
+    return "mitochondrial-genome";
+  }
+  if (/\b(coi|cox1)\b|cytochrome c oxidase subunit i\b/u.test(normalized)) return "coi";
+  if (/\bcytb\b|cytochrome b\b/u.test(normalized)) return "cytb";
+  return "unknown";
+};
+
 export class GenBankSearchService {
   private readonly genbankCache: GenbankCache;
   private readonly genBankQueries: GenBankQueries;
@@ -34,12 +69,159 @@ export class GenBankSearchService {
     string,
     { data: TaxonomicInfo; timestamp: number }
   >;
+  private readonly recordSearchCache = new Map<string, {expiresAt: number; page: GenBankRecordSearchPage}>();
   private readonly CACHE_TTL: number = 30 * 60 * 1000;
+  private readonly RECORD_CACHE_TTL = 15 * 60 * 1000;
+  private readonly MAX_RECORD_CACHE_ENTRIES = 100;
 
   constructor() {
     this.genbankCache = new GenbankCache();
     this.genBankQueries = new GenBankQueries();
     this.taxonomyCache = new Map();
+  }
+
+  async searchRecords(request: GenBankRecordSearchRequest): Promise<GenBankRecordSearchPage> {
+    const query = request.query.trim();
+    const page = request.page ?? 1;
+    const pageSize = request.pageSize ?? this.genBankQueries.DEFAULT_PAGE_SIZE;
+    if (query.length < 2 || query.length > 200) {
+      throw new GenBankSearchError("INVALID_QUERY", "Enter an animal name or accession between 2 and 200 characters.");
+    }
+    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 20) {
+      throw new GenBankSearchError("INVALID_QUERY", "The requested GenBank result page is invalid.");
+    }
+    if (request.signal?.aborted) throw new DOMException("GenBank search was cancelled.", "AbortError");
+    const cacheKey = `${query.toUpperCase()}\u0000${request.scope}\u0000${page}\u0000${pageSize}`;
+    const cached = this.recordSearchCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.page;
+    if (cached) this.recordSearchCache.delete(cacheKey);
+
+    try {
+      if (DIRECT_RECORD_PATTERN.test(query)) {
+        const summaryUri = this.genBankQueries.buildSequenceSummaryUri(query);
+        const response = await sendNcbiRequest(summaryUri, request.signal);
+        const records = this.parseRecordSummaries(response, request.scope, [], false);
+        if (records.length === 0) {
+          throw new GenBankSearchError("NO_MATCH", `NCBI did not return the requested record ${query}.`);
+        }
+        const exactRecord = records[0];
+        if (query.includes(".") && exactRecord.accessionVersion !== query.toUpperCase()) {
+          throw new GenBankSearchError(
+            "NO_MATCH",
+            `NCBI resolved ${query} as ${exactRecord.accessionVersion}; CompLearn will not substitute a different sequence version.`,
+          );
+        }
+        return this.cacheRecordSearchPage(cacheKey, {
+          records: [exactRecord], page: 1, pageSize: 1, total: 1, hasMore: false,
+        });
+      }
+
+      const taxonomy = await this.getTaxonomicGroupInfo(query, {signal: request.signal, strict: true});
+      if (!taxonomy.taxId) {
+        throw new GenBankSearchError("NO_MATCH", `No unambiguous NCBI animal taxonomy match was found for “${query}”.`);
+      }
+      const searchUri = this.genBankQueries.buildRecordSearchUri(taxonomy.taxId, request.scope, page, pageSize);
+      const searchResponse = await sendNcbiRequest(searchUri, request.signal);
+      const searchResult = searchResponse?.esearchresult;
+      const identifiers = Array.isArray(searchResult?.idlist)
+        ? searchResult.idlist.filter((value: unknown): value is string => typeof value === "string" && /^\d+$/u.test(value))
+        : [];
+      const total = Number.parseInt(String(searchResult?.count ?? "0"), 10);
+      if (!Number.isSafeInteger(total) || total < 0) {
+        throw new GenBankSearchError("MALFORMED_RESPONSE", "NCBI returned malformed search metadata.");
+      }
+      if (identifiers.length === 0) {
+        return this.cacheRecordSearchPage(cacheKey, {
+          records: [], page, pageSize, total, hasMore: false, resolvedTaxId: taxonomy.taxId,
+        });
+      }
+
+      const summaryUri = this.genBankQueries.buildSequenceSummaryUri(identifiers);
+      const summaryResponse = await sendNcbiRequest(summaryUri, request.signal);
+      const records = this.parseRecordSummaries(summaryResponse, request.scope, taxonomy.taxonomicGroup, true);
+      const consumed = (page - 1) * pageSize + identifiers.length;
+      return this.cacheRecordSearchPage(cacheKey, {
+        records,
+        page,
+        pageSize,
+        total,
+        hasMore: consumed < total,
+        resolvedTaxId: taxonomy.taxId,
+      });
+    } catch (error) {
+      if (request.signal?.aborted) throw new DOMException("GenBank search was cancelled.", "AbortError");
+      if (error instanceof GenBankSearchError) throw error;
+      throw new GenBankSearchError(
+        "UPSTREAM_UNAVAILABLE",
+        "GenBank search is temporarily unavailable. Please try again.",
+        error,
+      );
+    }
+  }
+
+  private cacheRecordSearchPage(
+    key: string,
+    page: GenBankRecordSearchPage,
+  ): GenBankRecordSearchPage {
+    if (this.recordSearchCache.size >= this.MAX_RECORD_CACHE_ENTRIES) {
+      const oldestKey = this.recordSearchCache.keys().next().value as string | undefined;
+      if (oldestKey) this.recordSearchCache.delete(oldestKey);
+    }
+    this.recordSearchCache.set(key, {expiresAt: Date.now() + this.RECORD_CACHE_TTL, page});
+    return page;
+  }
+
+  private parseRecordSummaries(
+    response: unknown,
+    requestedScope: GenBankSearchScope,
+    taxonomicGroup: readonly string[],
+    trustRequestedScope: boolean,
+  ): readonly GenBankRecordSuggestion[] {
+    if (!response || typeof response !== "object" || !("result" in response)) {
+      throw new GenBankSearchError("MALFORMED_RESPONSE", "NCBI returned a malformed record summary.");
+    }
+    const result = (response as {result?: unknown}).result;
+    if (!result || typeof result !== "object") {
+      throw new GenBankSearchError("MALFORMED_RESPONSE", "NCBI returned a malformed record summary.");
+    }
+
+    return Object.entries(result as Record<string, unknown>).flatMap(([key, raw]) => {
+      if (key === "uids" || !raw || typeof raw !== "object") return [];
+      const summary = raw as Record<string, unknown>;
+      const uid = String(summary.uid ?? key).trim();
+      const accessionVersion = String(summary.accessionversion ?? "").trim().toUpperCase();
+      if (!/^\d+$/u.test(uid) || !DIRECT_RECORD_PATTERN.test(accessionVersion) || /^\d+$/u.test(accessionVersion)) {
+        throw new GenBankSearchError("MALFORMED_RESPONSE", "NCBI returned a record without a stable accession version.");
+      }
+      const title = String(summary.title ?? "").trim();
+      const organism = String(summary.organism ?? "").trim();
+      if (!title || !organism) {
+        throw new GenBankSearchError("MALFORMED_RESPONSE", `NCBI returned incomplete metadata for ${accessionVersion}.`);
+      }
+      const inferredScope = inferRecordScope(title);
+      const scope = inferredScope === "unknown" && trustRequestedScope
+        ? requestedScope
+        : inferredScope;
+      const lowerTitle = title.toLowerCase();
+      const variant = this.extractVariantInfo(summary, [...taxonomicGroup]);
+      return [{
+        uid,
+        accession: accessionVersion.split(".")[0],
+        accessionVersion,
+        title,
+        organism,
+        taxId: String(summary.taxid ?? "").trim(),
+        length: parseRecordLength(summary.slen, accessionVersion),
+        scope,
+        isComplete: scope === "mitochondrial-genome"
+          ? lowerTitle.includes("complete") && !lowerTitle.includes("partial")
+          : !lowerTitle.includes("partial"),
+        sourceDatabase: REFSEQ_ACCESSION_PATTERN.test(accessionVersion) ? "RefSeq" : "GenBank",
+        updatedAt: String(summary.updatedate ?? "").trim() || undefined,
+        recordUrl: `https://www.ncbi.nlm.nih.gov/nuccore/${encodeURIComponent(accessionVersion)}`,
+        variantName: variant.name && variant.name !== organism ? variant.name : undefined,
+      } satisfies GenBankRecordSuggestion];
+    });
   }
 
   /**
@@ -164,12 +346,12 @@ export class GenBankSearchService {
   }
 
   async fetchSuggestionsFromGenbank(
-    mode: "common" | "scientific" | "accession",
+    _mode: "common" | "scientific" | "accession",
     term: AccessionId | ScientificNameSearch | CommonNameSearch,
     page: number
   ): Promise<SuggestionsResponse> {
     try {
-      const searchTerm = this.getQueryFromTermType(mode, term);
+      const searchTerm = this.getQueryFromTermType(term);
       const variantResponse = await this.getVariantsResponseFromSearchTerm(
         searchTerm,
         page
@@ -205,7 +387,6 @@ export class GenBankSearchService {
   }
 
   getQueryFromTermType = (
-    mode: "common" | "scientific" | "accession",
     term: AccessionId | ScientificNameSearch | CommonNameSearch
   ): string => {
     return term as string;
@@ -354,7 +535,10 @@ export class GenBankSearchService {
     };
   }
 
-  async getTaxonomicGroupInfo(searchTerm: string): Promise<TaxonomicInfo> {
+  async getTaxonomicGroupInfo(
+    searchTerm: string,
+    options: TaxonomyLookupOptions = {},
+  ): Promise<TaxonomicInfo> {
     try {
       const normalizedSearchTerm = searchTerm.toLowerCase().trim();
 
@@ -409,29 +593,30 @@ export class GenBankSearchService {
         return this.cacheAndReturn(normalizedSearchTerm, groupMatch);
 
       // 7. Try comprehensive taxonomy search
-      const taxId = await this.findTaxonomyId(normalizedSearchTerm);
+      const taxId = await this.findTaxonomyId(normalizedSearchTerm, options);
       if (taxId) {
-        const taxonomyMatch = this.findTaxonomyMatch(taxId);
+        const taxonomyMatch = this.findTaxonomyMatch(String(taxId));
         if (taxonomyMatch)
           return this.cacheAndReturn(normalizedSearchTerm, taxonomyMatch);
       }
 
       return this.createEmptyResult();
     } catch (error) {
+      if (options.strict) throw error;
       console.error(`Taxonomy detection error for: ${searchTerm}`, error);
       return this.createEmptyResult();
     }
   }
 
-  async findTaxonomyId(searchTerm: string) {
+  async findTaxonomyId(searchTerm: string, options: TaxonomyLookupOptions = {}) {
     try {
       const isAccession = this.isAccessionFormat(searchTerm);
       if (isAccession) {
         return await this.searchTaxonomyByAccession(searchTerm);
       } else {
         const [taxonomyResult, breedResult] = await Promise.all([
-          this.searchTaxonomyDirect(searchTerm),
-          this.searchVariantBreeds(searchTerm),
+          this.searchTaxonomyDirect(searchTerm, options),
+          this.searchVariantBreeds(searchTerm, options),
         ]);
 
         return this.getBestTaxIdMatch(
@@ -443,6 +628,7 @@ export class GenBankSearchService {
         );
       }
     } catch (error) {
+      if (options.strict) throw error;
       console.error("Error in findTaxonomyId:", error);
       return null;
     }
@@ -468,7 +654,11 @@ export class GenBankSearchService {
       if (!response?.result || Object.values(response?.result).length === 0) {
         return null;
       }
-      const taxId = Object.values(response.result)[0]?.taxid || null;
+      const summary = Object.values(response.result as Record<string, unknown>)
+        .find((value): value is {taxid?: unknown} => value !== null && typeof value === "object" && "taxid" in value);
+      const taxId = typeof summary?.taxid === "string" || typeof summary?.taxid === "number"
+        ? summary.taxid
+        : null;
       if (!taxId) {
         return null;
       }
@@ -479,21 +669,23 @@ export class GenBankSearchService {
     }
   }
 
-  async searchVariantBreeds(searchTerm: string): Promise<any | null> {
+  async searchVariantBreeds(
+    searchTerm: string,
+    options: TaxonomyLookupOptions = {},
+  ): Promise<any | null> {
     try {
       const uri = this.genBankQueries.buildAdvancedVariantSearchUri(searchTerm);
-      const response = await sendRequestToProxy({externalUrl: uri});
+      const response = await sendNcbiRequest(uri, options.signal);
 
       if (!response.esearchresult?.idlist?.length) return null;
 
       const summaryUri = this.genBankQueries.buildSequenceSummaryUri(
           response.esearchresult.idlist
       );
-      const summaryResponse = await sendRequestToProxy({
-        externalUrl: summaryUri,
-      });
+      const summaryResponse = await sendNcbiRequest(summaryUri, options.signal);
       return summaryResponse.result || null;
     } catch (error) {
+      if (options.strict) throw error;
       console.error("Error while search variant breeds:", error);
       return null;
     }
@@ -582,23 +774,25 @@ export class GenBankSearchService {
     };
   }
 
-  async searchTaxonomyDirect(searchTerm: string): Promise<any | null> {
+  async searchTaxonomyDirect(
+    searchTerm: string,
+    options: TaxonomyLookupOptions = {},
+  ): Promise<any | null> {
     try {
       const uri = this.genBankQueries.buildTaxonomySearchUri(searchTerm);
-      const response = await sendRequestToProxy({externalUrl: uri});
+      const response = await sendNcbiRequest(uri, options.signal);
 
       if (response.esearchresult?.count !== "0") {
         const summaryUri = this.genBankQueries.buildTaxonomicSummaryUri(
             response.esearchresult.idlist[0]
         );
-        const summaryResponse = await sendRequestToProxy({
-          externalUrl: summaryUri,
-        });
+        const summaryResponse = await sendNcbiRequest(summaryUri, options.signal);
         return summaryResponse.result || null;
       } else {
         return null;
       }
     } catch (error) {
+      if (options.strict) throw error;
       return null;
     }
   }
