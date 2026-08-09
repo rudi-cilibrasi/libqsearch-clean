@@ -1,6 +1,6 @@
 # Reproducible NCD and QSearch pipeline
 
-Updated 2026-08-06 (Asia/Ho_Chi_Minh).
+Updated 2026-08-09 (Asia/Ho_Chi_Minh).
 
 This document defines the numerical and provenance contract used by the browser workbench. It is intended to make a result repeatable and to prevent cache or search behavior from being mistaken for scientific evidence.
 
@@ -25,6 +25,14 @@ R[i, i] = 0
 Thus directionality belongs to compression and the full matrix, while the minimum belongs to an explicit matrix reduction. The worker result preserves both `directedNcdMatrix = D` and the reduced `ncdMatrix = R` so downstream code cannot confuse the two stages.
 
 This policy fixes the former pair-order cache defect. A sorted cache key previously allowed one direction to occupy both reflected positions. Version 3 instead stores ordered cells under distinct keys and performs no reduction inside the cache or pair-compression operation.
+
+## Compressor settings and window guard
+
+The active revisions are LZMA mode 9, bundled Zstandard level 22, `pako` 3.0.1 gzip framing at DEFLATE level 9, and `brotli-wasm` 3.0.1 at quality 11 with its default `lgwin` 22. gzip and Brotli share the same typed worker pipeline as the existing compressors; only the byte-to-compressed-length function changes.
+
+Before hashing, cache access, or worker initialization, the service measures the two largest UTF-8 objects plus the pair separator. The ordered pair must fit inside the selected compressor's effective history window. Current pair limits are 2 MiB for the application-bounded LZMA worker, 128 MiB for Zstandard, 32 KiB for DEFLATE, and 4 MiB for Brotli. An explicit selection outside its limit fails with a readable error. Auto-selection uses LZMA through 2 MiB and Zstandard above that threshold.
+
+These compressors do not establish empirical universality. Repeating one experiment across the portfolio is a sensitivity analysis: agreement can strengthen robustness, while disagreement identifies dependence on the model, window, framing overhead, or object representation. The decision record and candidate evaluation are in [Compressor portfolio and sensitivity analysis](COMPRESSOR_PORTFOLIO.md).
 
 ## Content-addressed, versioned cache
 

@@ -460,23 +460,55 @@
     border-color: var(--line-dark);
 }
 
-.compression-setting {
-    padding: 21px 26px;
-    border-bottom: 1px solid var(--line);
+.compressor-selector {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr);
+    gap: 28px;
+    align-items: center;
+    margin-top: 20px;
+    padding: 20px 22px;
+    background: var(--paper-deep);
+    border: 1px solid var(--line);
 }
 
-.compression-setting label {
+.compressor-selector__heading {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 9px;
+    gap: 11px;
+    align-items: flex-start;
+}
+
+.compressor-selector__heading > svg {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    color: var(--forest-deep);
+}
+
+.compressor-selector h3,
+.compressor-selector p {
+    margin: 0;
+}
+
+.compressor-selector h3,
+.compressor-selector__control label {
     font-family: var(--font-mono);
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
 }
 
-.compression-setting select {
+.compressor-selector__heading p {
+    margin-top: 5px;
+    color: var(--ink-muted);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.compressor-selector__control {
+    display: grid;
+    gap: 7px;
+}
+
+.compressor-selector__control select {
     width: 100%;
     min-height: 42px;
     padding: 8px 10px;
@@ -484,7 +516,21 @@
     background: var(--white);
     border: 1px solid var(--line-dark);
     border-radius: 0;
-    font-size: 0.76rem;
+    font-size: 0.78rem;
+}
+
+.compressor-selector__control p {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    color: var(--ink-muted);
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+.compressor-selector__control p svg {
+    flex: 0 0 auto;
+    margin-top: 1px;
 }
 
 .file-dropzone {
@@ -552,17 +598,6 @@
     display: flex;
     align-items: center;
     gap: 5px;
-}
-
-.compression-status {
-    padding: 2px 5px;
-    color: var(--forest-deep);
-    background: var(--paper-deep);
-    border: 1px solid var(--line);
-}
-
-.compression-status--warning {
-    color: var(--oxide);
 }
 
 .workbench-actions {
@@ -1496,10 +1531,15 @@ button.genbank-suggestions__status:hover {
 @media (max-width: 480px) {
     .source-browser__search,
     .selected-objects__summary,
-    .selected-objects__body,
-    .compression-setting {
+    .selected-objects__body {
         padding-right: 18px;
         padding-left: 18px;
+    }
+
+    .compressor-selector {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 18px;
     }
 
     .file-dropzone {

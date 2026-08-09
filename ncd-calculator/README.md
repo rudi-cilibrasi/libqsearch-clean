@@ -21,7 +21,10 @@ If Vite reports `504 Outdated Optimize Dep` after dependencies or the Vite confi
 The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source. **Animal example** resolves a version-pinned four-record mitochondrial set from NCBI, **Sequence example** provides a small local interface check, and **Astronomy example** loads a verified 16-object RXTE time-series corpus inspired by the astronomy experiment in *Clustering by Compression*.
 
 1. Add at least four objects, or use the example data.
-2. Select **Show Similarity**. The page reports compression progress and exposes quartet-tree, K-grid, and distance-matrix result views.
+2. Choose **Auto-select** or an explicit compressor model.
+3. Select **Show Similarity**. The page reports compression progress and exposes quartet-tree, K-grid, and distance-matrix result views.
+
+The compressor portfolio includes LZMA, Zstandard, gzip/DEFLATE, and Brotli. Explicit selection is carried into the calculation and exported provenance; it is no longer limited to the local-file browser. Each algorithm has a fail-fast ordered-pair limit derived from its effective history window. Auto-selection remains LZMA for pairs up to 2 MiB and Zstandard for larger pairs. The settings, scientific rationale, impact ratings, rejected candidates, and sensitivity-analysis workflow are documented in [`docs/COMPRESSOR_PORTFOLIO.md`](docs/COMPRESSOR_PORTFOLIO.md).
 
 The sequence example contains two intentionally related pairs. It exercises the same compression pipeline as uploaded content and is suitable for interface and worker verification; it is not a scientific benchmark dataset. The astronomy example is a reproducible public analogue of the paper's private GRS 1915+105 intervals. Its exact source, objective interval-selection rule, canonical signal encoding, integrity checks, and scientific limits are documented in [`docs/ASTRONOMY_EXAMPLE.md`](docs/ASTRONOMY_EXAMPLE.md).
 
@@ -53,7 +56,7 @@ After changing dependencies or switching branches while the development server i
 npm run dev -- --force
 ```
 
-The planar-tree interface reports initialization failures and offers **Retry renderer**. The shared loader deduplicates concurrent initialization and clears failed attempts before retrying. Compression workers use Vite's native `new Worker(new URL(...))` transform rather than dynamically importing `?worker` wrapper modules; `workers:verify-dev` transforms and serves both entries in middleware mode so development-only worker regressions fail before a build. The selected compressor starts lazily when a calculation begins—there is no competing ZSTD prewarm—and has a 30-second cold-start window. Native worker load and message-decoding failures are reported immediately and failed workers are terminated.
+The planar-tree interface reports initialization failures and offers **Retry renderer**. The shared loader deduplicates concurrent initialization and clears failed attempts before retrying. Compression workers use Vite's native `new Worker(new URL(...))` transform rather than dynamically importing `?worker` wrapper modules; `workers:verify-dev` transforms and serves all four entries in middleware mode so development-only worker regressions fail before a build. The selected compressor starts lazily when a calculation begins—there is no competing prewarm—and has a 30-second cold-start window. Native worker load and message-decoding failures are reported immediately and failed workers are terminated.
 
 Focused interface and export coverage is in `src/__test__/landingPage.test.tsx`, `src/__test__/workbench.test.tsx`, and `src/__test__/clusteringExperimentExport.test.ts`.
 

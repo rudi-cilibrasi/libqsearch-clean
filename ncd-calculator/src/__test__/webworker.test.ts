@@ -305,8 +305,8 @@ describe('Compression Worker Tests', () => {
             algorithm: compressionDecision.algorithm,
         })).rejects.toThrow();
         
-        // Service should still be in a valid state
-        expect(compressionService.hasActiveWorker()).toBe(true);
+        // Fail-fast validation rejects malformed input before allocating a worker.
+        expect(compressionService.hasActiveWorker()).toBe(false);
         
         // We should be able to initialize again without issues
         await compressionService.initialize(compressionDecision.algorithm);

@@ -1,14 +1,24 @@
 import type {NCDInput, WorkerMessage, WorkerResultMessage} from "../types/ncd";
 import {CompressionCache} from "@/cache/CompressionCache.ts";
 import {fingerprintContent, getCompressionProvenance} from "@/services/CompressionProtocol.ts";
-import {PAIR_SEPARATOR} from "@/services/CompressionProtocol.ts";
-import type {CompressionAlgorithm, PreparedCompressionInput} from "@/types/compression";
+import {
+	COMPRESSOR_PROFILES,
+	type CompressorProfile,
+	validateWindowForNCD,
+} from "@/services/CompressorCapabilities.ts";
+import type {
+	CompressionAlgorithm,
+	CompressionPreference,
+	PreparedCompressionInput,
+} from "@/types/compression";
+import {COMPRESSION_ALGORITHMS, isCompressionPreference} from "@/types/compression";
 
 export type {CompressionAlgorithm} from "@/types/compression";
 
 export interface CompressionResponse {
 	algorithm: CompressionAlgorithm;
 	reason: string;
+	warning?: string;
 }
 
 /**
@@ -25,18 +35,7 @@ export class CompressionService {
 	private static instance: CompressionService;
 	private static readonly DEFAULT_INITIALIZATION_TIMEOUT_MS = 30_000;
 	
-	// Configuration constants for compression algorithms
-	private static readonly MAX_SIZES = {
-		lzma: 2 * 1024 * 1024, // 2MB maximum for LZMA
-		zstd: 128 * 1024 * 1024, // 128MB maximum for ZSTD
-	} as const;
-	
 	private static readonly ABSOLUTE_MAX_SIZE = 128 * 1024 * 1024; // 128MB
-	
-	private static readonly ALGORITHM_DESCRIPTIONS = {
-		lzma: "High compression ratio, optimal for files ≤1MB (source code, text).",
-		zstd: "Fast compression for files up to 128MB.",
-	} as const;
 	
 	// Worker instance and current algorithm state
 	private worker: Worker | null = null;
@@ -108,28 +107,50 @@ export class CompressionService {
 	 * @returns CompressionResponse with selected algorithm and reason
 	 */
 	static needsAdvancedCompression(size1: number, size2: number): CompressionResponse {
-		if (![size1, size2].every((size) => Number.isFinite(size) && size >= 0)) {
-			throw new Error("Compression input sizes must be finite, non-negative byte counts");
-		}
-		const maxSize = size1 + size2 + new TextEncoder().encode(PAIR_SEPARATOR).length;
+		const zstdValidation = validateWindowForNCD("zstd", size1, size2);
+		const maxSize = zstdValidation.combinedSize;
 		
-		if (maxSize > this.ABSOLUTE_MAX_SIZE) {
+		if (!zstdValidation.valid || maxSize > this.ABSOLUTE_MAX_SIZE) {
 			throw new Error(
 				`Combined file size (${(maxSize / (1024 * 1024)).toFixed(2)}MB) ` +
 				`exceeds maximum allowed size (128MB)`
 			);
 		}
 		
-		if (maxSize <= this.MAX_SIZES.lzma) {
+		if (maxSize <= COMPRESSOR_PROFILES.lzma.maxInputSize) {
 			return {
 				algorithm: "lzma",
-				reason: this.ALGORITHM_DESCRIPTIONS.lzma,
+				reason: COMPRESSOR_PROFILES.lzma.description,
 			};
 		}
 		
 		return {
 			algorithm: "zstd",
-			reason: this.ALGORITHM_DESCRIPTIONS.zstd,
+			reason: COMPRESSOR_PROFILES.zstd.description,
+			warning: zstdValidation.warning,
+		};
+	}
+
+	/** Resolve an explicit or automatic compressor and fail before worker startup when unsafe. */
+	static selectCompression(
+		preference: CompressionPreference,
+		size1: number,
+		size2: number,
+	): CompressionResponse {
+		if (!isCompressionPreference(preference)) {
+			throw new Error(`Unsupported compression preference: ${String(preference)}`);
+		}
+		if (preference === "auto") return this.needsAdvancedCompression(size1, size2);
+
+		const validation = validateWindowForNCD(preference, size1, size2);
+		if (!validation.valid) {
+			throw new Error(validation.warning ?? `The ${preference} compressor cannot process this input`);
+		}
+
+		return {
+			algorithm: preference,
+			reason: COMPRESSOR_PROFILES[preference].description,
+			warning: validation.warning,
 		};
 	}
 	
@@ -139,7 +160,7 @@ export class CompressionService {
 	 * @returns Array of available compression algorithms
 	 */
 	static getAvailableAlgorithms(): CompressionAlgorithm[] {
-		return ["lzma", "zstd"];
+		return [...COMPRESSION_ALGORITHMS];
 	}
 	
 	/**
@@ -148,11 +169,8 @@ export class CompressionService {
 	 * @param algorithm The compression algorithm to get info for
 	 * @returns Object with algorithm size limits and description
 	 */
-	static getAlgorithmInfo(algorithm: CompressionAlgorithm) {
-		return {
-			maxSize: this.MAX_SIZES[algorithm],
-			description: this.ALGORITHM_DESCRIPTIONS[algorithm],
-		};
+	static getAlgorithmInfo(algorithm: CompressionAlgorithm): CompressorProfile {
+		return COMPRESSOR_PROFILES[algorithm];
 	}
 	
 	/**
@@ -176,7 +194,8 @@ export class CompressionService {
 			(content) => new TextEncoder().encode(content).length
 		);
 		const sortedSizes = [...contentSizes].sort((a, b) => b - a);
-		const compressionDecision = CompressionService.needsAdvancedCompression(
+		const compressionDecision = CompressionService.selectCompression(
+			input.compression ?? "auto",
 			sortedSizes[0],
 			sortedSizes[1]
 		);
@@ -187,6 +206,7 @@ export class CompressionService {
 		return {
 			algorithm,
 			reason: compressionDecision.reason,
+			warning: compressionDecision.warning,
 			contentKeys,
 			cachedSizes: cache.prepareWorkerCache(algorithm, contentKeys),
 			provenance: getCompressionProvenance(algorithm),
@@ -233,9 +253,13 @@ export class CompressionService {
 		},
 		onProgress?: (message: WorkerMessage) => void
 	): Promise<WorkerResultMessage> {
-		const totalSize = input.contents.reduce((sum, content) => {
-			return sum + new TextEncoder().encode(content).length;
-		}, 0);
+		if (input.contents.length < 2) {
+			throw new Error("At least two objects are required for an NCD comparison");
+		}
+		const contentSizes = input.contents.map((content) => new TextEncoder().encode(content).length);
+		const sortedSizes = [...contentSizes].sort((a, b) => b - a);
+		CompressionService.selectCompression(input.algorithm, sortedSizes[0], sortedSizes[1]);
+		const totalSize = contentSizes.reduce((sum, size) => sum + size, 0);
 		
 		if (totalSize > CompressionService.ABSOLUTE_MAX_SIZE) {
 			throw new Error(
@@ -284,6 +308,16 @@ export class CompressionService {
 				return new Worker(
 					new URL("../workers/zstdWorker.ts", import.meta.url),
 					{type: "module", name: "zstd-compression"},
+				);
+			case "gzip":
+				return new Worker(
+					new URL("../workers/gzipWorker.ts", import.meta.url),
+					{type: "module", name: "gzip-compression"},
+				);
+			case "brotli":
+				return new Worker(
+					new URL("../workers/brotliWorker.ts", import.meta.url),
+					{type: "module", name: "brotli-compression"},
 				);
 			default:
 				throw new Error(`Unsupported compression algorithm: ${algorithm}`);

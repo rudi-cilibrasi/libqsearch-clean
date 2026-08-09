@@ -1,19 +1,13 @@
-import React, { useCallback, useState, useRef } from "react";
+import React, { useCallback, useState } from "react";
 import { getFastaInfoFromFile, isFasta } from "../functions/fasta";
 import { FILE_UPLOAD } from "../constants/modalConstants";
 import {
   Upload,
   AlertCircle,
-  Files,
   Info
 } from "lucide-react";
 import { FileInfo, getFile } from "../functions/file";
 import type {SelectedItem} from "./workbenchTypes";
-import {
-  CompressionService,
-  type CompressionAlgorithm,
-  type CompressionResponse,
-} from "@/services/CompressionService";
 
 interface FileUploadProps {
   selectedItems: SelectedItem[];
@@ -29,27 +23,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                                                       }) => {
   // Component state management
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [selectedCompression, setSelectedCompression] = useState<CompressionAlgorithm | "auto">("auto");
-  const [effectiveAlgorithm, setEffectiveAlgorithm] = useState<CompressionResponse | null>(null);
   const [sizeError, setSizeError] = useState<string | null>(null);
-  const compressionServiceRef = useRef(CompressionService.getInstance());
-
-  // Define available compression algorithms
-  const availableAlgorithms = [
-    {
-      value: "auto",
-      label: "Auto-select",
-      description: "Automatically choose best algorithm based on file size",
-    },
-    ...CompressionService.getAvailableAlgorithms().map((algo) => {
-      const info = CompressionService.getAlgorithmInfo(algo);
-      return {
-        value: algo,
-        label: algo.toUpperCase(),
-        description: info.description,
-      };
-    }),
-  ];
 
   // Drag and drop event handlers
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -131,26 +105,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     }
   };
 
-  // Determine appropriate compression algorithm
-  const determineEffectiveAlgorithm = useCallback(
-      (fileInfos: FileInfo[]): CompressionResponse => {
-        if (selectedCompression !== "auto") {
-          return {
-            algorithm: selectedCompression,
-            reason: CompressionService.getAlgorithmInfo(selectedCompression).description,
-          };
-        }
-
-        const sizes = fileInfos.map((file) => {
-          const content = typeof file.content === "string" ? file.content : "";
-          return new TextEncoder().encode(content).length;
-        });
-        const sortedSizes = [...sizes].sort((a, b) => b - a);
-        return CompressionService.needsAdvancedCompression(sortedSizes[0], sortedSizes[1]);
-      },
-      [selectedCompression]
-  );
-
   // Handle file selection and processing
   const handleFiles = useCallback(
       async (files: File[]) => {
@@ -160,11 +114,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           if (!validateFileSizeCombinations(fileInfos)) {
             return;
           }
-
-          const compressionDecision = determineEffectiveAlgorithm(fileInfos);
-          setEffectiveAlgorithm(compressionDecision);
-
-          await compressionServiceRef.current.initialize(compressionDecision.algorithm);
 
           const newItems = await Promise.all(
               fileInfos.map(async (file) => getFileItem(file))
@@ -180,7 +129,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           setSizeError(error instanceof Error ? error.message : "Unknown error processing files");
         }
       },
-      [selectedItems, determineEffectiveAlgorithm]
+      [selectedItems, setSelectedItems]
   );
 
   // Handle file drop event
@@ -201,51 +150,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     await handleFiles(files);
   };
 
-  // Get status badge for compression algorithm
-  const getStatusBadge = () => {
-    if (!effectiveAlgorithm) return null;
-
-    if (selectedCompression === "auto") {
-      return (
-          <span className="compression-status">
-          Auto-selected
-        </span>
-      );
-    }
-
-    if (selectedCompression !== effectiveAlgorithm.algorithm) {
-      return (
-          <span className="compression-status compression-status--warning">
-          Switched to {effectiveAlgorithm.algorithm.toUpperCase()}
-        </span>
-      );
-    }
-
-    return null;
-  };
-
   return (
       <div className="source-browser file-browser">
-        <div className="compression-setting">
-          <label htmlFor="compression-algorithm">
-            <Files size={17} aria-hidden="true"/>
-            Compression
-          </label>
-          <select
-              id="compression-algorithm"
-              value={selectedCompression}
-              onChange={(e) =>
-                  setSelectedCompression(e.target.value as CompressionAlgorithm | "auto")
-              }
-          >
-            {availableAlgorithms.map((algo) => (
-                <option key={algo.value} value={algo.value}>
-                  {algo.label}
-                </option>
-            ))}
-          </select>
-        </div>
-
         {sizeError && (
             <div className="workbench-inline-error" role="alert">
               <AlertCircle size={17} aria-hidden="true"/>
@@ -274,11 +180,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
             <div className="file-dropzone__meta">
               <span><Info size={13} aria-hidden="true"/>128 MB maximum pair size</span>
-              {effectiveAlgorithm && (
-                  <span>
-                    Active compressor: {effectiveAlgorithm.algorithm.toUpperCase()} {getStatusBadge()}
-                  </span>
-              )}
             </div>
         </div>
       </div>

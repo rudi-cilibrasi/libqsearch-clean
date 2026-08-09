@@ -1,4 +1,5 @@
 import type {
+    CompressionPreference,
     CompressionProvenance,
     PairCompressionRecord,
     SingleCompressionRecord,
@@ -26,6 +27,8 @@ export interface NCDInput {
     objectMetadata?: ExperimentInputObjectMetadata[];
     /** Original filename when `kind` is an imported distance matrix. */
     sourceFileName?: string;
+    /** Requested compressor. Auto-selection remains the default when omitted. */
+    compression?: CompressionPreference;
     cachedSizes?: Map<string, number>;
     contentKeys?: string[];
 }

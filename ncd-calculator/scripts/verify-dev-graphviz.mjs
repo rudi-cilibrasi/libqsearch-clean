@@ -15,6 +15,10 @@ const server = await createServer({
         middlewareMode: true,
         hmr: false,
     },
+    optimizeDeps: {
+        noDiscovery: true,
+        include: [],
+    },
 });
 
 try {

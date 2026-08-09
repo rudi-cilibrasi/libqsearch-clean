@@ -88,7 +88,7 @@ export default defineConfig({
     // Graphviz is deliberately loaded only when the planar tree opens. Serving
     // it directly keeps that lazy import independent of Vite's disposable,
     // hashed dependency cache during development.
-    exclude: ['zstd.wasm', 'zstd.js', '@hpcc-js/wasm/graphviz'],
+    exclude: ['zstd.wasm', 'zstd.js', 'brotli-wasm', '@hpcc-js/wasm/graphviz'],
     esbuildOptions: {
       target: 'es2020',
       supported: {

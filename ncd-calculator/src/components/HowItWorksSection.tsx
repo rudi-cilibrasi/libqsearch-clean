@@ -34,8 +34,8 @@ const HowItWorksSection = () => {
                     <h2 id="method-title">From raw objects to a geometry of information.</h2>
                     <p>
                         The pipeline is deliberately small. Its main modeling decision is the
-                        compressor: LZMA favors compact representation, while Zstandard supports
-                        larger inputs with higher throughput.
+                        compressor. LZMA and Zstandard provide large-window defaults; gzip and
+                        Brotli make sensitivity to a classical and a modern coding model explicit.
                     </p>
                     <pre className="method-trace" aria-label="NCD processing pipeline">
 {`object xᵢ ─┐

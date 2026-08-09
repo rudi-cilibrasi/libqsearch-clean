@@ -118,7 +118,12 @@ export class LocalStorageKeyManager {
     try {
       // Remove only CompLearn-owned keys. Other applications or authentication
       // state may share the origin and must never be deleted by a cache upgrade.
-      const ownedExactKeys = new Set(["selectedItems", "searchMode", STORAGE_VERSION_NAME]);
+      const ownedExactKeys = new Set([
+        "selectedItems",
+        "searchMode",
+        "compressionPreference",
+        STORAGE_VERSION_NAME,
+      ]);
       const ownedPrefixes = [
         "fasta_suggestions",
         "fasta_localPageCount",
