@@ -31,6 +31,10 @@ const ENV_LOADER = {
     MYSQL_PASSWORD: process.env.MYSQL_PASSWORD || "",
     MYSQL_DATABASE: process.env.MYSQL_DATABASE || "",
 
+    // Protects the internal aggregate anonymous-usage endpoint. The endpoint
+    // remains unavailable when this is unset and requires at least 32 bytes.
+    ANONYMOUS_METRICS_TOKEN: process.env.ANONYMOUS_METRICS_TOKEN || "",
+
     NODE_ENV: process.env.NODE_ENV || ""
 };
 

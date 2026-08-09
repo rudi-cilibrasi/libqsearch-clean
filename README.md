@@ -13,6 +13,8 @@ The calculator includes a locally bundled, integrity-checked GRS 1915+105 RXTE t
 
 Completed clustering experiments can be downloaded as versioned JSON containing the exact inputs, compression records, NCD matrices, quartet topology, search metadata, and integrity hashes. See [`ncd-calculator/docs/CLUSTERING_EXPERIMENT_EXPORT.md`](ncd-calculator/docs/CLUSTERING_EXPERIMENT_EXPORT.md).
 
+Calculator use does not require an account. A first-party anonymous principal records activated browser installations and completed calculations without accepting filenames, labels, scientific contents, fingerprints, or IP-derived identifiers. The same principal can own a future cloud workspace and later be claimed by a recoverable account. The identity model, API, metrics semantics, security controls, retention, and operational procedure are documented in [`ncd-calculator/docs/ANONYMOUS_PRINCIPALS.md`](ncd-calculator/docs/ANONYMOUS_PRINCIPALS.md).
+
 ### Development environment
 ##### Configure NCBI E-utilities
 1. Go to: https://account.ncbi.nlm.nih.gov/settings/ > *Account Settings*
@@ -69,6 +71,10 @@ NCBI_EMAIL=<MAINTAINER_EMAIL>
 FRONTEND_BASE_URL=<FRONTEND_BASE_URL> (i.e. https://openscienceresearchpark.com)
 BASE_URL=<BACKEND_BASE_URL> (i.e. https://openscienceresearchpark.com/api)
 PORT=3001
+
+# Random value with at least 32 characters. When omitted, the internal
+# anonymous aggregate-metrics endpoint is unavailable.
+ANONYMOUS_METRICS_TOKEN=<RANDOM_METRICS_TOKEN>
 ```
 
 The API key is kept on the backend and must not be exposed through a `VITE_` variable. NCBI permits one API key per account. Without a key, the backend automatically uses the documented three-request-per-second limit; with a key it uses ten requests per second. `NCBI_EMAIL` identifies the maintainer to NCBI for operational contact.

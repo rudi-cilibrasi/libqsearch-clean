@@ -7,14 +7,12 @@ export interface InputAccumulatorProps {
   MIN_ITEMS?: number;
   selectedItems: SelectedItem[];
   onRemoveItem: (id: string) => void;
-  authenticated?: boolean;
 }
 
 export const InputHolder: React.FC<InputAccumulatorProps> = ({
   MIN_ITEMS = 4,
   selectedItems,
   onRemoveItem,
-  authenticated,
 }) => {
   const items = Array.isArray(selectedItems) ? selectedItems : [];
   const remainingItems = Math.max(MIN_ITEMS - items.length, 0);
@@ -70,11 +68,6 @@ export const InputHolder: React.FC<InputAccumulatorProps> = ({
             <div className="selected-objects__summary" aria-live="polite">
                 <strong>{items.length} {items.length === 1 ? "object" : "objects"}</strong>
                 {remainingItems > 0 && <span>{remainingItems} more needed</span>}
-                {!authenticated && items.length > 16 && (
-                    <p className="selected-objects__limit" role="alert">
-                        Sign in to prepare a set larger than 16 objects.
-                    </p>
-                )}
             </div>
             <div className="selected-objects__progress" aria-label={`${items.length} of ${MIN_ITEMS} required objects selected`}>
                 <span style={{width: `${Math.min((items.length / MIN_ITEMS) * 100, 100)}%`}} />

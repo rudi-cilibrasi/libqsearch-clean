@@ -39,17 +39,20 @@ import {
 	serializeClusteringExperimentExport,
 } from "@/services/ClusteringExperimentExport";
 import type {ClusteringExperimentTiming, CompleteCompressionRecords} from "@/types/experiment";
+import {
+	createAnonymousCalculationRun,
+	trackAnonymousCalculationEvent,
+} from "@/services/AnonymousActivity";
+import type {AnonymousCalculationRun} from "@/services/AnonymousActivity";
 import "./Workbench.css";
 
 export interface QSearchProps {
 	setOpenLogin: (open: boolean) => void;
-	authenticated: boolean;
 	setAuthenticated: (auth: boolean) => void;
 }
 
 export const QSearch: React.FC<QSearchProps> = ({
 	                                                setOpenLogin,
-	                                                authenticated,
 	                                                setAuthenticated,
 	                                                }) => {
 	const [ncdMatrix, setNcdMatrix] = useState<number[][]>([]);
@@ -69,6 +72,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 	const [compressionRecords, setCompressionRecords] = useState<CompleteCompressionRecords | null>(null);
 	const [experimentTiming, setExperimentTiming] = useState<ClusteringExperimentTiming | null>(null);
 	const experimentStartedAtRef = useRef<string | null>(null);
+	const anonymousCalculationRunRef = useRef<AnonymousCalculationRun | null>(null);
 	
 	// Add gridObjects state for KGridVisualization
 	const [gridObjects, setGridObjects] = useState<GridObject[]>([]);
@@ -111,10 +115,14 @@ export const QSearch: React.FC<QSearchProps> = ({
 				});
 				setQSearchProgress(null);
 				setIsLoading(false);
+				const anonymousRun = anonymousCalculationRunRef.current;
+				anonymousCalculationRunRef.current = null;
+				if (anonymousRun) trackAnonymousCalculationEvent(anonymousRun, "calculation_completed");
 			} catch (error) {
 				console.error("Error processing QSearch result:", error);
 				setErrorMsg("QSearch returned an invalid tree result");
 				setIsLoading(false);
+				anonymousCalculationRunRef.current = null;
 			}
 		} else if (event.data.action === "qsearchProgress") {
 			setQSearchProgress({
@@ -125,6 +133,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 			setErrorMsg(`Tree search failed: ${event.data.message}`);
 			setQSearchProgress(null);
 			setIsLoading(false);
+			anonymousCalculationRunRef.current = null;
 		}
 	};
 	
@@ -160,14 +169,19 @@ export const QSearch: React.FC<QSearchProps> = ({
 			return;
 		}
 		
-		// Check authentication for large computations
-		if (input.contents.length > 16 && !authenticated) {
-			setOpenLogin(true);
-			return;
-		}
-		
 		try {
 			const computationInput: NCDInput = {...input, labels: normalizedLabels};
+			try {
+				const anonymousRun = createAnonymousCalculationRun(
+					computationInput.kind === "distance-matrix" ? "distance-matrix" : "objects",
+					computationInput.contents.length,
+				);
+				anonymousCalculationRunRef.current = anonymousRun;
+				trackAnonymousCalculationEvent(anonymousRun, "calculation_started");
+			} catch {
+				anonymousCalculationRunRef.current = null;
+				console.warn("Anonymous usage activity could not be initialized.");
+			}
 			const startedAt = new Date().toISOString();
 			experimentStartedAtRef.current = startedAt;
 			setCurrentInput(computationInput);
@@ -324,6 +338,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 			console.error("Error in onNcdInput:", error);
 			setErrorMsg(error instanceof Error ? error.message : "Processing failed");
 			setIsLoading(false);
+			anonymousCalculationRunRef.current = null;
 		}
 	};
 
@@ -422,6 +437,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 		setCurrentInput(null);
 		setExperimentTiming(null);
 		experimentStartedAtRef.current = null;
+		anonymousCalculationRunRef.current = null;
 		setCompressionStats({
 			processedPairs: 0,
 			totalPairs: 0,
@@ -445,8 +461,6 @@ export const QSearch: React.FC<QSearchProps> = ({
 					onComputedNcdInput={onNcdInput}
 					setIsLoading={setIsLoading}
 					resetDisplay={resetDisplay}
-					setOpenLogin={setOpenLogin}
-					authenticated={authenticated}
 				/>
 				
 				{isLoading && (

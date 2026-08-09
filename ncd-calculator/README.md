@@ -20,6 +20,8 @@ If Vite reports `504 Outdated Optimize Dep` after dependencies or the Vite confi
 
 The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source. **Animal example** resolves a version-pinned four-record mitochondrial set from NCBI, **Sequence example** provides a small local interface check, and **Astronomy example** loads a verified 16-object RXTE time-series corpus inspired by the astronomy experiment in *Clustering by Compression*.
 
+No account is required for a calculation, including sets larger than 16 objects. After an input passes validation, the browser reports only a random calculation identifier, input kind, object count, and start/completion state to the same-origin backend. The backend maintains a first-party anonymous browser principal for aggregate usage measurement and future opt-in cloud ownership. It never accepts the research inputs through this activity endpoint. See [`docs/ANONYMOUS_PRINCIPALS.md`](docs/ANONYMOUS_PRINCIPALS.md) for exact counting semantics and operations.
+
 1. Add at least four objects, or use the example data.
 2. Choose **Auto-select** or an explicit compressor model.
 3. Select **Show Similarity**. The page reports compression progress and exposes quartet-tree, K-grid, and distance-matrix result views.
@@ -60,6 +62,8 @@ The planar-tree interface reports initialization failures and offers **Retry ren
 
 Focused interface and export coverage is in `src/__test__/landingPage.test.tsx`, `src/__test__/workbench.test.tsx`, and `src/__test__/clusteringExperimentExport.test.ts`.
 
+Anonymous principal client coverage is in `src/__test__/anonymousActivity.test.ts`; the corresponding backend API coverage is in `../complearn-genbank/__tests__/anonymousPrincipal.test.ts`.
+
 ### Reproducible UDHR inputs
 
 UDHR comparisons use a versioned UTF-8 snapshot generated from the Unicode UDHR Project at a pinned commit. Corpus v2 stores all 501 available stage-4 records locally, representing 431 ISO 639-3 language groups. Of those records, 465 link to an OHCHR translation and 36 retain a separate `unicode-complete` provenance tier. The audit accepts 496 records across 426 language codes for aligned comparison; five upstream XML records are preserved but blocked because they do not contain Articles 1–30 in full.
@@ -90,4 +94,4 @@ CompLearn targets WCAG 2.2 Level AA through staged, separately reviewed changes.
 
 The prioritized feature list, 1–10 impact ratings, audit evidence, PR boundaries, and verification policy are maintained in [`docs/ACCESSIBILITY_ROADMAP.md`](docs/ACCESSIBILITY_ROADMAP.md). Each roadmap item is intended to ship in its own PR, with an explicit approval signal before the next item begins.
 
-Updated 2026-08-09 (Asia/Ho_Chi_Minh).
+Updated 2026-08-10 (Asia/Ho_Chi_Minh).

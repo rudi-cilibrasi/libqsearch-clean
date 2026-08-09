@@ -145,8 +145,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -163,8 +161,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -185,8 +181,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -202,8 +196,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={onComputedNcdInput}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -234,8 +226,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={onComputedNcdInput}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -266,8 +256,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
