@@ -1,6 +1,6 @@
 import React from "react";
-import {Dna, FileType2, Globe2, Telescope, X} from "lucide-react";
-import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
+import {Activity, Dna, FileType2, Globe2, Telescope, X} from "lucide-react";
+import {EEG, FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 import type {SelectedItem} from "./workbenchTypes";
 
 export interface InputAccumulatorProps {
@@ -21,7 +21,7 @@ export const InputHolder: React.FC<InputAccumulatorProps> = ({
 
   const renderItemWithIcon = (
     item: SelectedItem,
-    type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD
+    type: typeof FASTA | typeof LANGUAGE | typeof FILE_UPLOAD | typeof EEG
   ) => {
     switch (type) {
       case FASTA:
@@ -52,6 +52,16 @@ export const InputHolder: React.FC<InputAccumulatorProps> = ({
           <div className="selected-object__identity">
             <Globe2 size={17} aria-hidden="true" />
             <span>{item.label}</span>
+          </div>
+        );
+      case EEG:
+        return (
+          <div className="selected-object__identity">
+            <Activity size={17} aria-hidden="true" />
+            <span className="selected-object__copy">
+              <span>{item.label}</span>
+              <small>{item.eegProvenance?.record.electrode.name} · verified EEG signal</small>
+            </span>
           </div>
         );
       default:

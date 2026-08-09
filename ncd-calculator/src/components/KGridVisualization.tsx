@@ -7,13 +7,16 @@ import {MatrixTable} from "@/components/MatrixTable.tsx";
 import {GridObject} from "@/datastructures/kgrid.ts";
 import {getDisplayLabel} from "@/services/DisplayLabelProtocol.ts";
 import type {NCDMatrixResponse} from "@/types/ncd";
+import type {EegExperimentContext} from "@/types/eeg";
+import {EegAnalysisPanel, EegQuartetContext} from "@/components/EegResultContext";
 
 // Visualization types enum for better type safety
 export const VisualizationType = {
     REPORT: "report",
     QUARTET: "quartet",
     KGRID: "kgrid",
-    MATRIX: "matrix"
+    MATRIX: "matrix",
+    EEG: "eeg"
 } as const;
 
 type VisualizationTypeValue = typeof VisualizationType[keyof typeof VisualizationType];
@@ -31,6 +34,7 @@ interface KGridVisualizationProps {
     qSearchTreeResult?: QTreeResponse;
     labelMap: ReadonlyMap<string, string>;
     errorMsg?: string;
+    eegContext?: EegExperimentContext;
 }
 
 const KGridVisualization: React.FC<KGridVisualizationProps> = ({
@@ -45,7 +49,8 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                                                                    autoStart = false,
                                                                    qSearchTreeResult,
                                                                    labelMap,
-                                                                   errorMsg
+                                                                   errorMsg,
+                                                                   eegContext,
                                                                }) => {
     // State management
     const [activeViz, setActiveViz] = useState<VisualizationTypeValue>(VisualizationType.QUARTET);
@@ -188,6 +193,7 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                         </div>
                     </div>
                 )}
+                {eegContext && <EegQuartetContext context={eegContext}/>}
             </div>
         );
     };
@@ -209,6 +215,10 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                 return renderMatrixContent();
             case VisualizationType.QUARTET:
                 return renderQuartetContent();
+            case VisualizationType.EEG:
+                return eegContext
+                    ? <EegAnalysisPanel context={eegContext} ncdMatrix={ncdMatrixResponse.ncdMatrix}/>
+                    : <div>EEG analysis is unavailable for this input.</div>;
             default:
                 return <div>Select a visualization</div>;
         }
@@ -227,17 +237,26 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
             <nav className="ncd-visualization__tabs" aria-label="Result view">
                 <button
                     type="button"
-                    onClick={() => setActiveViz(VisualizationType.REPORT)}
-                    aria-pressed={activeViz === VisualizationType.REPORT}
-                >
-                    Cluster report
-                </button>
-                <button
-                    type="button"
                     onClick={() => setActiveViz(VisualizationType.QUARTET)}
                     aria-pressed={activeViz === VisualizationType.QUARTET}
                 >
                     Quartet tree
+                </button>
+                {eegContext && (
+                    <button
+                        type="button"
+                        onClick={() => setActiveViz(VisualizationType.EEG)}
+                        aria-pressed={activeViz === VisualizationType.EEG}
+                    >
+                        EEG analysis
+                    </button>
+                )}
+                <button
+                    type="button"
+                    onClick={() => setActiveViz(VisualizationType.REPORT)}
+                    aria-pressed={activeViz === VisualizationType.REPORT}
+                >
+                    Cluster report
                 </button>
                 <button
                     type="button"

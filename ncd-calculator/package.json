@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "dev:clean": "vite --force",
-    "build": "npm run graphviz:verify-dev && npm run workers:verify-dev && npm run udhr:verify && npm run astronomy:verify && npm run export-schema:verify && vite build && node scripts/verify-production-bundle.mjs",
+    "build": "npm run graphviz:verify-dev && npm run workers:verify-dev && npm run udhr:verify && npm run astronomy:verify && npm run eeg:verify && npm run export-schema:verify && vite build && node scripts/verify-production-bundle.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "debug": "vite --debug",
@@ -22,7 +22,9 @@
     "udhr:refresh": "node scripts/build-udhr-corpus.mjs",
     "udhr:verify": "node scripts/verify-udhr-corpus.mjs",
     "astronomy:refresh": "python3 scripts/build-astronomy-corpus.py",
-    "astronomy:verify": "node scripts/verify-astronomy-corpus.mjs"
+    "astronomy:verify": "node scripts/verify-astronomy-corpus.mjs",
+    "eeg:build": "python3 scripts/build-eeg-corpus.py",
+    "eeg:verify": "node scripts/verify-eeg-corpus.mjs"
   },
   "dependencies": {
     "@hpcc-js/wasm": "^2.22.4",

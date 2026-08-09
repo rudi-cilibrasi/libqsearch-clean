@@ -5,6 +5,7 @@ import type {
     SingleCompressionRecord,
 } from "./compression";
 import type {ExperimentInputObjectMetadata} from "./experiment";
+import type {EegExperimentContext} from "./eeg";
 
 export interface CompressionStats {
     processedPairs: number;
@@ -29,6 +30,8 @@ export interface NCDInput {
     sourceFileName?: string;
     /** Requested compressor. Auto-selection remains the default when omitted. */
     compression?: CompressionPreference;
+    /** Present only for a verified, single-mode EEG comparison. */
+    eeg?: EegExperimentContext;
     cachedSizes?: Map<string, number>;
     contentKeys?: string[];
 }

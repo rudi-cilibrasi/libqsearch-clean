@@ -12,7 +12,7 @@
  */
 
 import React, {useEffect, useRef, useState} from "react";
-import {AlertCircle, Dna, FileType2, FlaskConical, Globe2, Telescope, Upload} from "lucide-react";
+import {Activity, AlertCircle, Dna, FileType2, FlaskConical, Globe2, Telescope, Upload} from "lucide-react";
 import {
 	getTranslationResponse,
 	getUdhrLanguage,
@@ -26,7 +26,7 @@ import {FastaSearch} from "./FastaSearch";
 import {FileUpload} from "./FileUpload";
 import {LocalStorageKeyManager} from "../cache/LocalStorageKeyManager";
 import {getFastaSequences} from "../functions/getPublicGenbank";
-import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
+import {EEG, FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 import {useSearchParams} from "react-router-dom";
 import type {NCDImportFormat, NCDInput} from "@/types/ncd";
 import type {ExperimentInputObjectMetadata, ExperimentObjectSource} from "@/types/experiment";
@@ -44,10 +44,17 @@ import {GenBankExperimentPreflight} from "./GenBankExperimentPreflight";
 import {getGenBankAnimalExampleItems} from "../services/genbankAnimalExample";
 import {CompressorSelector} from "./CompressorSelector";
 import {isCompressionPreference, type CompressionPreference} from "@/types/compression";
+import {EegSourceBrowser} from "@/components/EegSourceBrowser";
+import {getEegExampleItems, getEegExperimentContext, importEegPortablePackage, MAX_EEG_PACKAGE_BYTES, verifyEegExampleItem} from "@/services/eegExample";
 export type {SelectedItem} from "./workbenchTypes";
 export interface SearchMode {
 	searchMode: string;
 }
+
+const SOURCE_MODES = [FASTA, LANGUAGE, FILE_UPLOAD, EEG] as const;
+type SourceMode = typeof SOURCE_MODES[number];
+
+const sourceTabId = (mode: SourceMode): string => `source-tab-${mode}`;
 
 const getItemDisplayLabel = (item: SelectedItem): string => {
 	if (item.type === LANGUAGE) {
@@ -95,6 +102,9 @@ const getExperimentObjectSource = (
 	if (item.astronomyProvenance) {
 		return {kind: "astronomy", provenance: {...item.astronomyProvenance}};
 	}
+	if (item.eegProvenance) {
+		return {kind: "eeg", provenance: item.eegProvenance};
+	}
 	if (item.id.startsWith("example-")) {
 		return {kind: "built-in-example", exampleId: item.id};
 	}
@@ -133,6 +143,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	const [isAutoProcessing, setIsAutoProcessing] = useState<boolean>(false);
 	const [isLoadingAstronomy, setIsLoadingAstronomy] = useState<boolean>(false);
 	const [isLoadingAnimalExample, setIsLoadingAnimalExample] = useState<boolean>(false);
+	const [isLoadingEeg, setIsLoadingEeg] = useState<boolean>(false);
 	const [importedMatrixFileName, setImportedMatrixFileName] = useState<string | null>(null);
 	
 	
@@ -320,6 +331,20 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		});
 		setSearchParams({searchMode: mode});
 	};
+
+	const handleSourceTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentMode: SourceMode): void => {
+		const currentIndex = SOURCE_MODES.indexOf(currentMode);
+		let nextIndex: number | null = null;
+		if (["ArrowRight", "ArrowDown"].includes(event.key)) nextIndex = (currentIndex + 1) % SOURCE_MODES.length;
+		if (["ArrowLeft", "ArrowUp"].includes(event.key)) nextIndex = (currentIndex - 1 + SOURCE_MODES.length) % SOURCE_MODES.length;
+		if (event.key === "Home") nextIndex = 0;
+		if (event.key === "End") nextIndex = SOURCE_MODES.length - 1;
+		if (nextIndex === null) return;
+		event.preventDefault();
+		const nextMode = SOURCE_MODES[nextIndex];
+		setMode(nextMode);
+		requestAnimationFrame(() => document.getElementById(sourceTabId(nextMode))?.focus());
+	};
 	
 	const sendNcdInput = async (): Promise<void> => {
 		// if (selectedItems && selectedItems.length > 16 && !authenticated) {
@@ -366,6 +391,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 					kind: "objects",
 					compression: compressionPreference,
 					objectMetadata: getExperimentObjectMetadata(ncdSelectedItems, "objects"),
+					eeg: getEegExperimentContext(ncdSelectedItems),
 				} satisfies NCDInput;
 				await onComputedNcdInput(input);
 			}
@@ -381,6 +407,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		const langItems = selectedItems.filter((item) => item.type === LANGUAGE);
 		const fastaItems = selectedItems.filter((item) => item.type === FASTA);
 		const fileItems = selectedItems.filter((item) => item.type === FILE_UPLOAD);
+		const eegItems = selectedItems.filter((item) => item.type === EEG);
 		
 		const orderMap = getOrderMap(selectedItems);
 		const langNcdInput = await computeLanguageNcdInput(langItems);
@@ -393,6 +420,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		
 		const mergedObjectInput = [
 			...fileItems,
+			...eegItems,
 			...fastaNcdInput,
 			...needComputeFastaList,
 		];
@@ -412,6 +440,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		for (const item of resolvedItems) {
 			if (item.type === FASTA) validateGenBankNucleotideSequence(item.content ?? "");
 			await verifyAstronomyExampleItem(item);
+			await verifyEegExampleItem(item);
 		}
 	};
 	
@@ -641,6 +670,39 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			setIsLoadingAnimalExample(false);
 		}
 	};
+
+	const installEegItems = (items: SelectedItem[]): void => {
+		resetDisplay();
+		setMode(EEG);
+		setSelectedItems(items);
+		setHasImportedMatrix(false);
+		setImportedMatrixFileName(null);
+	};
+
+	const loadEegExample = async (mode: "condition" | "electrode"): Promise<void> => {
+		setImportError(null);
+		setIsLoadingEeg(true);
+		try {
+			installEegItems(await getEegExampleItems(mode));
+		} catch (error) {
+			setImportError(error instanceof Error ? error.message : "Unable to load the EEG example");
+		} finally {
+			setIsLoadingEeg(false);
+		}
+	};
+
+	const importEegPackage = async (file: File, mode: "condition" | "electrode"): Promise<void> => {
+		setImportError(null);
+		setIsLoadingEeg(true);
+		try {
+			if (file.size > MAX_EEG_PACKAGE_BYTES) throw new Error("EEG package exceeds the 2 MiB limit.");
+			installEegItems(await importEegPortablePackage(await file.text(), mode));
+		} catch (error) {
+			setImportError(error instanceof Error ? error.message : "Unable to import the EEG package");
+		} finally {
+			setIsLoadingEeg(false);
+		}
+	};
 	
 	const renderModal = (mode: SearchMode) => {
 		switch (mode.searchMode) {
@@ -658,6 +720,14 @@ const ListEditor: React.FC<ListEditorProps> = ({
 							addItem={addItem}
 						/>
 				);
+			case EEG:
+				return (
+					<EegSourceBrowser
+						isLoading={isLoadingEeg}
+						onLoadExample={loadEegExample}
+						onImportPackage={importEegPackage}
+					/>
+				);
 			default:
 				return (
 					<FileUpload
@@ -673,17 +743,21 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		<section className="workbench-editor" aria-label="NCD workbench">
 			<div className="workbench-sourcebar">
 				<div className="source-tabs" role="tablist" aria-label="Input source">
-					<button type="button" role="tab" aria-selected={searchMode.searchMode === FASTA} onClick={() => setMode(FASTA)}>
+					<button id={sourceTabId(FASTA)} type="button" role="tab" aria-controls="source-panel" aria-selected={searchMode.searchMode === FASTA} tabIndex={searchMode.searchMode === FASTA ? 0 : -1} onKeyDown={(event) => handleSourceTabKeyDown(event, FASTA)} onClick={() => setMode(FASTA)}>
 						<Dna size={17} aria-hidden="true"/>
 						<span>GenBank sequences</span>
 					</button>
-					<button type="button" role="tab" aria-selected={searchMode.searchMode === LANGUAGE} onClick={() => setMode(LANGUAGE)}>
+					<button id={sourceTabId(LANGUAGE)} type="button" role="tab" aria-controls="source-panel" aria-selected={searchMode.searchMode === LANGUAGE} tabIndex={searchMode.searchMode === LANGUAGE ? 0 : -1} onKeyDown={(event) => handleSourceTabKeyDown(event, LANGUAGE)} onClick={() => setMode(LANGUAGE)}>
 						<Globe2 size={17} aria-hidden="true"/>
 						<span>UDHR languages</span>
 					</button>
-					<button type="button" role="tab" aria-selected={searchMode.searchMode === FILE_UPLOAD} onClick={() => setMode(FILE_UPLOAD)}>
+					<button id={sourceTabId(FILE_UPLOAD)} type="button" role="tab" aria-controls="source-panel" aria-selected={searchMode.searchMode === FILE_UPLOAD} tabIndex={searchMode.searchMode === FILE_UPLOAD ? 0 : -1} onKeyDown={(event) => handleSourceTabKeyDown(event, FILE_UPLOAD)} onClick={() => setMode(FILE_UPLOAD)}>
 						<FileType2 size={17} aria-hidden="true"/>
 						<span>Local files</span>
+					</button>
+					<button id={sourceTabId(EEG)} type="button" role="tab" aria-controls="source-panel" aria-selected={searchMode.searchMode === EEG} tabIndex={searchMode.searchMode === EEG ? 0 : -1} onKeyDown={(event) => handleSourceTabKeyDown(event, EEG)} onClick={() => setMode(EEG)}>
+						<Activity size={17} aria-hidden="true"/>
+						<span>P300 EEG</span>
 					</button>
 				</div>
 					<div className="workbench-sourcebar__actions">
@@ -713,7 +787,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			</div>
 
 				<div className="workbench-input-grid">
-				<section className="workbench-panel workbench-panel--source" aria-label="Object source">
+				<section id="source-panel" role="tabpanel" aria-labelledby={sourceTabId((SOURCE_MODES.includes(searchMode.searchMode as SourceMode) ? searchMode.searchMode : FILE_UPLOAD) as SourceMode)} className="workbench-panel workbench-panel--source">
 					{renderModal(searchMode)}
 				</section>
 					<InputHolder selectedItems={selectedItems} onRemoveItem={removeItem} MIN_ITEMS={MIN_ITEMS}/>

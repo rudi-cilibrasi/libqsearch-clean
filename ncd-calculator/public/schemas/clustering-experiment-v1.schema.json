@@ -83,6 +83,7 @@
         {"type": "object", "required": ["kind", "corpus", "record"], "properties": {"kind": {"const": "udhr"}, "corpus": {"type": "object"}, "record": {"type": "object"}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "exampleId"], "properties": {"kind": {"const": "built-in-example"}, "exampleId": {"type": "string", "minLength": 1}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "provenance"], "properties": {"kind": {"const": "astronomy"}, "provenance": {"type": "object"}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "provenance"], "properties": {"kind": {"const": "eeg"}, "provenance": {"type": "object"}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "fileName"], "properties": {"kind": {"const": "local-file"}, "fileName": {"type": "string", "minLength": 1}}, "additionalProperties": false},
         {"type": "object", "required": ["kind", "fileName"], "properties": {"kind": {"const": "imported-distance-matrix"}, "fileName": {"type": "string", "minLength": 1}}, "additionalProperties": false}
       ]
