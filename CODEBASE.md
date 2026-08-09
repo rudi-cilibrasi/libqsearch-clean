@@ -37,6 +37,7 @@ ncd-calculator/
 │   │   ├── QSearch.tsx             # Main NCD calculator page (orchestrates everything)
 │   │   ├── ListEditor.tsx          # Input management (FASTA, files, languages)
 │   │   ├── InputHolder.tsx         # Selected items display
+│   │   ├── ClusterReport.tsx        # Explainable groups, pairs, and research summary
 │   │   ├── MatrixTable.tsx         # NCD matrix display
 │   │   ├── KGridVisualization.tsx  # 2D grid similarity visualization
 │   │   ├── KGridDualOptimization.tsx # Dual-run grid optimization
@@ -69,6 +70,7 @@ ncd-calculator/
 │   │   ├── qsearchWorker.ts        # QSearch tree algorithm worker
 │   │   └── kgridWorker.ts          # Grid optimization worker
 │   ├── services/
+│   │   ├── ClusterAnalysis.ts      # Deterministic average-linkage analysis
 │   │   ├── CompressionService.ts   # Compression worker orchestration (singleton)
 │   │   ├── CompressionProtocol.ts  # Versioned compressor and pair policy
 │   │   ├── QSearchProtocol.ts      # Seed schedule, canonical splits, support
@@ -185,6 +187,8 @@ Updated 2026-08-06 (Asia/Ho_Chi_Minh).
 
 The calculator route begins directly at the source controls and comparison set. `ListEditor.tsx` owns input selection and computation readiness; the source components handle GenBank, UDHR, and local-file acquisition; `InputHolder.tsx` provides a compact accessible object inventory. **Try example data** remains available beside the source selector, while the primary **Show Similarity** action closes the workflow at the bottom right. Long source corpora, including the UDHR language list, scroll within a keyboard-focusable work area instead of extending the page.
 
+Completed computations open on `ClusterReport.tsx`. Its pure `ClusterAnalysis.ts` service applies deterministic average-linkage clustering to the validated symmetric NCD matrix, evaluates candidate group counts with mean silhouette, and derives group membership, nearest pairs, nearest neighbors, relative isolation, and within/between summaries. Users can cut the same dendrogram at another group count without recomputing compression. QSearch remains a separate unrooted topology view; its selected-topology recurrence is shown only in the report's research section and is labeled optimization repeatability rather than scientific confidence. The complete method and scenario contract is documented in `ncd-calculator/docs/EXPLAINABLE_CLUSTER_REPORT.md`.
+
 `Workbench.css` extends the landing-page visual system across input preparation, progress, and result interpretation. The production GUI follows `ncd-calculator/docs/END_USER_UI_POLICY.md`: it shows actionable controls, meaningful progress, canonical object names, and scientific results, while seeds, internal identifiers, protocol versions, worker rates, iteration counts, objective values, cache state, and optimizer diagnostics remain in exports, logs, tests, or technical documentation. `src/__test__/workbench.test.tsx` verifies the example-set invariants, minimum-set readiness message, empty state, and accessible item removal; visualization tests prevent internal QSearch diagnostics from returning to the live tree.
 
 ## UDHR Corpus Pipeline
@@ -220,6 +224,7 @@ npx vitest --run --exclude='**/webworker*'
 - **Web Workers** — All heavy computation (compression, QSearch, grid optimization) runs in dedicated web workers to keep the UI responsive.
 - **Singleton Services** — `CompressionService` uses a singleton pattern with factory injection for testability.
 - **Protocol-versioned caching** — Compression results use SHA-256 content identities and ordered source-target cache keys that include the pipeline and compressor revision. Stale schemas are removed rather than reused.
+- **Deterministic explainable clustering** — Average-linkage grouping uses stable-identifier tie breaks, silhouette-based suggestions, and explicit weak-separation language.
 - **Seeded multi-start QSearch** — A bounded deterministic schedule explores multiple randomized starts. Canonical split counting reports optimization stability.
 - **Pinned QSearch WASM** — `make wasm-calculator` builds the checked-in module with Emscripten 3.1.74. CI verifies that regeneration is clean.
 

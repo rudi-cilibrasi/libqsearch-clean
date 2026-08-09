@@ -70,7 +70,7 @@ It also records the selected topology frequency, number of distinct topologies, 
 
 The result also identifies the internal edge with the most even number of leaves on its two sides. This "most balanced split" is a deterministic display summary. Search stability and canonical node-index ordering break ties. It does not change the NCD matrix, select a different QSearch topology, infer an evolutionary root, or assert that either side is a known scientific class. Leaf indices rather than display labels define the split, so repeated human-readable names cannot make distinct inputs collide.
 
-These diagnostics remain in the typed QSearch result and are included as comments and edge metadata when the user explicitly exports DOT. They are intentionally absent from the live tree: seed values, optimizer scores, run counts, protocol identifiers, and heuristic split summaries are reproducibility metadata rather than primary end-user results. The live view presents the inferred unrooted topology and language names only.
+These diagnostics remain in the typed QSearch result and are included as comments and edge metadata when the user explicitly exports DOT. They are intentionally absent from the live tree: seed values, optimizer scores, protocol identifiers, edge-level percentages, and heuristic split summaries are reproducibility metadata rather than primary tree labels. The explainable cluster report may state how often the selected complete topology recurred across the bounded deterministic schedule, together with the run count and an explicit warning that this is optimization repeatability rather than scientific confidence. The live tree itself presents the inferred unrooted topology and object names only.
 
 ## Fail-fast boundaries
 
