@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import {useCallback, useState} from 'react'
 import './App.css'
 import QSearch from "./components/QSearch"
 import ErrorPage from "./components/ErrorPage"
@@ -6,20 +6,23 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
 import AboutPage from "@/components/AboutPage"
 import {LandingPage} from "@/components/LandingPage.tsx";
 import {ROUTER_BASENAME} from "@/configs/site";
+import {LoginDialog} from "@/components/LoginDialog";
+import {RouteAccessibility} from "@/components/RouteAccessibility";
 
 function App() {
     const [openLogin, setOpenLogin] = useState(false)
     const [authenticated, setAuthenticated] = useState(false)
+    const closeLogin = useCallback((): void => setOpenLogin(false), []);
 
     return (
         <Router basename={ROUTER_BASENAME}>
-            <div>
+            <div id="application-shell">
+                <RouteAccessibility />
                 <Routes>
                     <Route
                         path="/"
                         element={
                             <LandingPage
-                                openLogin={openLogin}
                                 setOpenLogin={setOpenLogin}
                                 setAuthenticated={setAuthenticated}
                             />
@@ -29,7 +32,6 @@ function App() {
                         path="/calculator"
                         element={
                             <QSearch
-                                openLogin={openLogin}
                                 setOpenLogin={setOpenLogin}
                                 authenticated={authenticated}
                                 setAuthenticated={setAuthenticated}
@@ -41,7 +43,6 @@ function App() {
                         path="/about"
                         element={
                             <AboutPage
-                                openLogin={openLogin}
                                 setOpenLogin={setOpenLogin}
                                 setAuthenticated={setAuthenticated}
                             />
@@ -49,6 +50,7 @@ function App() {
                     />
                 </Routes>
             </div>
+            <LoginDialog open={openLogin} onClose={closeLogin}/>
         </Router>
     )
 }

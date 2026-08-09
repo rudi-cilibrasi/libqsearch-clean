@@ -11,13 +11,11 @@ import "./LandingPage.css";
 export type AnalysisType = "fasta" | "language" | "file_upload";
 
 export interface LandingPageProps {
-    openLogin: boolean;
     setOpenLogin: (open: boolean) => void;
     setAuthenticated: (authenticated: boolean) => void;
 }
 
 export const LandingPage = ({
-    openLogin,
     setOpenLogin,
     setAuthenticated,
 }: LandingPageProps) => {
@@ -30,12 +28,11 @@ export const LandingPage = ({
     return (
         <div className="landing-shell">
             <Header
-                openLogin={openLogin}
                 setOpenLogin={setOpenLogin}
                 setAuthenticated={setAuthenticated}
                 variant="landing"
             />
-            <main>
+            <main id="main-content" tabIndex={-1}>
                 <HeroSection navigateToCalculator={navigateToCalculator}/>
                 <FeaturesSection navigateToCalculator={navigateToCalculator}/>
                 <HowItWorksSection/>

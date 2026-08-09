@@ -5,7 +5,6 @@ import Header from "./Header";
 import "./AboutPage.css";
 
 interface AboutPageProps {
-    openLogin: boolean;
     setOpenLogin: (open: boolean) => void;
     setAuthenticated: (authenticated: boolean) => void;
 }
@@ -27,19 +26,17 @@ const TEAM_MEMBERS: TeamMember[] = [
 ];
 
 const AboutPage = ({
-    openLogin,
     setOpenLogin,
     setAuthenticated,
 }: AboutPageProps): JSX.Element => {
     return (
         <div className="about-shell">
             <Header
-                openLogin={openLogin}
                 setOpenLogin={setOpenLogin}
                 setAuthenticated={setAuthenticated}
             />
 
-            <main>
+            <main id="main-content" tabIndex={-1}>
                 <section className="about-hero" aria-labelledby="about-title">
                     <div className="landing-container about-hero__grid">
                         <div>

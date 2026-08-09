@@ -12,7 +12,7 @@ const ErrorPage: FC<ErrorPageProps> = (): JSX.Element => {
     };
 
     return (
-        <div className="flex justify-center items-center w-full h-screen">
+        <main id="main-content" tabIndex={-1} className="flex justify-center items-center w-full h-screen">
             <div
                 className="flex flex-col justify-center items-center text-center bg-white p-10 rounded-lg shadow-lg w-[80vw] h-[60vh]">
                 <img
@@ -29,7 +29,7 @@ const ErrorPage: FC<ErrorPageProps> = (): JSX.Element => {
                     Back to Home page
                 </button>
             </div>
-        </div>
+        </main>
     );
 };
 
