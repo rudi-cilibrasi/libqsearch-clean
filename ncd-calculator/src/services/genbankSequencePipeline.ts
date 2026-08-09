@@ -1,4 +1,4 @@
-export const GENBANK_SEQUENCE_PIPELINE_VERSION = "genbank-sequence-v2";
+export const GENBANK_SEQUENCE_PIPELINE_VERSION = "genbank-sequence-v3";
 export const MAX_GENBANK_RECORDS_PER_REQUEST = 64;
 export const MAX_GENBANK_SEQUENCE_LENGTH = 20_000_000;
 export const MAX_GENBANK_TOTAL_BASES = 128_000_000;
@@ -20,6 +20,7 @@ export interface GenBankSequenceProvenance {
     readonly retrievedAt: string;
     readonly recordUrl: string;
     readonly sha256: string;
+    readonly provenanceSha256: string;
 }
 
 export interface GenBankSequenceRecord {
@@ -132,6 +133,24 @@ const sha256 = async (value: string): Promise<string> => {
     return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
 };
 
+type UnsignedGenBankSequenceProvenance = Omit<GenBankSequenceProvenance, "provenanceSha256">;
+
+const hashProvenance = async (provenance: UnsignedGenBankSequenceProvenance): Promise<string> => sha256(JSON.stringify([
+    provenance.pipelineVersion,
+    provenance.database,
+    provenance.requestedId,
+    provenance.uid,
+    provenance.accession,
+    provenance.accessionVersion,
+    provenance.title,
+    provenance.organism,
+    provenance.taxId,
+    provenance.expectedLength,
+    provenance.retrievedAt,
+    provenance.recordUrl,
+    provenance.sha256,
+]));
+
 export const assembleValidatedGenBankRecords = async (
     requestedIds: readonly string[],
     fastaText: string,
@@ -169,6 +188,13 @@ export const assembleValidatedGenBankRecords = async (
             ?? byAccession.get(normalizedRequest)
             ?? summaries.find(candidate => accessionWithoutVersion(candidate.accessionVersion) === accessionWithoutVersion(normalizedRequest));
         if (!summaryEntry) throw new Error(`NCBI did not return metadata for ${requestedId}.`);
+        if (
+            !/^\d+$/u.test(normalizedRequest)
+            && normalizedRequest.includes(".")
+            && summaryEntry.accessionVersion !== normalizedRequest
+        ) {
+            throw new Error(`NCBI substituted ${summaryEntry.accessionVersion} for requested version ${normalizedRequest}.`);
+        }
 
         const fasta = fastaByAccession.get(summaryEntry.accessionVersion)
             ?? fastaRecords.find(record => (
@@ -194,23 +220,31 @@ export const assembleValidatedGenBankRecords = async (
             throw new Error(`The selected GenBank records exceed the ${MAX_GENBANK_TOTAL_BASES.toLocaleString()}-base comparison limit.`);
         }
 
-        results.push({
-            sequence: fasta.sequence,
-            provenance: {
+        const title = String(summaryEntry.summary.title ?? "").trim();
+        const organism = String(summaryEntry.summary.organism ?? "").trim();
+        const taxId = String(summaryEntry.summary.taxid ?? "").trim();
+        if (!title || !organism || !/^\d+$/u.test(taxId)) {
+            throw new Error(`NCBI returned incomplete provenance metadata for ${summaryEntry.accessionVersion}.`);
+        }
+
+        const provenance: UnsignedGenBankSequenceProvenance = {
                 pipelineVersion: GENBANK_SEQUENCE_PIPELINE_VERSION,
                 database: "nuccore",
                 requestedId,
                 uid: summaryEntry.uid,
                 accession: accessionWithoutVersion(summaryEntry.accessionVersion),
                 accessionVersion: summaryEntry.accessionVersion,
-                title: String(summaryEntry.summary.title ?? "").trim(),
-                organism: String(summaryEntry.summary.organism ?? "").trim(),
-                taxId: String(summaryEntry.summary.taxid ?? "").trim(),
+                title,
+                organism,
+                taxId,
                 expectedLength,
                 retrievedAt,
                 recordUrl: `https://www.ncbi.nlm.nih.gov/nuccore/${encodeURIComponent(summaryEntry.accessionVersion)}`,
                 sha256: await sha256(fasta.sequence),
-            },
+        };
+        results.push({
+            sequence: fasta.sequence,
+            provenance: {...provenance, provenanceSha256: await hashProvenance(provenance)},
         });
     }
 
@@ -232,12 +266,39 @@ export const verifyCachedGenBankRecord = async (
         || provenance.requestedId !== requestedId
         || typeof candidate.sequence !== "string"
         || typeof provenance.sha256 !== "string"
+        || typeof provenance.provenanceSha256 !== "string"
+        || provenance.database !== "nuccore"
+        || typeof provenance.uid !== "string"
+        || !/^\d+$/u.test(provenance.uid)
+        || typeof provenance.accession !== "string"
+        || typeof provenance.accessionVersion !== "string"
+        || !ACCESSION_PATTERN.test(provenance.accessionVersion)
+        || accessionWithoutVersion(provenance.accessionVersion) !== normalizeIdentifier(provenance.accession)
+        || typeof provenance.title !== "string"
+        || !provenance.title.trim()
+        || typeof provenance.organism !== "string"
+        || !provenance.organism.trim()
+        || typeof provenance.taxId !== "string"
+        || !/^\d+$/u.test(provenance.taxId)
+        || !Number.isSafeInteger(provenance.expectedLength)
+        || (provenance.expectedLength ?? 0) <= 0
+        || typeof provenance.retrievedAt !== "string"
+        || !Number.isFinite(Date.parse(provenance.retrievedAt))
+        || provenance.recordUrl !== `https://www.ncbi.nlm.nih.gov/nuccore/${encodeURIComponent(provenance.accessionVersion)}`
+        || !/^[a-f0-9]{64}$/u.test(provenance.sha256)
+        || !/^[a-f0-9]{64}$/u.test(provenance.provenanceSha256)
     ) return null;
 
     try {
         const sequence = validateGenBankNucleotideSequence(candidate.sequence);
-        if (sequence.length !== provenance.expectedLength || await sha256(sequence) !== provenance.sha256) return null;
-        return {sequence, provenance: provenance as GenBankSequenceProvenance};
+        const validProvenance = provenance as GenBankSequenceProvenance;
+        const {provenanceSha256: _storedProvenanceHash, ...unsigned} = validProvenance;
+        if (
+            sequence.length !== validProvenance.expectedLength
+            || await sha256(sequence) !== validProvenance.sha256
+            || await hashProvenance(unsigned) !== validProvenance.provenanceSha256
+        ) return null;
+        return {sequence, provenance: validProvenance};
     } catch {
         return null;
     }

@@ -21,4 +21,3 @@ if (configuredBaseUrl) {
 
 console.log("api.tsx finalUrl", finalUrl);
 export const BACKEND_BASE_URL = finalUrl;
-export const VITE_REDIS_ENDPOINT = BACKEND_BASE_URL + "/redis";

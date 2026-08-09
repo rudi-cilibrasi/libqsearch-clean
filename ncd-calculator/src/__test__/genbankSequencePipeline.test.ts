@@ -42,6 +42,7 @@ describe("GenBank sequence pipeline", () => {
             expectedLength: 15,
         });
         expect(records[0].provenance.sha256).toMatch(/^[a-f0-9]{64}$/u);
+        expect(records[0].provenance.provenanceSha256).toMatch(/^[a-f0-9]{64}$/u);
     });
 
     test("maps a numeric UID through ESummary instead of relying on FASTA order", async () => {
@@ -72,6 +73,19 @@ describe("GenBank sequence pipeline", () => {
             ">NC_000001.1 stale version\nACGTURYSWKMBDHV\n",
             summary(),
         )).rejects.toThrow("different sequence version");
+        await expect(assembleValidatedGenBankRecords(
+            ["NC_000001.1"],
+            ">NC_000001.2 current version\nACGTURYSWKMBDHV\n",
+            summary(),
+        )).rejects.toThrow("substituted NC_000001.2");
+    });
+
+    test("requires complete metadata before creating scientific provenance", async () => {
+        await expect(assembleValidatedGenBankRecords(
+            ["NC_000001.2"],
+            ">NC_000001.2 Example species\nACGTURYSWKMBDHV\n",
+            summary({organism: ""}),
+        )).rejects.toThrow("incomplete provenance metadata");
     });
 
     test("accepts only intact, pipeline-versioned cached records", async () => {
@@ -83,6 +97,10 @@ describe("GenBank sequence pipeline", () => {
         await expect(verifyCachedGenBankRecord(record, "NC_000001.2")).resolves.toEqual(record);
         await expect(verifyCachedGenBankRecord({...record, sequence: `${record.sequence}A`}, "NC_000001.2"))
             .resolves.toBeNull();
+        await expect(verifyCachedGenBankRecord({
+            ...record,
+            provenance: {...record.provenance, organism: "Tampered species"},
+        }, "NC_000001.2")).resolves.toBeNull();
         await expect(verifyCachedGenBankRecord(record, "NC_999999.1")).resolves.toBeNull();
     });
 });

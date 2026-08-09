@@ -144,10 +144,14 @@ export class CacheInterface<CacheTypes extends Record<string, any>> {
   }
 
   private isExpired<K extends keyof CacheTypes>(
-      entry: CacheEntry<CacheTypes[K]>
+    entry: CacheEntry<CacheTypes[K]>
   ): boolean {
+    const timestamp = typeof entry.timestamp === "number"
+      ? entry.timestamp
+      : (typeof entry.metadata?.lastUpdated === "number" ? entry.metadata.lastUpdated : null);
+    if (timestamp === null) return false;
     const now = Date.now();
-    return now - entry.timestamp > (this.options.ttl || 0);
+    return now - timestamp > (this.options.ttl || 0);
   }
 
   getCacheKey(cacheName: string, key: string): string {

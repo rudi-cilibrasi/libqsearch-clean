@@ -36,8 +36,9 @@ export class GenBankCacheEntry {
     this.taxonomicGroup = data.taxonomicGroup || null;
     this.taxId = data.taxId || null;
     this.metadata = {
-      lastFetched: data.metadata?.lastFetched || Date.now(),
       ...data.metadata,
+      lastUpdated: data.metadata?.lastUpdated ?? Date.now(),
+      lastFetched: data.metadata?.lastFetched ?? Date.now(),
     };
   }
 }

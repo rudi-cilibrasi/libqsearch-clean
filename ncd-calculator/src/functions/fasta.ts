@@ -15,7 +15,7 @@
 
 import { parseAccessionAndRemoveVersion } from "../cache/cache.ts";
 import { FILE_UPLOAD } from "../constants/modalConstants.js";
-import { SelectedItem } from '../components/InputHolder.tsx';
+import type {SelectedItem} from "../components/workbenchTypes";
 import {FileInfo} from "@/functions/file.ts";
 
 export interface FastaMetadata {
@@ -259,7 +259,8 @@ const isValidFastaWithSequence = (fastaList: FastaMetadata[]): boolean => {
  */
 export const getFastaInfoFromFile = (fileInfo: FileInfo): SelectedItem => {
   const content = fileInfo.content;
-  let label = fileInfo.name;
+  let label = fileInfo.name ?? "FASTA file";
+  const fileId = fileInfo.name ?? `fasta-${Date.now()}`;
   if (typeof content === "string" && hasMetadata(content)) {
     const headerWithSequence = parseFasta(content);
     const first = headerWithSequence[0];
@@ -273,20 +274,20 @@ export const getFastaInfoFromFile = (fileInfo: FileInfo): SelectedItem => {
       }
       label = t.join(" ");
     } else {
-      label = first.accession;
+      label = first.accession ?? label;
     }
     return {
       type: FILE_UPLOAD,
       content: getCleanSequence(first.sequence || ""),
       label: label,
-      id: fileInfo.name,
+      id: fileId,
     };
   } else {
     return {
       type: FILE_UPLOAD,
       content: typeof fileInfo.content === "string" ? getCleanSequence(fileInfo.content) : undefined,
       label: label,
-      id: fileInfo.name,
+      id: fileId,
     };
   }
 };

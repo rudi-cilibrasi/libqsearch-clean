@@ -11,7 +11,6 @@ import logger from "./configurations/logger";
 import loginRoutes from "./routes/login";
 import externalRoutes from "./routes/external";
 import {upsertUser} from "./services/userService";
-import redisRoutes from "./routes/redis";
 import {requestLogger} from "./middleware/requestLogger";
 import {ExtendedGithubProfile} from "./models/extendedGithubProfile";
 import {Request, Response, NextFunction} from 'express';
@@ -81,7 +80,6 @@ passport.use(new GoogleStrategy({
 // mount routes with parent path
 app.use("/api/auth", loginRoutes(passport));
 app.use("/api/external", externalRoutes);
-app.use("/api/redis", redisRoutes);
 
 // user = the profile object above strategy
 // After authentication is complete => serializeUser to store in the session, allowing the user to stay logged in

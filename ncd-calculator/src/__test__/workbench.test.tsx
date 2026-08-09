@@ -75,9 +75,6 @@ describe("NCD workbench", () => {
             <FastaSearch
                 addItem={vi.fn()}
                 selectedItems={[]}
-                getAllFastaSuggestionWithLastIndex={() => ({})}
-                getFastaSuggestionStartIndex={() => 0}
-                setFastaSuggestionStartIndex={vi.fn()}
             />
         );
 
