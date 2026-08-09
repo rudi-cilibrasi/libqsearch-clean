@@ -86,7 +86,7 @@ const LABEL_MAP = new Map([
 ]);
 
 describe("K-grid visualization lifecycle", () => {
-  test("opens on the cluster report and stops K-grid work when the report becomes active", async () => {
+  test("opens completed results on the quartet tree and stops K-grid work when the tree becomes active", async () => {
     const onOptimizationEnd = vi.fn();
     render(
       <KGridVisualization
@@ -98,15 +98,17 @@ describe("K-grid visualization lifecycle", () => {
       />,
     );
 
-    expect(screen.getByRole("button", {name: "Cluster report"})).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("heading", {name: "Suggested structure"})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: "Quartet tree"})).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", {name: "Cluster report"})).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Quartet result")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", {name: "Suggested structure"})).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", {name: "K-grid"}));
     fireEvent.click(screen.getByRole("button", {name: "Start mock K-grid"}));
-    fireEvent.click(screen.getByRole("button", {name: "Cluster report"}));
+    fireEvent.click(screen.getByRole("button", {name: "Quartet tree"}));
 
     await waitFor(() => expect(onOptimizationEnd).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("button", {name: "Cluster report"})).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", {name: "Quartet tree"})).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(/Status:/)).not.toBeInTheDocument();
     expect(screen.queryByText("ncd-pipeline-v3")).not.toBeInTheDocument();
   });
