@@ -42,6 +42,8 @@ import {GenBankSequenceCache} from "../services/GenBankSequenceCache";
 import {analyzeGenBankExperiment} from "../services/genbankExperimentPreflight";
 import {GenBankExperimentPreflight} from "./GenBankExperimentPreflight";
 import {getGenBankAnimalExampleItems} from "../services/genbankAnimalExample";
+import {CompressorSelector} from "./CompressorSelector";
+import {isCompressionPreference, type CompressionPreference} from "@/types/compression";
 export type {SelectedItem} from "./workbenchTypes";
 export interface SearchMode {
 	searchMode: string;
@@ -254,6 +256,13 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		"searchMode",
 		defaultSearchMode
 	);
+	const [compressionPreference, setCompressionPreference] = useStorageState<CompressionPreference>(
+		"compressionPreference",
+		"auto",
+	);
+	useEffect(() => {
+		if (!isCompressionPreference(compressionPreference)) setCompressionPreference("auto");
+	}, [compressionPreference, setCompressionPreference]);
 	
 	const [selectedItems, setSelectedItems] = useStorageState<SelectedItem[]>(
 		"selectedItems",
@@ -355,6 +364,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 					displayLabels: ncdSelectedItems.map(getItemDisplayLabel),
 					contents: ncdSelectedItems.map((item) => item.content || ""),
 					kind: "objects",
+					compression: compressionPreference,
 					objectMetadata: getExperimentObjectMetadata(ncdSelectedItems, "objects"),
 				} satisfies NCDInput;
 				await onComputedNcdInput(input);
@@ -709,6 +719,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 					<InputHolder selectedItems={selectedItems} onRemoveItem={removeItem} MIN_ITEMS={MIN_ITEMS}/>
 				</div>
 				<GenBankExperimentPreflight selectedItems={selectedItems}/>
+				<CompressorSelector value={compressionPreference} onChange={setCompressionPreference}/>
 
 				<footer className="workbench-actions">
 				<div className="workbench-actions__secondary">

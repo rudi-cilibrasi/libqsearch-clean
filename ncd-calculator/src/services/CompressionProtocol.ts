@@ -12,6 +12,8 @@ export const MATRIX_REDUCTION: MatrixReduction = "reflected-minimum";
 export const COMPRESSOR_REVISIONS: Readonly<Record<CompressionAlgorithm, string>> = Object.freeze({
   lzma: "nmrugg-lzma-mode-9-v1",
   zstd: "zstd-wasm-level-22-v1",
+  gzip: "pako-3.0.1-gzip-level-9-v1",
+  brotli: "brotli-wasm-3.0.1-quality-11-lgwin-22-v1",
 });
 
 const bytesToHex = (bytes: Uint8Array): string => (

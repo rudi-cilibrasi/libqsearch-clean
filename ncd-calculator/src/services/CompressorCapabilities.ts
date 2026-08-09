@@ -1,171 +1,124 @@
-/**
- * CompressorCapabilities — tracks window size properties for each compression algorithm.
- *
- * NCD requires the compressor's window to cover the ENTIRE input (both files concatenated).
- * If window < input size, the compressor only "sees" a portion of the data, producing
- * meaningless NCD values (typically showing unrelated files as similar, or vice versa).
- *
- * Window types:
- *   a) FIXED     — compressor has a hardcoded window size that cannot be changed
- *   b) CONFIGURABLE — window size can be set (up to some maximum)
- *   c) INFINITE  — compressor considers all prior input (e.g., PPM, some BWT variants)
- *
- * References:
- *   - Cilibrasi & Vitányi, "Clustering by Compression" (2005)
- *   - https://en.wikipedia.org/wiki/Normalized_compression_distance
- */
+import {PAIR_SEPARATOR} from "@/services/CompressionProtocol";
+import type {CompressionAlgorithm} from "@/types/compression";
 
-export type WindowType = "fixed" | "configurable" | "infinite";
+export type WindowType = "fixed" | "configurable";
 
 export interface CompressorProfile {
-  /** Algorithm identifier */
-  algorithm: string;
-  /** Human-readable name */
-  name: string;
-  /** Window type classification */
-  windowType: WindowType;
-  /**
-   * Effective window size in bytes.
-   * - For FIXED: the hardcoded window size
-   * - For CONFIGURABLE: the currently configured / maximum configurable window
-   * - For INFINITE: Infinity
-   */
-  windowSize: number;
-  /**
-   * Maximum possible window size (for configurable compressors).
-   * Equal to windowSize for fixed/infinite types.
-   */
-  maxWindowSize: number;
-  /** Maximum input size the compressor accepts */
-  maxInputSize: number;
-  /** Notes about NCD suitability */
-  notes: string;
+  readonly algorithm: CompressionAlgorithm;
+  readonly name: string;
+  readonly family: string;
+  readonly windowType: WindowType;
+  /** Effective history window used by the pinned application settings. */
+  readonly windowSize: number;
+  /** Maximum ordered-pair input accepted by this application. */
+  readonly maxInputSize: number;
+  readonly description: string;
+  readonly settings: string;
+  readonly ncdNotes: string;
 }
 
+const MEBIBYTE = 1024 * 1024;
+
 /**
- * Known compressor profiles used in this application.
+ * The active compressor portfolio and its reproducibility-critical settings.
  *
- * LZMA: Dictionary-based, configurable from 4KB to 128MB.
- *   - Our implementation dynamically sizes the dictionary to fit the input.
- *   - At level 9 (max), dictionary = next power of 2 above input size, up to 128MB.
- *   - SAFE for NCD: dictionary always >= input size (up to 128MB limit).
- *
- * ZSTD: Block-based with configurable window, up to ~128MB at level 22.
- *   - Window size depends on compression level and input size.
- *   - At level 22 (our setting), window can reach ~128MB.
- *   - SAFE for NCD if input < window size; needs validation.
- *
- * gzip/zlib (not currently used, but for reference):
- *   - FIXED 32KB window (LZ77). Cannot be changed.
- *   - UNSAFE for NCD with inputs > 32KB — only compares trailing 32KB.
- *   - Should NEVER be used for NCD on genomic data (typically >>32KB).
- *
- * bzip2 (not currently used, but for reference):
- *   - Configurable block size: 100KB to 900KB.
- *   - BWT-based, so within a block it has "infinite" context.
- *   - SAFE for NCD if input fits in one block; warn otherwise.
+ * The input limit is a scientific guardrail, not merely a memory limit: NCD
+ * needs the compressor history window to cover x + separator + y. Algorithms
+ * with a smaller window are rejected before a worker starts.
  */
-export const COMPRESSOR_PROFILES: Record<string, CompressorProfile> = {
-  lzma: {
+export const COMPRESSOR_PROFILES: Readonly<Record<CompressionAlgorithm, CompressorProfile>> = Object.freeze({
+  lzma: Object.freeze({
     algorithm: "lzma",
     name: "LZMA",
+    family: "Lempel–Ziv dictionary coding with range coding",
     windowType: "configurable",
-    windowSize: 128 * 1024 * 1024, // dynamically set, max 128MB
-    maxWindowSize: 128 * 1024 * 1024,
-    maxInputSize: 2 * 1024 * 1024, // current app limit
-    notes:
-      "Dictionary auto-sized to input. Safe for NCD up to 128MB. " +
-      "Our app limits LZMA to 2MB inputs for performance.",
-  },
-  zstd: {
+    windowSize: 128 * MEBIBYTE,
+    maxInputSize: 2 * MEBIBYTE,
+    description: "High-ratio baseline for text and compact research objects up to 2 MiB per pair.",
+    settings: "nmrugg LZMA mode 9",
+    ncdNotes: "The application limit stays below the compressor dictionary and bounds browser CPU cost.",
+  }),
+  zstd: Object.freeze({
     algorithm: "zstd",
     name: "Zstandard",
+    family: "LZ77 with entropy coding",
     windowType: "configurable",
-    windowSize: 128 * 1024 * 1024, // at level 22
-    maxWindowSize: 128 * 1024 * 1024,
-    maxInputSize: 128 * 1024 * 1024,
-    notes:
-      "Window size depends on level. At level 22 (max), window up to ~128MB. " +
-      "Safe for NCD within this range.",
-  },
-  gzip: {
+    windowSize: 128 * MEBIBYTE,
+    maxInputSize: 128 * MEBIBYTE,
+    description: "Large-window default for datasets with ordered pairs up to 128 MiB.",
+    settings: "zstd-wasm level 22",
+    ncdNotes: "Level 22 provides the largest window in the bundled Zstandard build.",
+  }),
+  gzip: Object.freeze({
     algorithm: "gzip",
-    name: "gzip (LZ77)",
+    name: "gzip / DEFLATE",
+    family: "LZ77 with Huffman coding",
     windowType: "fixed",
-    windowSize: 32 * 1024, // 32KB, hardcoded in deflate
-    maxWindowSize: 32 * 1024,
-    maxInputSize: Infinity,
-    notes:
-      "FIXED 32KB window. UNSAFE for NCD with inputs > 32KB. " +
-      "Only compares the last 32KB of input — will produce incorrect NCD " +
-      "for genomic sequences, documents, or any file larger than 32KB.",
-  },
-  bzip2: {
-    algorithm: "bzip2",
-    name: "bzip2 (BWT)",
+    windowSize: 32 * 1024,
+    maxInputSize: 32 * 1024,
+    description: "Classical, widely understood NCD baseline for ordered pairs no larger than 32 KiB.",
+    settings: "pako 3, gzip framing, DEFLATE level 9",
+    ncdNotes: "DEFLATE has a fixed 32 KiB history window, so larger pairs are rejected as unreliable.",
+  }),
+  brotli: Object.freeze({
+    algorithm: "brotli",
+    name: "Brotli",
+    family: "LZ77 with context modeling, Huffman coding, and a static dictionary",
     windowType: "configurable",
-    windowSize: 900 * 1024, // default max block size
-    maxWindowSize: 900 * 1024,
-    maxInputSize: Infinity,
-    notes:
-      "BWT-based with configurable block size (100KB–900KB). " +
-      "Effectively infinite context within a block. " +
-      "Safe for NCD if combined input fits in one block.",
-  },
+    windowSize: 4 * MEBIBYTE,
+    maxInputSize: 4 * MEBIBYTE,
+    description: "Modern high-ratio comparison codec for text-oriented ordered pairs up to 4 MiB.",
+    settings: "brotli-wasm 3, quality 11, default lgwin 22",
+    ncdNotes: "The 4 MiB limit matches the encoder's default 2^22-byte history window.",
+  }),
+});
+
+export interface CompressorValidation {
+  readonly valid: boolean;
+  readonly combinedSize: number;
+  readonly warning?: string;
+}
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < MEBIBYTE) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / MEBIBYTE).toFixed(2)} MiB`;
 };
 
-/**
- * Validate that a compressor's window is adequate for the given input sizes.
- *
- * @param algorithm - compressor algorithm key
- * @param size1 - size of first input in bytes
- * @param size2 - size of second input in bytes
- * @returns validation result with warning if window is too small
- */
+/** Validate the largest ordered pair against the selected compressor window. */
 export function validateWindowForNCD(
-  algorithm: string,
+  algorithm: CompressionAlgorithm,
   size1: number,
-  size2: number
-): { valid: boolean; warning?: string } {
+  size2: number,
+): CompressorValidation {
+  if (![size1, size2].every((size) => Number.isFinite(size) && size >= 0)) {
+    throw new Error("Compression input sizes must be finite, non-negative byte counts");
+  }
+
   const profile = COMPRESSOR_PROFILES[algorithm];
-  if (!profile) {
+  const separatorSize = new TextEncoder().encode(PAIR_SEPARATOR).length;
+  const combinedSize = size1 + size2 + separatorSize;
+
+  if (combinedSize > profile.maxInputSize || combinedSize > profile.windowSize) {
     return {
       valid: false,
-      warning: `Unknown compressor: ${algorithm}. Cannot verify window size adequacy.`,
-    };
-  }
-
-  // Infinite window is always fine
-  if (profile.windowType === "infinite") {
-    return { valid: true };
-  }
-
-  // The concatenated size is what matters — NCD compresses x+y together
-  const combinedSize = size1 + size2;
-
-  if (combinedSize > profile.windowSize) {
-    const windowMB = (profile.windowSize / (1024 * 1024)).toFixed(1);
-    const inputMB = (combinedSize / (1024 * 1024)).toFixed(1);
-    return {
-      valid: false,
+      combinedSize,
       warning:
-        `${profile.name} has a ${profile.windowType} window of ${windowMB}MB, ` +
-        `but the combined input is ${inputMB}MB. NCD results will be unreliable — ` +
-        `the compressor can only compare a portion of the data. ` +
-        `Use a compressor with a larger window or reduce input size.`,
+        `${profile.name} cannot produce a reliable NCD for this set: the largest ordered pair is `
+        + `${formatBytes(combinedSize)}, above its ${formatBytes(profile.windowSize)} history window. `
+        + "Choose a larger-window compressor or reduce the object sizes.",
     };
   }
 
-  // Warn if we're close to the limit (>80% of window)
   if (combinedSize > profile.windowSize * 0.8) {
-    const pct = ((combinedSize / profile.windowSize) * 100).toFixed(0);
     return {
       valid: true,
+      combinedSize,
       warning:
-        `Combined input uses ${pct}% of ${profile.name}'s window. ` +
-        `Results should be valid but consider a compressor with more headroom.`,
+        `The largest ordered pair uses ${Math.round((combinedSize / profile.windowSize) * 100)}% `
+        + `of the ${profile.name} history window.`,
     };
   }
 
-  return { valid: true };
+  return {valid: true, combinedSize};
 }

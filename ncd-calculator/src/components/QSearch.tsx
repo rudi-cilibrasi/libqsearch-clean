@@ -452,7 +452,10 @@ export const QSearch: React.FC<QSearchProps> = ({
 				{isLoading && (
 					<section className="workbench-computation" aria-live="polite" aria-label="NCD computation progress">
 						{compressionInfo && (
-							<p>Computing pairwise distances with {compressionInfo.algorithm.toUpperCase()}.</p>
+							<>
+								<p>Computing pairwise distances with {compressionInfo.algorithm.toUpperCase()}.</p>
+								{compressionInfo.warning && <p>{compressionInfo.warning}</p>}
+							</>
 						)}
 						{qSearchProgress && (
 							<p>Building the quartet tree…</p>

@@ -31,9 +31,11 @@ const compressionWorkerLifecycleMocks = vi.hoisted(() => ({
 vi.mock("../services/CompressionService", () => ({
     CompressionService: {
         getInstance: () => compressionWorkerLifecycleMocks,
-        getAvailableAlgorithms: () => ["lzma", "zstd"],
+        getAvailableAlgorithms: () => ["lzma", "zstd", "gzip", "brotli"],
         getAlgorithmInfo: (algorithm: string) => ({
-            maxSize: algorithm === "lzma" ? 2 * 1024 * 1024 : 128 * 1024 * 1024,
+            name: ({lzma: "LZMA", zstd: "Zstandard", gzip: "gzip / DEFLATE", brotli: "Brotli"})[
+                algorithm as "lzma" | "zstd" | "gzip" | "brotli"
+            ],
             description: `${algorithm} compression`,
         }),
     },
@@ -212,6 +214,7 @@ describe("NCD workbench", () => {
         await waitFor(() => expect(onComputedNcdInput).toHaveBeenCalledOnce());
         expect(onComputedNcdInput).toHaveBeenCalledWith(expect.objectContaining({
             kind: "objects",
+            compression: "auto",
             objectMetadata: expect.arrayContaining([
                 expect.objectContaining({
                     id: "example-alpha",
@@ -221,6 +224,32 @@ describe("NCD workbench", () => {
             ]),
         }));
         expect(screen.queryByRole("button", {name: "Export tree"})).not.toBeInTheDocument();
+    });
+
+    test("carries an explicit compressor choice into the computation", async () => {
+        const onComputedNcdInput = vi.fn();
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={onComputedNcdInput}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(screen.getByRole("button", {name: "Sequence example"}));
+        fireEvent.change(screen.getByLabelText("Compression algorithm"), {target: {value: "gzip"}});
+        expect(screen.getByText("gzip compression")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", {name: "Show Similarity"}));
+
+        await waitFor(() => expect(onComputedNcdInput).toHaveBeenCalledOnce());
+        expect(onComputedNcdInput).toHaveBeenCalledWith(expect.objectContaining({
+            kind: "objects",
+            compression: "gzip",
+        }));
     });
 
     test("upgrades saved UDHR identifiers to canonical language names", async () => {
