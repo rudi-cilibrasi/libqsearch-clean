@@ -42,14 +42,12 @@ import type {ClusteringExperimentTiming, CompleteCompressionRecords} from "@/typ
 import "./Workbench.css";
 
 export interface QSearchProps {
-	openLogin: boolean;
 	setOpenLogin: (open: boolean) => void;
 	authenticated: boolean;
 	setAuthenticated: (auth: boolean) => void;
 }
 
 export const QSearch: React.FC<QSearchProps> = ({
-	                                                openLogin,
 	                                                setOpenLogin,
 	                                                authenticated,
 	                                                setAuthenticated,
@@ -439,11 +437,10 @@ export const QSearch: React.FC<QSearchProps> = ({
 	return (
 		<div className="ncd-workbench">
 			<Header
-				openLogin={openLogin}
 				setOpenLogin={setOpenLogin}
 				setAuthenticated={setAuthenticated}
 			/>
-			<main className="workbench-page">
+			<main id="main-content" className="workbench-page" tabIndex={-1}>
 				<ListEditor
 					onComputedNcdInput={onNcdInput}
 					setIsLoading={setIsLoading}

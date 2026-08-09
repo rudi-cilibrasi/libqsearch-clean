@@ -12,7 +12,6 @@ describe("scientific About page", () => {
         render(
             <MemoryRouter initialEntries={["/about"]}>
                 <AboutPage
-                    openLogin={false}
                     setOpenLogin={vi.fn()}
                     setAuthenticated={vi.fn()}
                 />

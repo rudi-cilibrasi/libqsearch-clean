@@ -19,7 +19,6 @@ const renderLandingPage = () => {
     render(
         <MemoryRouter initialEntries={["/"]}>
             <LandingPage
-                openLogin={false}
                 setOpenLogin={setOpenLogin}
                 setAuthenticated={setAuthenticated}
             />

@@ -81,4 +81,10 @@ The landing page and workbench share a restrained scientific/editorial system: w
 
 The production interface is for end users. Internal identifiers, seeds, protocol versions, worker throughput, iteration counts, objective values, cache state, and raw optimizer diagnostics belong in exports, logs, tests, or technical documents rather than the GUI. See [`docs/END_USER_UI_POLICY.md`](docs/END_USER_UI_POLICY.md).
 
-Updated 2026-08-07 (Asia/Ho_Chi_Minh).
+## Accessibility
+
+CompLearn targets WCAG 2.2 Level AA through staged, separately reviewed changes. The current accessibility foundation provides a keyboard-visible bypass link, route-specific titles and focus handoff, a focus-contained sign-in dialog with an inert background and focus restoration, and an automated axe-core A/AA regression check. Automated checks do not establish conformance; keyboard, zoom, forced-colors, screen-reader, visualization, and long-running-workflow reviews remain part of the delivery plan.
+
+The prioritized feature list, 1–10 impact ratings, audit evidence, PR boundaries, and verification policy are maintained in [`docs/ACCESSIBILITY_ROADMAP.md`](docs/ACCESSIBILITY_ROADMAP.md). Each roadmap item is intended to ship in its own PR, with an explicit approval signal before the next item begins.
+
+Updated 2026-08-09 (Asia/Ho_Chi_Minh).
