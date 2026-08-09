@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {ClusterReport} from "@/components/ClusterReport";
 import {KGridDualOptimization} from './KGridDualOptimization';
 import {QSearchTree3D} from './QSearchTree3D';
 import type {QTreeResponse} from "@/types/qsearch";
@@ -9,6 +10,7 @@ import type {NCDMatrixResponse} from "@/types/ncd";
 
 // Visualization types enum for better type safety
 export const VisualizationType = {
+    REPORT: "report",
     QUARTET: "quartet",
     KGRID: "kgrid",
     MATRIX: "matrix"
@@ -45,29 +47,14 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                                                                    labelMap,
                                                                    errorMsg
                                                                }) => {
-    // Default to QUARTET view, fallback to others if available
-    const getDefaultView = (): VisualizationTypeValue => {
-        if (qSearchTreeResult && Object.keys(qSearchTreeResult).length > 0) {
-            return VisualizationType.QUARTET;
-        }
-        return VisualizationType.KGRID;
-    };
-
     // State management
-    const [activeViz, setActiveViz] = useState<VisualizationTypeValue>(getDefaultView());
+    const [activeViz, setActiveViz] = useState<VisualizationTypeValue>(VisualizationType.REPORT);
     const [selectedTheme, setSelectedTheme] = useState("scientific");
     const [isRunning, setIsRunning] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
 
     // Track if optimization has been started manually
     const manuallyStartedRef = useRef(false);
-
-    // Update default view when tree data becomes available
-    useEffect(() => {
-        if (qSearchTreeResult && Object.keys(qSearchTreeResult).length > 0) {
-            setActiveViz(VisualizationType.QUARTET);
-        }
-    }, [qSearchTreeResult]);
 
     // Use a ref to track running state to avoid closure issues
     const isRunningRef = useRef<boolean>(false);
@@ -208,6 +195,14 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
     // Get content for current visualization type
     const renderVisualizationContent = () => {
         switch (activeViz) {
+            case VisualizationType.REPORT:
+                return (
+                    <ClusterReport
+                        ncdMatrixResponse={ncdMatrixResponse}
+                        labelMap={labelMap}
+                        qSearchTreeResult={qSearchTreeResult}
+                    />
+                );
             case VisualizationType.KGRID:
                 return renderKGridContent();
             case VisualizationType.MATRIX:
@@ -230,27 +225,34 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
 
             {/* Visualization Type Selector */}
             <nav className="ncd-visualization__tabs" aria-label="Result view">
-                    <button
-                        type="button"
-                        onClick={() => setActiveViz(VisualizationType.QUARTET)}
-                        aria-pressed={activeViz === VisualizationType.QUARTET}
-                    >
-                        Quartet tree
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setActiveViz(VisualizationType.KGRID)}
-                        aria-pressed={activeViz === VisualizationType.KGRID}
-                    >
-                        K-grid
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setActiveViz(VisualizationType.MATRIX)}
-                        aria-pressed={activeViz === VisualizationType.MATRIX}
-                    >
-                        Distance matrix
-                    </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveViz(VisualizationType.REPORT)}
+                    aria-pressed={activeViz === VisualizationType.REPORT}
+                >
+                    Cluster report
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveViz(VisualizationType.QUARTET)}
+                    aria-pressed={activeViz === VisualizationType.QUARTET}
+                >
+                    Quartet tree
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveViz(VisualizationType.KGRID)}
+                    aria-pressed={activeViz === VisualizationType.KGRID}
+                >
+                    K-grid
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveViz(VisualizationType.MATRIX)}
+                    aria-pressed={activeViz === VisualizationType.MATRIX}
+                >
+                    Distance matrix
+                </button>
             </nav>
 
 
@@ -337,11 +339,14 @@ const KGridVisualization: React.FC<KGridVisualizationProps> = ({
                         <div className="bg-gray-800 p-4 border-l-4 border-yellow-500 mb-4 text-white text-left">
                             <h3 className="font-bold text-lg mb-2 text-yellow-300 text-center">Reading NCD outputs</h3>
                             <p className="mb-2 text-base">
-                                This tool presents relationships among the selected objects in three forms:
+                                This tool presents relationships among the selected objects in four forms:
                             </p>
                             <ul className="text-left">
+                                <li className="mb-1"><strong className="text-yellow-300">Cluster Report:</strong> Summarizes
+                                    suggested groups, closest pairs, separation, and research limitations in text.
+                                </li>
                                 <li className="mb-1"><strong className="text-yellow-300">Quartet Tree:</strong> Displays
-                                    relationships as a hierarchical tree structure showing evolutionary relationships.
+                                    global relationships as an unrooted topology without asserting evolutionary ancestry.
                                 </li>
                                 <li className="mb-1"><strong className="text-yellow-300">K-Grid:</strong> Arranges items
                                     in a grid where similar items are placed close together. The optimization process

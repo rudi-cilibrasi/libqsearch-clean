@@ -821,6 +821,356 @@
     overflow: auto;
 }
 
+.cluster-report {
+    display: grid;
+    gap: 18px;
+    padding: clamp(18px, 3vw, 30px);
+    color: #17231d;
+    background: #f7f3e8;
+    border: 1px solid #53635a;
+}
+
+.cluster-report--error {
+    color: #6e2514;
+    border-left: 4px solid #a6462b;
+}
+
+.cluster-report--error span {
+    display: block;
+}
+
+.cluster-report__header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #7e877f;
+}
+
+.cluster-report__eyebrow,
+.cluster-report__highlights span,
+.cluster-report__group header span,
+.cluster-report__pairs header span {
+    margin: 0 0 7px;
+    color: #5c675f;
+    font-family: var(--font-mono);
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+
+.cluster-report__header h3 {
+    margin: 0;
+    color: #173c2e;
+    font-family: var(--font-serif);
+    font-size: clamp(1.55rem, 3vw, 2.25rem);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+}
+
+.cluster-report__header p:last-child {
+    max-width: 680px;
+    margin: 8px 0 0;
+    color: #3b463f;
+    font-size: 0.83rem;
+    line-height: 1.55;
+}
+
+.cluster-report__group-control {
+    min-width: 190px;
+    display: grid;
+    gap: 7px;
+}
+
+.cluster-report__group-control label {
+    color: #3b463f;
+    font-family: var(--font-mono);
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.cluster-report__group-control select,
+.cluster-report__group-control button {
+    min-height: 38px;
+    padding: 8px 10px;
+    color: #17231d;
+    background: #fffdf7;
+    border: 1px solid #53635a;
+    border-radius: 0;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.cluster-report__group-control button:hover,
+.cluster-report__group-control button:focus-visible {
+    color: #fffdf7;
+    background: #173c2e;
+}
+
+.cluster-report__assessment {
+    display: grid;
+    grid-template-columns: minmax(130px, 0.3fr) minmax(0, 1fr);
+    gap: 16px;
+    padding: 13px 15px;
+    color: #17231d;
+    border-left: 4px solid #315b4b;
+    background: #e4ebe4;
+    font-size: 0.78rem;
+}
+
+.cluster-report__assessment--moderate {
+    border-left-color: #9b6334;
+    background: #f1e7d6;
+}
+
+.cluster-report__assessment--weak {
+    border-left-color: #a6462b;
+    background: #f3dfd7;
+}
+
+.cluster-report__highlights {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid #7e877f;
+    border-left: 1px solid #7e877f;
+}
+
+.cluster-report__highlights article {
+    min-width: 0;
+    display: grid;
+    align-content: start;
+    gap: 5px;
+    padding: 16px;
+    background: #fffdf7;
+    border-right: 1px solid #7e877f;
+    border-bottom: 1px solid #7e877f;
+}
+
+.cluster-report__highlights strong {
+    color: #173c2e;
+    font-size: 0.89rem;
+    overflow-wrap: anywhere;
+}
+
+.cluster-report__highlights small {
+    color: #5c675f;
+    font-size: 0.7rem;
+    line-height: 1.45;
+}
+
+.cluster-report__groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.cluster-report__group {
+    min-width: 0;
+    background: #fffdf7;
+    border: 1px solid #7e877f;
+}
+
+.cluster-report__group header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 13px;
+    border-bottom: 1px solid #b5b9b2;
+}
+
+.cluster-report__group header span {
+    margin: 0;
+    color: #173c2e;
+}
+
+.cluster-report__group header small {
+    color: #5c675f;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+}
+
+.cluster-report__group ul {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 13px 13px 12px 30px;
+    color: #17231d;
+    font-size: 0.78rem;
+}
+
+.cluster-report__group p {
+    margin: 0;
+    padding: 10px 13px;
+    color: #5c675f;
+    background: #eeeadd;
+    border-top: 1px solid #b5b9b2;
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    line-height: 1.45;
+}
+
+.cluster-report__pairs {
+    background: #fffdf7;
+    border: 1px solid #7e877f;
+}
+
+.cluster-report__pairs header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 13px 15px;
+    border-bottom: 1px solid #b5b9b2;
+}
+
+.cluster-report__pairs h4,
+.cluster-report__nearest-neighbors h4,
+.cluster-report__stability h4 {
+    margin: 0;
+    color: #173c2e;
+    font-size: 0.82rem;
+}
+
+.cluster-report__pairs header span {
+    margin: 0;
+}
+
+.cluster-report__pairs ol,
+.cluster-report__nearest-neighbors ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cluster-report__pairs li,
+.cluster-report__nearest-neighbors li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 10px 15px;
+    border-bottom: 1px solid #d2d2ca;
+    font-size: 0.74rem;
+}
+
+.cluster-report__pairs li:last-child,
+.cluster-report__nearest-neighbors li:last-child {
+    border-bottom: 0;
+}
+
+.cluster-report__pairs li strong,
+.cluster-report__nearest-neighbors li strong {
+    color: #173c2e;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+}
+
+.cluster-report__research {
+    background: #eeeadd;
+    border: 1px solid #7e877f;
+}
+
+.cluster-report__research summary {
+    padding: 13px 15px;
+    color: #173c2e;
+    cursor: pointer;
+    font-size: 0.76rem;
+    font-weight: 750;
+}
+
+.cluster-report__research-body {
+    display: grid;
+    gap: 18px;
+    padding: 0 15px 16px;
+    color: #3b463f;
+    border-top: 1px solid #b5b9b2;
+    font-size: 0.75rem;
+    line-height: 1.6;
+}
+
+.cluster-report__research-body > p {
+    margin: 15px 0 0;
+}
+
+.cluster-report__metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    border-top: 1px solid #b5b9b2;
+    border-left: 1px solid #b5b9b2;
+}
+
+.cluster-report__metrics div {
+    padding: 11px;
+    background: #fffdf7;
+    border-right: 1px solid #b5b9b2;
+    border-bottom: 1px solid #b5b9b2;
+}
+
+.cluster-report__metrics dt {
+    color: #5c675f;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+}
+
+.cluster-report__metrics dd {
+    margin: 5px 0 0;
+    color: #173c2e;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.cluster-report__candidate-table {
+    overflow-x: auto;
+}
+
+.cluster-report__candidate-table table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fffdf7;
+}
+
+.cluster-report__candidate-table caption {
+    padding: 9px 11px;
+    color: #173c2e;
+    font-weight: 700;
+    text-align: left;
+}
+
+.cluster-report__candidate-table th,
+.cluster-report__candidate-table td {
+    padding: 8px 11px;
+    border: 1px solid #b5b9b2;
+    text-align: left;
+}
+
+.cluster-report__nearest-neighbors,
+.cluster-report__stability {
+    background: #fffdf7;
+    border: 1px solid #b5b9b2;
+}
+
+.cluster-report__nearest-neighbors h4,
+.cluster-report__stability h4,
+.cluster-report__stability p {
+    padding: 11px 13px;
+}
+
+.cluster-report__stability h4 {
+    border-bottom: 1px solid #b5b9b2;
+}
+
+.cluster-report__stability p {
+    margin: 0;
+}
+
 .ncd-visualization__canvas,
 .ncd-visualization__pending {
     min-height: 480px;
@@ -1452,6 +1802,30 @@ button.genbank-suggestions__status:hover {
     }
 
     .ncd-visualization__body {
+        flex-direction: column;
+    }
+
+    .cluster-report__header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .cluster-report__group-control {
+        min-width: 0;
+    }
+
+    .cluster-report__highlights,
+    .cluster-report__metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .cluster-report__assessment {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .cluster-report__pairs header {
+        align-items: flex-start;
         flex-direction: column;
     }
 
