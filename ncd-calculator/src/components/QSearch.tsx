@@ -13,6 +13,8 @@
  */
 
 import React, {useEffect, useRef, useState} from "react";
+import {Download} from "lucide-react";
+import {saveAs} from "file-saver";
 // @ts-ignore
 import QSearchWorker from "../workers/qsearchWorker.js?worker";
 import ListEditor from "./ListEditor";
@@ -30,6 +32,13 @@ import {IMPORTED_MATRIX_PROVENANCE} from "@/services/CompressionProtocol";
 import type {CompressionProvenance} from "@/types/compression";
 import {getQSearchRunCount} from "@/services/QSearchProtocol";
 import {createDisplayLabelMap, getDisplayLabel} from "@/services/DisplayLabelProtocol";
+import {
+	buildClusteringExperimentExport,
+	collectCompleteCompressionRecords,
+	getClusteringExperimentFilename,
+	serializeClusteringExperimentExport,
+} from "@/services/ClusteringExperimentExport";
+import type {ClusteringExperimentTiming, CompleteCompressionRecords} from "@/types/experiment";
 import "./Workbench.css";
 
 export interface QSearchProps {
@@ -51,11 +60,17 @@ export const QSearch: React.FC<QSearchProps> = ({
 	const [hasMatrix, setHasMatrix] = useState(false);
 	const [errorMsg, setErrorMsg] = useState("");
 	const [qSearchTreeResult, setQSearchTreeResult] = useState<QTreeResponse | undefined>();
+	const [rawQSearchTreeResult, setRawQSearchTreeResult] = useState<QTreeResponse | undefined>();
 	const [qSearchProgress, setQSearchProgress] = useState<{completed: number; total: number} | null>(null);
 	const [matrixProvenance, setMatrixProvenance] = useState<CompressionProvenance>(IMPORTED_MATRIX_PROVENANCE);
 	const [labelMap, setLabelMap] = useState<Map<string, string>>(new Map());
 	const labelMapRef = useRef(labelMap);
 	const [isLoading, setIsLoading] = useState(false);
+	const [isExporting, setIsExporting] = useState(false);
+	const [currentInput, setCurrentInput] = useState<NCDInput | null>(null);
+	const [compressionRecords, setCompressionRecords] = useState<CompleteCompressionRecords | null>(null);
+	const [experimentTiming, setExperimentTiming] = useState<ClusteringExperimentTiming | null>(null);
+	const experimentStartedAtRef = useRef<string | null>(null);
 	
 	// Add gridObjects state for KGridVisualization
 	const [gridObjects, setGridObjects] = useState<GridObject[]>([]);
@@ -82,6 +97,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 		if (event.data.action === "treeJSON") {
 			try {
 				const parsed = JSON.parse(event.data.result) as QTreeResponse;
+				setRawQSearchTreeResult(parsed);
 				const result: QTreeResponse = {
 					...parsed,
 					nodes: parsed.nodes.map((node: QTreeNode) => ({
@@ -90,6 +106,11 @@ export const QSearch: React.FC<QSearchProps> = ({
 					})),
 				};
 				setQSearchTreeResult(result);
+				const completedAt = new Date().toISOString();
+				setExperimentTiming({
+					startedAt: experimentStartedAtRef.current ?? completedAt,
+					completedAt,
+				});
 				setQSearchProgress(null);
 				setIsLoading(false);
 			} catch (error) {
@@ -149,6 +170,10 @@ export const QSearch: React.FC<QSearchProps> = ({
 		
 		try {
 			const computationInput: NCDInput = {...input, labels: normalizedLabels};
+			const startedAt = new Date().toISOString();
+			experimentStartedAtRef.current = startedAt;
+			setCurrentInput(computationInput);
+			setExperimentTiming(null);
 			const nextLabelMap = createDisplayLabelMap(normalizedLabels, input.displayLabels);
 			labelMapRef.current = nextLabelMap;
 			setLabelMap(nextLabelMap);
@@ -156,8 +181,10 @@ export const QSearch: React.FC<QSearchProps> = ({
 			setIsLoading(true);
 			setErrorMsg("");
 			setQSearchTreeResult(undefined);
+			setRawQSearchTreeResult(undefined);
 			setQSearchProgress(null);
 			setCompressionInfo(null);
+			setCompressionRecords(null);
 			setCompressionStats({
 				processedPairs: 0,
 				totalPairs: 0,
@@ -207,6 +234,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 					ncdMatrix: ncdMatrix,
 				});
 				setCompressionInfo(null);
+				setCompressionRecords(null);
 			} else {
 				const emptyObjectIndex = computationInput.contents.findIndex(
 					(content) => typeof content !== "string" || content.trim().length === 0,
@@ -260,6 +288,14 @@ export const QSearch: React.FC<QSearchProps> = ({
 				if (!result) {
 					throw new Error("Processing failed");
 				}
+				const completeRecords = collectCompleteCompressionRecords({
+					algorithm: prepared.algorithm,
+					contentKeys: prepared.contentKeys,
+					cachedSizes: prepared.cachedSizes,
+					newSingles: result.singleCompressionData,
+					newOrderedPairs: result.pairCompressionData,
+				});
+				setCompressionRecords(completeRecords);
 				
 				// Display results
 				const response: NCDMatrixResponse = result;
@@ -290,6 +326,47 @@ export const QSearch: React.FC<QSearchProps> = ({
 			console.error("Error in onNcdInput:", error);
 			setErrorMsg(error instanceof Error ? error.message : "Processing failed");
 			setIsLoading(false);
+		}
+	};
+
+	const exportExperiment = async (): Promise<void> => {
+		if (
+			!currentInput
+			|| !rawQSearchTreeResult
+			|| !experimentTiming
+			|| labels.length === 0
+			|| ncdMatrix.length === 0
+		) {
+			setErrorMsg("The clustering result is not ready to export");
+			return;
+		}
+		setIsExporting(true);
+		setErrorMsg("");
+		try {
+			const exportedAt = new Date().toISOString();
+			const document = await buildClusteringExperimentExport({
+				input: currentInput,
+				matrix: {
+					labels,
+					directedNcdMatrix,
+					ncdMatrix,
+					provenance: matrixProvenance,
+				},
+				compressionRecords,
+				tree: rawQSearchTreeResult,
+				timing: experimentTiming,
+				exportedAt,
+			});
+			const blob = new Blob(
+				[serializeClusteringExperimentExport(document)],
+				{type: "application/json;charset=utf-8"},
+			);
+			saveAs(blob, getClusteringExperimentFilename(exportedAt));
+		} catch (error) {
+			console.error("Unable to export clustering experiment:", error);
+			setErrorMsg(error instanceof Error ? error.message : "Unable to export the clustering result");
+		} finally {
+			setIsExporting(false);
 		}
 	};
 
@@ -339,9 +416,14 @@ export const QSearch: React.FC<QSearchProps> = ({
 		setLabelMap(new Map());
 		setHasMatrix(false);
 		setQSearchTreeResult(undefined);
+		setRawQSearchTreeResult(undefined);
 		setQSearchProgress(null);
 		setMatrixProvenance(IMPORTED_MATRIX_PROVENANCE);
 		setCompressionInfo(null);
+		setCompressionRecords(null);
+		setCurrentInput(null);
+		setExperimentTiming(null);
+		experimentStartedAtRef.current = null;
 		setCompressionStats({
 			processedPairs: 0,
 			totalPairs: 0,
@@ -363,7 +445,6 @@ export const QSearch: React.FC<QSearchProps> = ({
 			/>
 			<main className="workbench-page">
 				<ListEditor
-					qTreeResponse={qSearchTreeResult}
 					onComputedNcdInput={onNcdInput}
 					setIsLoading={setIsLoading}
 					resetDisplay={resetDisplay}
@@ -389,7 +470,18 @@ export const QSearch: React.FC<QSearchProps> = ({
 					<section className="workbench-results" aria-labelledby="results-title">
 						<header className="workbench-results__header">
 							<h2 id="results-title">Similarity</h2>
-							<span>{labels.length} objects · {labels.length * (labels.length - 1) / 2} pairs</span>
+							<div className="workbench-results__summary">
+								<span>{labels.length} objects · {labels.length * (labels.length - 1) / 2} pairs</span>
+								<button
+									type="button"
+									onClick={exportExperiment}
+									disabled={!rawQSearchTreeResult || !experimentTiming || isExporting}
+									className="workbench-button workbench-results__export"
+								>
+									<Download size={16} aria-hidden="true"/>
+									{isExporting ? "Preparing JSON…" : "Download JSON"}
+								</button>
+							</div>
 						</header>
 						<KGridVisualization
 							labelMap={labelMap}

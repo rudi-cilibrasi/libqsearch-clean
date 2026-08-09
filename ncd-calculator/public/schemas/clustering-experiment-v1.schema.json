@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rudi-cilibrasi/libqsearch-clean/main/ncd-calculator/public/schemas/clustering-experiment-v1.schema.json",
+  "title": "CompLearn clustering experiment export",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schemaVersion", "schema", "exportedAt", "experiment", "integrity"],
+  "properties": {
+    "format": {"const": "complearn-clustering-experiment"},
+    "schemaVersion": {"const": 1},
+    "schema": {"const": "https://raw.githubusercontent.com/rudi-cilibrasi/libqsearch-clean/main/ncd-calculator/public/schemas/clustering-experiment-v1.schema.json"},
+    "exportedAt": {"type": "string", "format": "date-time"},
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "timing", "input", "distanceAnalysis", "quartetTree"],
+      "properties": {
+        "id": {"$ref": "#/$defs/sha256Key"},
+        "timing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["startedAt", "completedAt"],
+          "properties": {
+            "startedAt": {"type": "string", "format": "date-time"},
+            "completedAt": {"type": "string", "format": "date-time"}
+          }
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sourceFileName", "objectCount", "objects"],
+          "properties": {
+            "kind": {"enum": ["objects", "distance-matrix"]},
+            "sourceFileName": {"type": ["string", "null"]},
+            "objectCount": {"type": "integer", "minimum": 1},
+            "objects": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/inputObject"}
+            }
+          }
+        },
+        "distanceAnalysis": {"$ref": "#/$defs/distanceAnalysis"},
+        "quartetTree": {"$ref": "#/$defs/quartetTree"}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "scope", "canonicalization", "sha256"],
+      "properties": {
+        "algorithm": {"const": "SHA-256"},
+        "scope": {"const": "input-manifest + distance-analysis + quartet-tree"},
+        "canonicalization": {"const": "complearn-export-integrity-v1"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "sha256Key": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "matrix": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "number", "minimum": 0}
+      }
+    },
+    "objectReference": {
+      "type": "object",
+      "required": ["index", "id", "displayLabel"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "id": {"type": "string", "minLength": 1},
+        "displayLabel": {"type": "string", "minLength": 1}
+      }
+    },
+    "source": {
+      "oneOf": [
+        {"type": "object", "required": ["kind", "provenance"], "properties": {"kind": {"const": "genbank"}, "provenance": {"type": "object"}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "corpus", "record"], "properties": {"kind": {"const": "udhr"}, "corpus": {"type": "object"}, "record": {"type": "object"}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "exampleId"], "properties": {"kind": {"const": "built-in-example"}, "exampleId": {"type": "string", "minLength": 1}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "provenance"], "properties": {"kind": {"const": "astronomy"}, "provenance": {"type": "object"}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "fileName"], "properties": {"kind": {"const": "local-file"}, "fileName": {"type": "string", "minLength": 1}}, "additionalProperties": false},
+        {"type": "object", "required": ["kind", "fileName"], "properties": {"kind": {"const": "imported-distance-matrix"}, "fileName": {"type": "string", "minLength": 1}}, "additionalProperties": false}
+      ]
+    },
+    "inputObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "id", "displayLabel", "source", "data", "contentKey"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "id": {"type": "string", "minLength": 1},
+        "displayLabel": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/source"},
+        "contentKey": {"oneOf": [{"$ref": "#/$defs/sha256Key"}, {"type": "null"}]},
+        "data": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mediaType", "encoding", "utf8Bytes", "sha256", "text"],
+              "properties": {
+                "mediaType": {"const": "text/plain; charset=utf-8"},
+                "encoding": {"const": "utf-8"},
+                "utf8Bytes": {"type": "integer", "minimum": 0},
+                "sha256": {"$ref": "#/$defs/sha256"},
+                "text": {"type": "string"}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "compressionProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "algorithm", "compressorRevision", "pipelineVersion", "cacheSchemaVersion", "directedMatrixForm", "matrixReduction", "pairSeparator"],
+      "properties": {
+        "source": {"enum": ["computed", "imported"]},
+        "algorithm": {"enum": ["lzma", "zstd", "unknown"]},
+        "compressorRevision": {"type": "string"},
+        "pipelineVersion": {"type": "string"},
+        "cacheSchemaVersion": {"type": "integer", "minimum": 0},
+        "directedMatrixForm": {"enum": ["ordered", "unknown"]},
+        "matrixReduction": {"enum": ["reflected-minimum", "unknown"]},
+        "pairSeparator": {"type": "string"}
+      }
+    },
+    "singleCompressionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contentKey", "compressedSize"],
+      "properties": {
+        "contentKey": {"$ref": "#/$defs/sha256Key"},
+        "compressedSize": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "pairCompressionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceContentKey", "targetContentKey", "compressedSize"],
+      "properties": {
+        "sourceContentKey": {"$ref": "#/$defs/sha256Key"},
+        "targetContentKey": {"$ref": "#/$defs/sha256Key"},
+        "compressedSize": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "distanceAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objectOrder", "directedNcdMatrix", "reflectedMinimumNcdMatrix", "compression"],
+      "properties": {
+        "objectOrder": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/objectReference"}},
+        "directedNcdMatrix": {"oneOf": [{"$ref": "#/$defs/matrix"}, {"type": "null"}]},
+        "reflectedMinimumNcdMatrix": {"$ref": "#/$defs/matrix"},
+        "compression": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provenance", "records"],
+          "properties": {
+            "provenance": {"$ref": "#/$defs/compressionProvenance"},
+            "records": {
+              "oneOf": [
+                {"type": "null"},
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["singles", "orderedPairs"],
+                  "properties": {
+                    "singles": {"type": "array", "items": {"$ref": "#/$defs/singleCompressionRecord"}},
+                    "orderedPairs": {"type": "array", "items": {"$ref": "#/$defs/pairCompressionRecord"}}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "quartetTree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rooted", "nodes", "edges", "edgeSupport", "balancedSplit", "search"],
+      "properties": {
+        "rooted": {"const": false},
+        "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/treeNode"}},
+        "edges": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/treeEdge"}},
+        "edgeSupport": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}},
+        "balancedSplit": {"$ref": "#/$defs/balancedSplit"},
+        "search": {"$ref": "#/$defs/searchSummary"}
+      }
+    },
+    "treeNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "kind", "nativeLabel", "objectId", "displayLabel", "connections"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "kind": {"enum": ["leaf", "branch"]},
+        "nativeLabel": {"type": ["string", "null"]},
+        "objectId": {"type": ["string", "null"]},
+        "displayLabel": {"type": ["string", "null"]},
+        "connections": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}, "uniqueItems": true}
+      }
+    },
+    "treeEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "target", "support", "supportKind"],
+      "properties": {
+        "source": {"type": "integer", "minimum": 0},
+        "target": {"type": "integer", "minimum": 0},
+        "support": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "supportKind": {"enum": ["repeated-search-stability", null]}
+      }
+    },
+    "balancedSplit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edgeKey", "leftLeafIndices", "rightLeafIndices", "support", "leftObjects", "rightObjects"],
+      "properties": {
+        "edgeKey": {"type": "string", "pattern": "^[0-9]+-[0-9]+$"},
+        "leftLeafIndices": {"type": "array", "items": {"type": "integer", "minimum": 0}, "uniqueItems": true},
+        "rightLeafIndices": {"type": "array", "items": {"type": "integer", "minimum": 0}, "uniqueItems": true},
+        "support": {"type": "number", "minimum": 0, "maximum": 1},
+        "leftObjects": {"type": "array", "items": {"$ref": "#/$defs/objectReference"}},
+        "rightObjects": {"type": "array", "items": {"$ref": "#/$defs/objectReference"}}
+      }
+    },
+    "searchSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pipelineVersion", "runCount", "baseSeed", "selectedSeed", "selectedScore", "scoreMinimum", "scoreMean", "scoreMaximum", "selectedTopologyCount", "selectedTopologySupport", "uniqueTopologyCount", "supportKind"],
+      "properties": {
+        "pipelineVersion": {"type": "string", "minLength": 1},
+        "runCount": {"type": "integer", "minimum": 1},
+        "baseSeed": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "selectedSeed": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "selectedScore": {"type": "number"},
+        "scoreMinimum": {"type": "number"},
+        "scoreMean": {"type": "number"},
+        "scoreMaximum": {"type": "number"},
+        "selectedTopologyCount": {"type": "integer", "minimum": 1},
+        "selectedTopologySupport": {"type": "number", "minimum": 0, "maximum": 1},
+        "uniqueTopologyCount": {"type": "integer", "minimum": 1},
+        "supportKind": {"const": "repeated-search-stability"}
+      }
+    }
+  }
+}

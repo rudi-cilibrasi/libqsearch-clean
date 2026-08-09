@@ -195,6 +195,37 @@ describe("NCD workbench", () => {
         expect(compressionWorkerLifecycleMocks.initialize).not.toHaveBeenCalled();
     });
 
+    test("passes source metadata with the built-in comparison set", async () => {
+        const onComputedNcdInput = vi.fn();
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={onComputedNcdInput}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(screen.getByRole("button", {name: "Sequence example"}));
+        fireEvent.click(screen.getByRole("button", {name: "Show Similarity"}));
+
+        await waitFor(() => expect(onComputedNcdInput).toHaveBeenCalledOnce());
+        expect(onComputedNcdInput).toHaveBeenCalledWith(expect.objectContaining({
+            kind: "objects",
+            objectMetadata: expect.arrayContaining([
+                expect.objectContaining({
+                    id: "example-alpha",
+                    displayLabel: "Sequence alpha",
+                    source: {kind: "built-in-example", exampleId: "example-alpha"},
+                }),
+            ]),
+        }));
+        expect(screen.queryByRole("button", {name: "Export tree"})).not.toBeInTheDocument();
+    });
+
     test("upgrades saved UDHR identifiers to canonical language names", async () => {
         localStorage.setItem(STORAGE_VERSION_NAME, STORAGE_VERSION.toString());
         localStorage.setItem("searchMode", JSON.stringify({searchMode: FASTA}));

@@ -12,11 +12,12 @@
  */
 
 import React, {useEffect, useRef, useState} from "react";
-import {AlertCircle, Dna, Download, FileType2, FlaskConical, Globe2, Telescope, Upload} from "lucide-react";
+import {AlertCircle, Dna, FileType2, FlaskConical, Globe2, Telescope, Upload} from "lucide-react";
 import {
 	getTranslationResponse,
 	getUdhrLanguage,
 	getUdhrRecordDisplayLabel,
+	UDHR_CORPUS,
 } from "../functions/udhr";
 import {InputHolder} from "./InputHolder.tsx";
 import {Language} from "./Language";
@@ -27,10 +28,8 @@ import {LocalStorageKeyManager, LocalStorageKeys} from "../cache/LocalStorageKey
 import {getFastaSequences} from "../functions/getPublicGenbank";
 import {FASTA, FILE_UPLOAD, LANGUAGE} from "../constants/modalConstants";
 import {useSearchParams} from "react-router-dom";
-import {NCDImportFormat} from "@/types/ncd";
-import createGraph from "@/functions/graphExport.ts";
-import {saveAs} from "file-saver";
-import type {QTreeResponse} from "@/types/qsearch";
+import type {NCDImportFormat, NCDInput} from "@/types/ncd";
+import type {ExperimentInputObjectMetadata, ExperimentObjectSource} from "@/types/experiment";
 import {getWorkbenchExampleItems} from "./workbenchExamples";
 import type {SelectedItem} from "./workbenchTypes";
 import {
@@ -44,13 +43,6 @@ export interface SearchMode {
 	searchMode: string;
 }
 
-export interface NcdInput {
-	labels: string[];
-	displayLabels?: string[];
-	contents: string[];
-	kind?: "objects" | "distance-matrix";
-}
-
 const getItemDisplayLabel = (item: SelectedItem): string => {
 	if (item.type === LANGUAGE) {
 		return getUdhrRecordDisplayLabel(item.id) ?? item.label ?? item.id;
@@ -58,14 +50,68 @@ const getItemDisplayLabel = (item: SelectedItem): string => {
 	return item.label?.trim() || item.id;
 };
 
+const getExperimentObjectSource = (
+	item: SelectedItem,
+	kind: "objects" | "distance-matrix",
+	importedMatrixFileName?: string,
+): ExperimentObjectSource => {
+	if (kind === "distance-matrix") {
+		return {
+			kind: "imported-distance-matrix",
+			fileName: importedMatrixFileName?.trim() || "imported-matrix.json",
+		};
+	}
+	if (item.type === LANGUAGE) {
+		const record = getUdhrLanguage(item.id);
+		if (!record) throw new Error(`Missing UDHR provenance for ${item.id}`);
+		return {
+			kind: "udhr",
+			corpus: {
+				schemaVersion: UDHR_CORPUS.schemaVersion,
+				corpusVersion: UDHR_CORPUS.corpusVersion,
+				assetBasePath: UDHR_CORPUS.assetBasePath,
+				source: {...UDHR_CORPUS.source},
+				summary: {...UDHR_CORPUS.summary},
+			},
+			record: {
+				...record,
+				articleNumbers: [...record.articleNumbers],
+				comparisonExclusionReasons: [...record.comparisonExclusionReasons],
+			},
+		};
+	}
+	if (item.type === FASTA) {
+		if (!item.genBankProvenance) {
+			throw new Error(`Missing verified GenBank provenance for ${item.id}`);
+		}
+		return {kind: "genbank", provenance: {...item.genBankProvenance}};
+	}
+	if (item.astronomyProvenance) {
+		return {kind: "astronomy", provenance: {...item.astronomyProvenance}};
+	}
+	if (item.id.startsWith("example-")) {
+		return {kind: "built-in-example", exampleId: item.id};
+	}
+	return {kind: "local-file", fileName: item.id};
+};
+
+const getExperimentObjectMetadata = (
+	items: readonly SelectedItem[],
+	kind: "objects" | "distance-matrix",
+	importedMatrixFileName?: string,
+): ExperimentInputObjectMetadata[] => items.map((item) => ({
+	id: item.id,
+	displayLabel: getItemDisplayLabel(item),
+	source: getExperimentObjectSource(item, kind, importedMatrixFileName),
+}));
+
 interface ListEditorProps {
-	onComputedNcdInput: (input: NcdInput) => void;
+	onComputedNcdInput: (input: NCDInput) => void;
 	setIsLoading: (loading: boolean) => void;
 	resetDisplay: () => void;
 	setOpenLogin: (open: boolean) => void;
 	authenticated: boolean;
 	initialSearchMode?: SearchMode | null;
-	qTreeResponse?: QTreeResponse | null;
 }
 
 const ListEditor: React.FC<ListEditorProps> = ({
@@ -73,7 +119,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	                                               setIsLoading,
 	                                               resetDisplay,
 	                                               initialSearchMode,
-	                                               qTreeResponse
                                                }) => {
 	
 	const [importError, setImportError] = React.useState<string | null>(null);
@@ -81,6 +126,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	const [hasImportedMatrix, setHasImportedMatrix] = useState<boolean>(false);
 	const [isAutoProcessing, setIsAutoProcessing] = useState<boolean>(false);
 	const [isLoadingAstronomy, setIsLoadingAstronomy] = useState<boolean>(false);
+	const [importedMatrixFileName, setImportedMatrixFileName] = useState<string | null>(null);
 	
 	
 	const triggerFileInput = () => {
@@ -134,6 +180,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			
 			// Update selected items
 			setSelectedItems(importedItems);
+			setImportedMatrixFileName(file.name);
 			
 			// Set flag that we've imported a matrix
 			setHasImportedMatrix(true);
@@ -145,7 +192,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				fileInputRef.current.value = '';
 			}
 			
-			await processImportedMatrix(importedItems);
+			await processImportedMatrix(importedItems, file.name);
 			
 		} catch (err) {
 			console.error('Error importing file:', err);
@@ -159,7 +206,10 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	};
 	
 	
-	const processImportedMatrix = async (importedItems: SelectedItem[]): Promise<void> => {
+	const processImportedMatrix = async (
+		importedItems: SelectedItem[],
+		sourceFileName: string,
+	): Promise<void> => {
 		try {
 			console.log("Automatically processing imported matrix data...");
 			setIsLoading(true);
@@ -178,6 +228,8 @@ const ListEditor: React.FC<ListEditorProps> = ({
 				displayLabels: importedItems.map(getItemDisplayLabel),
 				contents,
 				kind: "distance-matrix",
+				objectMetadata: getExperimentObjectMetadata(importedItems, "distance-matrix", sourceFileName),
+				sourceFileName,
 			});
 			console.log("Automatic processing of imported matrix complete");
 		} catch (error) {
@@ -188,14 +240,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		}
 	};
 	
-	
-	const handleExportMatrix = (): void => {
-		
-		const dotFormat = createGraph(qTreeResponse as Parameters<typeof createGraph>[0], false);
-		
-		const blob = new Blob([dotFormat], {type: "text/plain;charset=utf-8"});
-		saveAs(blob, "matrix_structure.dot");
-	};
 	
 	const defaultSearchMode = {
 		searchMode: initialSearchMode?.searchMode || FASTA
@@ -285,6 +329,12 @@ const ListEditor: React.FC<ListEditorProps> = ({
 					displayLabels: selectedItems.map(getItemDisplayLabel),
 					contents,
 					kind: "distance-matrix",
+					objectMetadata: getExperimentObjectMetadata(
+						selectedItems,
+						"distance-matrix",
+						importedMatrixFileName ?? undefined,
+					),
+					sourceFileName: importedMatrixFileName ?? "imported-matrix.json",
 				});
 			} else {
 				const computedNcdInput = await computeNcdInput(selectedItems);
@@ -298,7 +348,8 @@ const ListEditor: React.FC<ListEditorProps> = ({
 					displayLabels: ncdSelectedItems.map(getItemDisplayLabel),
 					contents: ncdSelectedItems.map((item) => item.content || ""),
 					kind: "objects",
-				} as NcdInput;
+					objectMetadata: getExperimentObjectMetadata(ncdSelectedItems, "objects"),
+				} satisfies NCDInput;
 				await onComputedNcdInput(input);
 			}
 		} catch (error) {
@@ -360,6 +411,9 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			const item = itemMap.get(computed.id);
 			if (item && computed.content) {
 				item.content = computed.content;
+				if (computed.genBankProvenance) {
+					item.genBankProvenance = computed.genBankProvenance;
+				}
 			}
 		})
 		
@@ -520,6 +574,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		setSelectedItems([]);
 		resetDisplay();
 		setHasImportedMatrix(false);
+		setImportedMatrixFileName(null);
 		setImportError(null);
 		if (currentMode) {
 			setSearchParams({searchMode: currentMode});
@@ -536,6 +591,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 		setMode(FILE_UPLOAD);
 		setSelectedItems(examples);
 		setHasImportedMatrix(false);
+		setImportedMatrixFileName(null);
 		setImportError(null);
 	};
 
@@ -548,6 +604,7 @@ const ListEditor: React.FC<ListEditorProps> = ({
 			setMode(FILE_UPLOAD);
 			setSelectedItems(examples);
 			setHasImportedMatrix(false);
+			setImportedMatrixFileName(null);
 		} catch (error) {
 			setImportError(error instanceof Error ? error.message : "Unable to load the astronomy example");
 		} finally {
@@ -635,10 +692,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 					<button type="button" onClick={triggerFileInput} className="workbench-button">
 						<Upload size={17} aria-hidden="true"/>
 						Import matrix
-					</button>
-					<button type="button" onClick={handleExportMatrix} className="workbench-button" disabled={selectedItems.length === 0}>
-						<Download size={17} aria-hidden="true"/>
-						Export tree
 					</button>
 				</div>
 				<div className="workbench-actions__primary">

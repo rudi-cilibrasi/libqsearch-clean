@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm run graphviz:verify-dev && npm run workers:verify-dev && npm run udhr:verify && npm run astronomy:verify && vite build && node scripts/verify-production-bundle.mjs",
+    "build": "npm run graphviz:verify-dev && npm run workers:verify-dev && npm run udhr:verify && npm run astronomy:verify && npm run export-schema:verify && vite build && node scripts/verify-production-bundle.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "debug": "vite --debug",
@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "graphviz:verify-dev": "node scripts/verify-dev-graphviz.mjs",
     "workers:verify-dev": "node scripts/verify-dev-compression-workers.mjs",
+    "export-schema:verify": "node scripts/verify-clustering-export-schema.mjs",
     "udhr:audit": "node scripts/build-udhr-corpus.mjs --audit-only",
     "udhr:refresh": "node scripts/build-udhr-corpus.mjs",
     "udhr:verify": "node scripts/verify-udhr-corpus.mjs",
