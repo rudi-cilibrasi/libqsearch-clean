@@ -115,8 +115,6 @@ interface ListEditorProps {
 	onComputedNcdInput: (input: NCDInput) => void;
 	setIsLoading: (loading: boolean) => void;
 	resetDisplay: () => void;
-	setOpenLogin: (open: boolean) => void;
-	authenticated: boolean;
 	initialSearchMode?: SearchMode | null;
 }
 
@@ -322,10 +320,6 @@ const ListEditor: React.FC<ListEditorProps> = ({
 	};
 	
 	const sendNcdInput = async (): Promise<void> => {
-		// if (selectedItems && selectedItems.length > 16 && !authenticated) {
-		// 	setOpenLogin(true);
-		// 	return;
-		// }
 		setImportError(null);
 		setIsLoading(true);
 		try {

@@ -32,7 +32,10 @@ cd ncd-calculator
 2. Create environment variables in .env file:
 ```
 VITE_BACKEND_BASE_URL=<BACKEND-SERVER-DOMAIN> (i.e. https://openscienceresearchpark.com/api)
+VITE_GA_MEASUREMENT_ID=<GA4-WEB-STREAM-ID> (optional, i.e. G-XXXXXXXXXX)
 ```
+
+The GA4 measurement ID is a public build-time identifier, not a secret. When it is unset, analytics is disabled. The frontend reports only coarse calculation start/completion events in addition to GA4's default web measurement; it does not send scientific inputs. See [`ncd-calculator/docs/GOOGLE_ANALYTICS.md`](ncd-calculator/docs/GOOGLE_ANALYTICS.md) for counting semantics, dashboard setup, privacy controls, and deployment requirements.
 3. Running commands
 ```bash
 npm install && npm run dev
@@ -93,5 +96,6 @@ cd ncd-calculator
 VITE_BASE_URL=/ncd/ \
 VITE_BACKEND_BASE_URL=https://openscienceresearchpark.com/api \
 VITE_AUTH_ENABLED=false \
+VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX \
 npm run build
 ```

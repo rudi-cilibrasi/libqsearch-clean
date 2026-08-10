@@ -39,17 +39,19 @@ import {
 	serializeClusteringExperimentExport,
 } from "@/services/ClusteringExperimentExport";
 import type {ClusteringExperimentTiming, CompleteCompressionRecords} from "@/types/experiment";
+import {
+	trackCalculationEvent,
+} from "@/services/GoogleAnalytics";
+import type {CalculationAnalyticsContext} from "@/services/GoogleAnalytics";
 import "./Workbench.css";
 
 export interface QSearchProps {
 	setOpenLogin: (open: boolean) => void;
-	authenticated: boolean;
 	setAuthenticated: (auth: boolean) => void;
 }
 
 export const QSearch: React.FC<QSearchProps> = ({
 	                                                setOpenLogin,
-	                                                authenticated,
 	                                                setAuthenticated,
 	                                                }) => {
 	const [ncdMatrix, setNcdMatrix] = useState<number[][]>([]);
@@ -69,6 +71,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 	const [compressionRecords, setCompressionRecords] = useState<CompleteCompressionRecords | null>(null);
 	const [experimentTiming, setExperimentTiming] = useState<ClusteringExperimentTiming | null>(null);
 	const experimentStartedAtRef = useRef<string | null>(null);
+	const calculationAnalyticsRef = useRef<CalculationAnalyticsContext | null>(null);
 	
 	// Add gridObjects state for KGridVisualization
 	const [gridObjects, setGridObjects] = useState<GridObject[]>([]);
@@ -111,10 +114,14 @@ export const QSearch: React.FC<QSearchProps> = ({
 				});
 				setQSearchProgress(null);
 				setIsLoading(false);
+				const analyticsContext = calculationAnalyticsRef.current;
+				calculationAnalyticsRef.current = null;
+				if (analyticsContext) trackCalculationEvent("calculation_completed", analyticsContext);
 			} catch (error) {
 				console.error("Error processing QSearch result:", error);
 				setErrorMsg("QSearch returned an invalid tree result");
 				setIsLoading(false);
+				calculationAnalyticsRef.current = null;
 			}
 		} else if (event.data.action === "qsearchProgress") {
 			setQSearchProgress({
@@ -125,6 +132,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 			setErrorMsg(`Tree search failed: ${event.data.message}`);
 			setQSearchProgress(null);
 			setIsLoading(false);
+			calculationAnalyticsRef.current = null;
 		}
 	};
 	
@@ -160,14 +168,14 @@ export const QSearch: React.FC<QSearchProps> = ({
 			return;
 		}
 		
-		// Check authentication for large computations
-		if (input.contents.length > 16 && !authenticated) {
-			setOpenLogin(true);
-			return;
-		}
-		
 		try {
 			const computationInput: NCDInput = {...input, labels: normalizedLabels};
+			const analyticsContext: CalculationAnalyticsContext = {
+				inputKind: computationInput.kind === "distance-matrix" ? "distance-matrix" : "objects",
+				objectCount: computationInput.contents.length,
+			};
+			calculationAnalyticsRef.current = analyticsContext;
+			trackCalculationEvent("calculation_started", analyticsContext);
 			const startedAt = new Date().toISOString();
 			experimentStartedAtRef.current = startedAt;
 			setCurrentInput(computationInput);
@@ -324,6 +332,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 			console.error("Error in onNcdInput:", error);
 			setErrorMsg(error instanceof Error ? error.message : "Processing failed");
 			setIsLoading(false);
+			calculationAnalyticsRef.current = null;
 		}
 	};
 
@@ -422,6 +431,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 		setCurrentInput(null);
 		setExperimentTiming(null);
 		experimentStartedAtRef.current = null;
+		calculationAnalyticsRef.current = null;
 		setCompressionStats({
 			processedPairs: 0,
 			totalPairs: 0,
@@ -445,8 +455,6 @@ export const QSearch: React.FC<QSearchProps> = ({
 					onComputedNcdInput={onNcdInput}
 					setIsLoading={setIsLoading}
 					resetDisplay={resetDisplay}
-					setOpenLogin={setOpenLogin}
-					authenticated={authenticated}
 				/>
 				
 				{isLoading && (

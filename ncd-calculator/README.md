@@ -20,6 +20,8 @@ If Vite reports `504 Outdated Optimize Dep` after dependencies or the Vite confi
 
 The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source. **Animal example** resolves a version-pinned four-record mitochondrial set from NCBI, **Sequence example** provides a small local interface check, and **Astronomy example** loads a verified 16-object RXTE time-series corpus inspired by the astronomy experiment in *Clustering by Compression*.
 
+No account is required for a calculation, including sets larger than 16 objects. When `VITE_GA_MEASUREMENT_ID` is configured, GA4 provides approximate browser-user and usage reports without an application analytics database. The calculator sends only calculation start/completion state, input kind, and object count as custom fields; it never sends labels, filenames, scientific contents, matrices, or hashes. See [`docs/GOOGLE_ANALYTICS.md`](docs/GOOGLE_ANALYTICS.md) for the exact measurement contract, dashboard setup, consent boundary, and limitations.
+
 1. Add at least four objects, or use the example data.
 2. Choose **Auto-select** or an explicit compressor model.
 3. Select **Show Similarity**. The page reports compression progress and exposes quartet-tree, K-grid, and distance-matrix result views.
@@ -59,6 +61,8 @@ npm run dev -- --force
 The planar-tree interface reports initialization failures and offers **Retry renderer**. The shared loader deduplicates concurrent initialization and clears failed attempts before retrying. Compression workers use Vite's native `new Worker(new URL(...))` transform rather than dynamically importing `?worker` wrapper modules; `workers:verify-dev` transforms and serves all four entries in middleware mode so development-only worker regressions fail before a build. The selected compressor starts lazily when a calculation begins—there is no competing prewarm—and has a 30-second cold-start window. Native worker load and message-decoding failures are reported immediately and failed workers are terminated.
 
 Focused interface and export coverage is in `src/__test__/landingPage.test.tsx`, `src/__test__/workbench.test.tsx`, and `src/__test__/clusteringExperimentExport.test.ts`.
+
+Google Analytics integration coverage is in `src/__test__/googleAnalytics.test.ts`. Analytics remains disabled when its public GA4 measurement ID is not configured.
 
 ### Reproducible UDHR inputs
 

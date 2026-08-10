@@ -11,7 +11,7 @@ import {RouteAccessibility} from "@/components/RouteAccessibility";
 
 function App() {
     const [openLogin, setOpenLogin] = useState(false)
-    const [authenticated, setAuthenticated] = useState(false)
+    const [, setAuthenticated] = useState(false)
     const closeLogin = useCallback((): void => setOpenLogin(false), []);
 
     return (
@@ -33,7 +33,6 @@ function App() {
                         element={
                             <QSearch
                                 setOpenLogin={setOpenLogin}
-                                authenticated={authenticated}
                                 setAuthenticated={setAuthenticated}
                             />
                         }
