@@ -72,6 +72,20 @@ describe("NCD workbench", () => {
         expect(screen.getByLabelText("0 of 4 required objects selected")).toBeInTheDocument();
     });
 
+    test("does not require sign-in for a comparison set larger than 16 objects", () => {
+        const example = getWorkbenchExampleItems()[0];
+        const items = Array.from({length: 17}, (_, index) => ({
+            ...example,
+            id: `large-set-${index}`,
+            label: `Object ${index + 1}`,
+        }));
+
+        render(<InputHolder selectedItems={items} onRemoveItem={vi.fn()} MIN_ITEMS={4}/>);
+
+        expect(screen.getByText("17 objects")).toBeInTheDocument();
+        expect(screen.queryByText(/sign in to prepare/i)).not.toBeInTheDocument();
+    });
+
     test("opens source modes directly at their useful controls", () => {
         render(
             <FastaSearch
@@ -145,8 +159,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -163,8 +175,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -185,8 +195,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -202,8 +210,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={onComputedNcdInput}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -234,8 +240,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={onComputedNcdInput}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
@@ -266,8 +270,6 @@ describe("NCD workbench", () => {
                     onComputedNcdInput={vi.fn()}
                     setIsLoading={vi.fn()}
                     resetDisplay={vi.fn()}
-                    setOpenLogin={vi.fn()}
-                    authenticated={false}
                 />
             </MemoryRouter>
         );
