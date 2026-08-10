@@ -1,6 +1,6 @@
 # CompLearn NCD Calculator
 
-Browser-based normalized compression distance analysis for GenBank sequences, Universal Declaration of Human Rights translations, astronomical time series, and local files. Compression, matrix construction, and layout optimization run in web workers so the interface remains responsive.
+Browser-based normalized compression distance analysis for GenBank sequences, Universal Declaration of Human Rights translations, astronomical time series, P300 EEG derivatives, and local files. Compression, matrix construction, and layout optimization run in web workers so the interface remains responsive.
 
 GenBank/NCBI Nucleotide retrieval is fail-fast and version-pinned: the requested accession version, ESummary metadata, and FASTA content must agree before a record can enter a comparison. Search supports complete mitochondrial genome, COI/COX1, and cytochrome b scopes with metadata, NCBI links, cancellation, and pagination. A structural preflight blocks mixed or partial sequence sets. Cached records carry separate sequence and provenance SHA-256 digests and are revalidated before reuse. See [`docs/GENBANK_SEQUENCE_PIPELINE.md`](docs/GENBANK_SEQUENCE_PIPELINE.md) and [`docs/GENBANK_ANIMAL_EXPERIMENTS.md`](docs/GENBANK_ANIMAL_EXPERIMENTS.md).
 
@@ -18,17 +18,19 @@ If Vite reports `504 Outdated Optimize Dep` after dependencies or the Vite confi
 
 ## Workbench workflow
 
-The calculator opens directly at its input controls. Choose GenBank, UDHR, or local files as the object source. **Animal example** resolves a version-pinned four-record mitochondrial set from NCBI, **Sequence example** provides a small local interface check, and **Astronomy example** loads a verified 16-object RXTE time-series corpus inspired by the astronomy experiment in *Clustering by Compression*.
+The calculator opens directly at its input controls. Choose GenBank, UDHR, local files, or P300 EEG as the object source. **Animal example** resolves a version-pinned four-record mitochondrial set from NCBI, **Sequence example** provides a small local interface check, and **Astronomy example** loads a verified 16-object RXTE time-series corpus inspired by the astronomy experiment in *Clustering by Compression*. The P300 source provides a small, verified `ds003061` derivative in condition and electrode modes.
 
 No account is required for a calculation, including sets larger than 16 objects. When `VITE_GA_MEASUREMENT_ID` is configured, GA4 provides approximate browser-user and usage reports without an application analytics database. The calculator sends only calculation start/completion state, input kind, and object count as custom fields; it never sends labels, filenames, scientific contents, matrices, or hashes. See [`docs/GOOGLE_ANALYTICS.md`](docs/GOOGLE_ANALYTICS.md) for the exact measurement contract, dashboard setup, consent boundary, and limitations.
 
 1. Add at least four objects, or use the example data.
 2. Choose **Auto-select** or an explicit compressor model.
-3. Select **Show Similarity**. The page reports compression progress and exposes quartet-tree, K-grid, and distance-matrix result views.
+3. Select **Show Similarity**. The page reports compression progress and opens the quartet tree first, with optional cluster-report, K-grid, and distance-matrix views. EEG experiments add waveform QC, source provenance, a label-reveal evaluation, conventional baselines, and an electrode scalp map.
 
 The compressor portfolio includes LZMA, Zstandard, gzip/DEFLATE, and Brotli. Explicit selection is carried into the calculation and exported provenance; it is no longer limited to the local-file browser. Each algorithm has a fail-fast ordered-pair limit derived from its effective history window. Auto-selection remains LZMA for pairs up to 2 MiB and Zstandard for larger pairs. The settings, scientific rationale, impact ratings, rejected candidates, and sensitivity-analysis workflow are documented in [`docs/COMPRESSOR_PORTFOLIO.md`](docs/COMPRESSOR_PORTFOLIO.md).
 
 The sequence example contains two intentionally related pairs. It exercises the same compression pipeline as uploaded content and is suitable for interface and worker verification; it is not a scientific benchmark dataset. The astronomy example is a reproducible public analogue of the paper's private GRS 1915+105 intervals. Its exact source, objective interval-selection rule, canonical signal encoding, integrity checks, and scientific limits are documented in [`docs/ASTRONOMY_EXAMPLE.md`](docs/ASTRONOMY_EXAMPLE.md).
+
+The EEG example is a public analogue derived offline with MNE-Python from subject 001, run 1 of OpenNeuro `ds003061` v1.1.2. A deterministic fixed-width ASCII serializer keeps only quantized signal values and constant segment boundaries in the compressed bytes; condition labels and all provenance stay outside that stream. Raw BIDS recordings are not parsed in the browser. Researchers can run the same fail-fast builder locally and import its bounded self-contained derivative package. The complete object contract, build procedure, evaluation design, and scientific limits are documented in [`docs/EEG_ANALYSIS.md`](docs/EEG_ANALYSIS.md).
 
 The quartet-tree result opens in a planar 2D presentation so topology and labels can be read without manipulating a camera. The view automatically fits after layout and when the viewport changes, and provides explicit zoom, fit, and reset controls. **Interactive 3D** remains available for spatial exploration; its camera also fits the complete tree on entry and resize, while node selection reports whether the selected point is a leaf or an internal node.
 
@@ -42,6 +44,7 @@ Pair compression is explicitly order-dependent. The worker first constructs the 
 npm run build
 npm run graphviz:verify-dev
 npm run astronomy:verify
+npm run eeg:verify
 npm run workers:verify-dev
 npm run export-schema:verify
 npm run lint
@@ -94,4 +97,4 @@ CompLearn targets WCAG 2.2 Level AA through staged, separately reviewed changes.
 
 The prioritized feature list, 1–10 impact ratings, audit evidence, PR boundaries, and verification policy are maintained in [`docs/ACCESSIBILITY_ROADMAP.md`](docs/ACCESSIBILITY_ROADMAP.md). Each roadmap item is intended to ship in its own PR, with an explicit approval signal before the next item begins.
 
-Updated 2026-08-09 (Asia/Ho_Chi_Minh).
+Updated 2026-08-10 (Asia/Ho_Chi_Minh).

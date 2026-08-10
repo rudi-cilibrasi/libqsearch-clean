@@ -496,6 +496,7 @@ export const QSearch: React.FC<QSearchProps> = ({
 							objects={gridObjects}
 							maxIterations={100000}
 							qSearchTreeResult={qSearchTreeResult}
+							eegContext={currentInput?.eeg}
 							autoStart={true}
 							ncdMatrixResponse={{labels, directedNcdMatrix, ncdMatrix, provenance: matrixProvenance}}
 						/>

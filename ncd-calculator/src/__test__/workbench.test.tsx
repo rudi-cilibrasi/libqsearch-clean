@@ -18,9 +18,26 @@ const getAstronomyExampleItemsMock = vi.hoisted(() => vi.fn(async () => (
     }))
 )));
 
+const getEegExampleItemsMock = vi.hoisted(() => vi.fn(async (mode: "condition" | "electrode") => (
+    Array.from({length: 16}, (_, index) => ({
+        id: `eeg:test:${mode}:${index}`,
+        label: `${mode === "condition" ? "Condition object" : "Electrode object"} ${index + 1}`,
+        type: "eeg" as const,
+        content: "+00001\n".repeat(8),
+    }))
+)));
+
 vi.mock("../services/astronomyExample", () => ({
     getAstronomyExampleItems: getAstronomyExampleItemsMock,
     verifyAstronomyExampleItem: vi.fn(async () => undefined),
+}));
+
+vi.mock("../services/eegExample", () => ({
+    MAX_EEG_PACKAGE_BYTES: 2 * 1024 * 1024,
+    getEegExampleItems: getEegExampleItemsMock,
+    importEegPortablePackage: vi.fn(async () => []),
+    verifyEegExampleItem: vi.fn(async () => undefined),
+    getEegExperimentContext: vi.fn(() => undefined),
 }));
 
 const compressionWorkerLifecycleMocks = vi.hoisted(() => ({
@@ -185,6 +202,48 @@ describe("NCD workbench", () => {
         expect(screen.getByText("Astronomy 1")).toBeInTheDocument();
         expect(screen.getByText("Astronomy 16")).toBeInTheDocument();
         expect(getAstronomyExampleItemsMock).toHaveBeenCalledOnce();
+    });
+
+    test("offers the P300 corpus as a dedicated source with explicit analysis modes", async () => {
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={vi.fn()}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(screen.getByRole("tab", {name: "P300 EEG"}));
+        expect(screen.getByRole("heading", {name: "EEG source"})).toBeInTheDocument();
+        expect(screen.getByRole("radio", {name: /Condition mode/u})).toBeChecked();
+        fireEvent.click(screen.getByRole("button", {name: "Load condition example"}));
+
+        expect(await screen.findByText("16 objects")).toBeInTheDocument();
+        expect(screen.getByText("Condition object 1")).toBeInTheDocument();
+        expect(getEegExampleItemsMock).toHaveBeenCalledWith("condition");
+    });
+
+    test("supports arrow-key navigation across source tabs", () => {
+        render(
+            <MemoryRouter>
+                <ListEditor
+                    onComputedNcdInput={vi.fn()}
+                    setIsLoading={vi.fn()}
+                    resetDisplay={vi.fn()}
+                    setOpenLogin={vi.fn()}
+                    authenticated={false}
+                />
+            </MemoryRouter>
+        );
+        const genbank = screen.getByRole("tab", {name: "GenBank sequences"});
+        genbank.focus();
+        fireEvent.keyDown(genbank, {key: "End"});
+        expect(screen.getByRole("tab", {name: "P300 EEG"})).toHaveAttribute("aria-selected", "true");
+        expect(screen.getByRole("tabpanel", {name: "P300 EEG"})).toBeInTheDocument();
     });
 
     test("does not prewarm an unused compression worker", () => {

@@ -1,6 +1,7 @@
 import type {GenBankSequenceProvenance} from "@/services/genbankSequencePipeline";
 import type {UdhrLanguageRecord} from "@/functions/udhr";
 import type {AstronomyExampleProvenance} from "@/services/astronomyExample";
+import type {EegObjectProvenance} from "@/types/eeg";
 import type {
   CompressionProvenance,
   PairCompressionRecord,
@@ -31,6 +32,10 @@ export type ExperimentObjectSource =
   | {
       readonly kind: "astronomy";
       readonly provenance: AstronomyExampleProvenance;
+    }
+  | {
+      readonly kind: "eeg";
+      readonly provenance: EegObjectProvenance;
     }
   | {
       readonly kind: "local-file";

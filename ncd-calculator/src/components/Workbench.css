@@ -1179,6 +1179,532 @@
     border: 1px solid #53635a;
 }
 
+.eeg-source {
+    overflow-y: auto;
+}
+
+.eeg-source__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    padding: 24px 26px 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.eeg-source__header svg {
+    flex: 0 0 auto;
+    color: var(--oxide);
+}
+
+.eeg-source__eyebrow,
+.eeg-context header span,
+.eeg-analysis header span {
+    color: var(--oxide);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.eeg-source__header h2 {
+    margin: 5px 0 6px;
+    font-family: var(--font-serif);
+    font-size: 1.55rem;
+    font-weight: 550;
+}
+
+.eeg-source__header p,
+.eeg-source__dataset p,
+.eeg-source__researcher p {
+    margin: 0;
+    color: var(--ink-muted);
+    font-size: 0.74rem;
+    line-height: 1.5;
+}
+
+.eeg-source__body {
+    display: grid;
+    gap: 16px;
+    padding: 18px 26px 24px;
+}
+
+.eeg-source__modes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.eeg-source__modes legend {
+    grid-column: 1 / -1;
+    margin-bottom: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.eeg-source__modes label {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 9px;
+    padding: 11px;
+    background: var(--white);
+    border: 1px solid var(--line-dark);
+    cursor: pointer;
+}
+
+.eeg-source__modes label:has(input:checked) {
+    background: var(--paper-deep);
+    border-color: var(--forest);
+    box-shadow: inset 3px 0 0 var(--forest);
+}
+
+.eeg-source__modes input {
+    margin-top: 3px;
+    accent-color: var(--forest-deep);
+}
+
+.eeg-source__modes span {
+    display: grid;
+    gap: 3px;
+}
+
+.eeg-source__modes strong {
+    font-size: 0.76rem;
+}
+
+.eeg-source__modes small {
+    color: var(--ink-muted);
+    font-size: 0.66rem;
+    line-height: 1.35;
+}
+
+.eeg-source__dataset {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    background: var(--paper-deep);
+    border: 1px solid var(--line-dark);
+}
+
+.eeg-source__dataset > div {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.eeg-source__dataset h3 {
+    margin: 0 0 4px;
+    font-size: 0.82rem;
+}
+
+.eeg-source__dataset .eeg-source__safety {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    color: var(--forest-deep);
+    font-size: 0.67rem;
+}
+
+.eeg-source__researcher {
+    border-top: 1px solid var(--line);
+}
+
+.eeg-source__researcher summary,
+.eeg-object-qc summary,
+.eeg-revealed-labels summary {
+    padding: 11px 0;
+    font-size: 0.73rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.eeg-source__researcher > div {
+    display: grid;
+    gap: 10px;
+    padding-bottom: 6px;
+}
+
+.eeg-source__researcher code {
+    display: block;
+    overflow-x: auto;
+    padding: 8px;
+    color: var(--forest-deep);
+    background: var(--white);
+    border: 1px solid var(--line);
+    font-size: 0.61rem;
+    white-space: nowrap;
+}
+
+.eeg-context,
+.eeg-analysis {
+    margin-top: 16px;
+    padding: clamp(18px, 3vw, 28px);
+    color: #17231d;
+    background: #f7f3e8;
+    border: 1px solid #53635a;
+}
+
+.eeg-context > header,
+.eeg-analysis > header {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: center;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #7e877f;
+}
+
+.eeg-context h3,
+.eeg-analysis h3 {
+    margin: 4px 0 0;
+    color: #173c2e;
+    font-family: var(--font-serif);
+    font-size: clamp(1.3rem, 2.5vw, 1.85rem);
+    font-weight: 550;
+}
+
+.eeg-context > header p {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 0;
+    color: #315b4b;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.eeg-context__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(220px, 0.7fr);
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.eeg-waveform-card,
+.eeg-qc-metrics,
+.eeg-provenance,
+.eeg-analysis__locked,
+.eeg-scalp-layout {
+    background: #fffdf7;
+    border: 1px solid #b5b9b2;
+}
+
+.eeg-waveform-card {
+    min-width: 0;
+    padding: 14px;
+}
+
+.eeg-waveform-card h4,
+.eeg-waveform-card p {
+    margin: 0;
+}
+
+.eeg-waveform-card h4 {
+    color: #173c2e;
+    font-size: 0.78rem;
+}
+
+.eeg-waveform-card svg {
+    width: 100%;
+    height: auto;
+    margin: 10px 0;
+    overflow: visible;
+}
+
+.eeg-waveform__axis {
+    stroke: #b5b9b2;
+    stroke-width: 1;
+}
+
+.eeg-waveform__range,
+.eeg-waveform__mean {
+    fill: none;
+    vector-effect: non-scaling-stroke;
+}
+
+.eeg-waveform__range {
+    stroke: #9b6334;
+    stroke-width: 1.2;
+    stroke-dasharray: 5 4;
+}
+
+.eeg-waveform__mean {
+    stroke: #173c2e;
+    stroke-width: 2;
+}
+
+.eeg-waveform-card p {
+    color: #5c675f;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+}
+
+.eeg-qc-metrics {
+    display: grid;
+    margin: 0;
+}
+
+.eeg-qc-metrics div {
+    padding: 12px;
+    border-bottom: 1px solid #d2d2ca;
+}
+
+.eeg-qc-metrics div:last-child {
+    border-bottom: 0;
+}
+
+.eeg-qc-metrics dt,
+.eeg-provenance dt {
+    color: #5c675f;
+    font-family: var(--font-mono);
+    font-size: 0.61rem;
+    text-transform: uppercase;
+}
+
+.eeg-qc-metrics dd,
+.eeg-provenance dd {
+    margin: 4px 0 0;
+    color: #173c2e;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.eeg-provenance {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.42fr);
+    gap: 20px;
+    margin-top: 14px;
+    padding: 14px;
+}
+
+.eeg-provenance dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 18px;
+    margin: 0;
+}
+
+.eeg-provenance a {
+    color: #173c2e;
+    text-underline-offset: 2px;
+}
+
+.eeg-provenance > p,
+.eeg-analysis__method {
+    margin: 0;
+    color: #5c675f;
+    font-size: 0.68rem;
+    line-height: 1.55;
+}
+
+.eeg-provenance > p {
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+    padding-left: 16px;
+    border-left: 2px solid #9b6334;
+}
+
+.eeg-object-qc {
+    margin-top: 10px;
+}
+
+.eeg-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.eeg-table-scroll table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #17231d;
+    background: #fffdf7;
+    font-size: 0.7rem;
+}
+
+.eeg-table-scroll caption {
+    padding: 9px 10px;
+    color: #173c2e;
+    font-weight: 750;
+    text-align: left;
+}
+
+.eeg-table-scroll th,
+.eeg-table-scroll td {
+    padding: 8px 10px;
+    border: 1px solid #b5b9b2;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.eeg-table-scroll thead th {
+    background: #eeeadd;
+}
+
+.eeg-analysis {
+    margin-top: 0;
+}
+
+.eeg-analysis > header button {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    color: #fffdf7;
+    background: #173c2e;
+    border: 1px solid #173c2e;
+    border-radius: 0;
+    font-size: 0.72rem;
+    font-weight: 750;
+}
+
+.eeg-analysis > header button:hover,
+.eeg-analysis > header button:focus-visible {
+    background: #315b4b;
+}
+
+.eeg-analysis__intro {
+    margin: 14px 0;
+    color: #3b463f;
+    font-size: 0.75rem;
+    line-height: 1.55;
+}
+
+.eeg-analysis__locked {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 18px;
+}
+
+.eeg-analysis__locked > svg {
+    flex: 0 0 auto;
+    color: #9b6334;
+}
+
+.eeg-analysis__locked strong,
+.eeg-analysis__locked p {
+    margin: 0;
+}
+
+.eeg-analysis__locked p {
+    margin-top: 4px;
+    color: #5c675f;
+    font-size: 0.72rem;
+}
+
+.eeg-analysis__revealed {
+    display: grid;
+    gap: 13px;
+}
+
+.eeg-scalp-layout {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.65fr) minmax(0, 1fr);
+    gap: 18px;
+    margin: 15px 0;
+    padding: 16px;
+}
+
+.eeg-scalp-map {
+    margin: 0;
+}
+
+.eeg-scalp-map svg {
+    width: min(100%, 330px);
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.eeg-scalp-map__head {
+    fill: #f7f3e8;
+    stroke: #53635a;
+    stroke-width: 2;
+}
+
+.eeg-scalp-map__outline {
+    fill: none;
+    stroke: #53635a;
+    stroke-width: 2;
+}
+
+.eeg-scalp-map__point {
+    stroke: #17231d;
+    stroke-width: 1.5;
+}
+
+.eeg-scalp-map__point--0 { fill: #e8ddc7; }
+.eeg-scalp-map__point--1 { fill: #d0b788; }
+.eeg-scalp-map__point--2 { fill: #b47b4e; }
+.eeg-scalp-map__point--3 { fill: #a6462b; }
+.eeg-scalp-map__point--4 { fill: #6e2514; }
+
+.eeg-scalp-map g text {
+    fill: #17231d;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 750;
+    pointer-events: none;
+}
+
+.eeg-scalp-map g:focus-visible circle {
+    stroke: #fffdf7;
+    stroke-width: 4;
+    outline: 3px solid #17231d;
+}
+
+.eeg-scalp-map figcaption {
+    color: #5c675f;
+    font-size: 0.66rem;
+    line-height: 1.45;
+    text-align: center;
+}
+
+.eeg-revealed-labels ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1px;
+    margin: 0;
+    padding: 1px;
+    background: #b5b9b2;
+    list-style: none;
+}
+
+.eeg-revealed-labels li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    background: #fffdf7;
+    font-size: 0.68rem;
+}
+
+.eeg-revealed-labels li span {
+    color: #5c675f;
+}
+
+@media (max-width: 900px) {
+    .eeg-context__grid,
+    .eeg-provenance,
+    .eeg-scalp-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .eeg-provenance > p {
+        padding: 12px 0 0;
+        border-top: 2px solid #9b6334;
+        border-left: 0;
+    }
+}
+
 .ncd-visualization__pending {
     display: grid;
     place-items: center;
@@ -1900,6 +2426,21 @@ button.genbank-suggestions__status:hover {
     .distance-matrix__legend {
         grid-template-columns: 1fr;
     }
+
+    .eeg-context > header,
+    .eeg-analysis > header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .eeg-analysis > header button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .eeg-provenance dl {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1942,6 +2483,16 @@ button.genbank-suggestions__status:hover {
 
     .workbench-button {
         width: 100%;
+    }
+
+    .eeg-source__header,
+    .eeg-source__body {
+        padding-right: 18px;
+        padding-left: 18px;
+    }
+
+    .eeg-source__modes {
+        grid-template-columns: 1fr;
     }
 }
 
